@@ -5,6 +5,7 @@ import { Bell, Home, TrendingUp, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HistoryDrawer } from "@/components/ui/history-drawer";
+import { APP_NAME } from "@/lib/config/app";
 
 export function MainShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,7 +20,7 @@ export function MainShell({ children }: { children: React.ReactNode }) {
             <Link href="/" className="flex items-center -ml-1 active:scale-95 transition-transform duration-150">
               <Image
                 src="/logo/brand_logo.png"
-                alt="VARO Logo"
+                alt={`${APP_NAME} logo`}
                 width={87}
                 height={32}
                 className="h-8 w-auto object-contain"

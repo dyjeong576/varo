@@ -1,12 +1,16 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { API_BASE_URL } from "@/lib/api/http";
 import { getServerSession } from "@/lib/auth/session";
+import { APP_NAME, APP_TAGLINE } from "@/lib/config/app";
+import { buildPageMetadata } from "@/lib/config/metadata";
 
-export const metadata = {
-  title: "로그인 - VARO",
-  description: "VARO에 로그인하여 근거 기반 검토를 시작하세요.",
-};
+export const metadata: Metadata = buildPageMetadata(
+  "로그인",
+  `${APP_NAME} ${APP_TAGLINE}. 수집된 출처를 바탕으로 근거 중심 검토를 시작하세요.`,
+);
 
 export default async function LoginPage() {
   const session = await getServerSession();
@@ -18,12 +22,20 @@ export default async function LoginPage() {
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-white px-6 py-8">
       <div className="flex w-full max-w-sm flex-col items-center justify-center flex-1">
-        <h1 className="mb-4 text-5xl font-bold tracking-tight text-blue-600">
-          VARO
-        </h1>
+        <p className="mb-3 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-600">
+          {APP_TAGLINE}
+        </p>
+        <Image
+          src="/logo/brand_logo.png"
+          alt={`${APP_NAME} logo`}
+          width={190}
+          height={70}
+          className="mb-4 h-20 w-auto object-contain"
+          priority
+        />
 
         <p className="mb-12 text-center text-lg text-gray-600 break-keep">
-          수집된 출처를 바탕으로 판단의 맥락을 정리합니다
+          수집된 출처를 바탕으로 판단의 맥락을 정리합니다.
         </p>
 
         <Link
@@ -60,10 +72,10 @@ export default async function LoginPage() {
 
       <div className="w-full max-w-sm shrink-0">
         <p className="mb-4 text-center text-xs leading-relaxed text-gray-500 break-keep">
-          로그인 시 VARO의 서비스 약관 및 개인정보 처리방침에 동의하게 됩니다.
+          로그인 시 {APP_NAME}의 서비스 약관 및 개인정보 처리방침에 동의하게 됩니다.
         </p>
         <p className="text-center text-xs text-gray-400">
-          &copy; 2024 VARO.
+          &copy; 2026 {APP_NAME}.
         </p>
       </div>
     </main>

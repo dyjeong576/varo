@@ -1,6 +1,12 @@
 export type AppEnv = "dev" | "prod";
+export type CanonicalHostStatus = "pending" | "live";
 
 export interface AppConfig {
+  appName: string;
+  appTagline: string;
+  appPublicUrl: string | null;
+  appIntendedProductionHost: string;
+  appCanonicalHostStatus: CanonicalHostStatus;
   port: number;
   nodeEnv: string;
   appEnv: AppEnv;
@@ -27,6 +33,12 @@ function getRequired(name: string): string {
   return value;
 }
 
+function getOptional(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+
+  return value ? value : undefined;
+}
+
 export function normalizeBaseUrl(name: string, value: string): string {
   let parsedUrl: URL;
 
@@ -41,6 +53,18 @@ export function normalizeBaseUrl(name: string, value: string): string {
   }
 
   return value.replace(/\/+$/, "");
+}
+
+function normalizeOptionalBaseUrl(name: string, value?: string): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return normalizeBaseUrl(name, value);
+}
+
+function readCanonicalHostStatus(value?: string): CanonicalHostStatus {
+  return value === "live" ? "live" : "pending";
 }
 
 export function buildGoogleCallbackUrl(apiBaseUrl: string): string {
@@ -72,10 +96,18 @@ export function getAppConfig(): AppConfig {
     throw new Error("SESSION_TTL_DAYS는 1 이상의 정수여야 합니다.");
   }
 
+  const appName = getOptional("APP_NAME") ?? "VARO";
+  const appTagline = getOptional("APP_TAGLINE") ?? "Verified Analysis, Reasoned Opinion";
+  const appPublicUrl = normalizeOptionalBaseUrl("APP_PUBLIC_URL", getOptional("APP_PUBLIC_URL"));
   const apiBaseUrl = normalizeBaseUrl("API_BASE_URL", getRequired("API_BASE_URL"));
   const frontendBaseUrl = normalizeBaseUrl("FRONTEND_BASE_URL", getRequired("FRONTEND_BASE_URL"));
 
   return {
+    appName,
+    appTagline,
+    appPublicUrl,
+    appIntendedProductionHost: getOptional("APP_INTENDED_PRODUCTION_HOST") ?? "www.varocheck.com",
+    appCanonicalHostStatus: readCanonicalHostStatus(getOptional("APP_CANONICAL_HOST_STATUS")),
     port: Number(process.env.PORT ?? 4000),
     nodeEnv: process.env.NODE_ENV ?? "development",
     appEnv,

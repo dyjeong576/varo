@@ -24,6 +24,13 @@
 
 ### 브랜드
 - 서비스 브랜드는 `VARO`를 사용한다.
+- 기본 브랜드 casing은 예외 없이 `VARO`로 고정한다.
 - 사용자 노출 표기는 `VARO`로 고정한다.
-- `Verified Analysis, Reasoned Opinion` 풀네임은 소개 문맥에서만 1회 사용한다.
+- `Verified Analysis, Reasoned Opinion`은 `VARO`의 기본 확장형 설명이자 사용자-facing 태그라인으로 사용한다.
 - 로고 이미지 파일 자체 교체는 후속 작업으로 남기고, 이번 단계에서는 텍스트와 설정값만 `VARO` 기준으로 반영한다.
+
+### 도메인 기준선
+- `www.varocheck.com`은 예정된 production host로 기록한다.
+- canonical host 상태는 도메인 연결 전까지 `pending`으로 유지한다.
+- 실제 배포 연결 전에는 canonical tag, live redirect, OAuth callback URL, sitemap host, CORS production origin을 `www.varocheck.com`으로 고정하지 않는다.
+- 위 항목은 모두 config를 통해 준비하고, 실제 도메인 연결 시점에만 활성화한다.

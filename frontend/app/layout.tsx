@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
+import { rootMetadata } from "@/lib/config/metadata";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "VARO",
-  description: "근거와 맥락을 먼저 보여주는 분석 서비스, VARO",
-};
+export const metadata: Metadata = rootMetadata;
 
 export default function RootLayout({
   children,

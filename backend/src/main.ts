@@ -10,6 +10,8 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const appName = configService.get<string>("appName", "VARO");
+  const appTagline = configService.get<string>("appTagline", "Verified Analysis, Reasoned Opinion");
 
   app.setGlobalPrefix("api/v1");
   app.use(cookieParser());
@@ -30,8 +32,10 @@ async function bootstrap(): Promise<void> {
     const document = SwaggerModule.createDocument(
       app,
       new DocumentBuilder()
-        .setTitle("VARO 백엔드 API 문서")
-        .setDescription("구글 로그인, 세션, 사용자 프로필 관련 API를 설명하는 개발용 문서입니다.")
+        .setTitle(`${appName} 백엔드 API 문서`)
+        .setDescription(
+          `${appName} (${appTagline})의 구글 로그인, 세션, 사용자 프로필 관련 API를 설명하는 개발용 문서입니다.`,
+        )
         .setVersion("1.0.0")
         .addCookieAuth("varo_session", {
           type: "apiKey",
@@ -46,7 +50,7 @@ async function bootstrap(): Promise<void> {
       swaggerOptions: {
         persistAuthorization: true,
       },
-      customSiteTitle: "VARO API 문서",
+      customSiteTitle: `${appName} API 문서`,
     });
   }
 

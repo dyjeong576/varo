@@ -146,6 +146,8 @@ VARO는 아래 도메인으로 구성한다.
 - API shape와 DB 스키마 구조는 환경 간 동일하게 유지한다.
 - `dev`는 mock 외부 연동을 기본 허용한다.
 - `prod`는 실제 provider만 허용한다.
+- 브랜드 표기는 `VARO`로 고정하고, `Verified Analysis, Reasoned Opinion`을 기본 포지셔닝 문구로 사용한다.
+- 예정 production host `www.varocheck.com`은 config로만 관리하며, canonical host 상태가 `pending`인 동안은 URL 정책을 확정하지 않는다.
 
 환경 타입:
 

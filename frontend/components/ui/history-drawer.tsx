@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Menu, X, Settings, Loader2 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { Review } from "@/lib/api/types";
+import { APP_NAME, APP_TAGLINE } from "@/lib/config/app";
 
 export function HistoryDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,7 +54,12 @@ export function HistoryDrawer() {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-          <h2 className="text-xl font-black tracking-tight text-primary">VARO</h2>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-primary">{APP_NAME}</h2>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+              {APP_TAGLINE}
+            </p>
+          </div>
           <button 
             onClick={() => setIsOpen(false)}
             className="p-2 -mr-2 text-gray-400 hover:text-gray-700 rounded-full transition-colors"
@@ -77,7 +83,7 @@ export function HistoryDrawer() {
         <div className="flex-1 overflow-y-auto p-6">
           <h3 className="text-[14px] font-bold text-gray-900 mb-2">최근 검증 리포트</h3>
           <p className="text-[12px] text-gray-500 mb-5 break-keep leading-relaxed">
-            VARO가 최근 검토한 이슈들의 리포트입니다. 각 항목을 열어 출처와 판단 맥락을 확인하세요.
+            {APP_NAME}가 최근 검토한 이슈들의 리포트입니다. 각 항목을 열어 출처와 판단 맥락을 확인하세요.
           </p>
 
           <div className="space-y-4">
@@ -118,9 +124,9 @@ export function HistoryDrawer() {
 
         {/* Footer Callout */}
         <div className="p-6 bg-[#F8FAFC] mt-auto border-t border-gray-100 shrink-0">
-          <h4 className="text-[12px] font-extrabold text-gray-800 mb-1.5 tracking-tight">데이터로 증명하는 진실</h4>
+          <h4 className="text-[12px] font-extrabold text-gray-800 mb-1.5 tracking-tight">{APP_TAGLINE}</h4>
           <p className="text-[11px] text-gray-500 break-keep leading-relaxed">
-            VARO는 단정적인 결론보다, 출처와 근거를 먼저 비교할 수 있는 경험을 지향합니다.
+            {APP_NAME}는 단정적인 결론보다 출처와 근거를 먼저 비교할 수 있는 경험을 지향합니다.
           </p>
         </div>
       </div>

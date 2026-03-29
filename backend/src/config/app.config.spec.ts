@@ -49,6 +49,11 @@ describe("app.config", () => {
 
     const config = getAppConfig();
 
+    expect(config.appName).toBe("VARO");
+    expect(config.appTagline).toBe("Verified Analysis, Reasoned Opinion");
+    expect(config.appPublicUrl).toBeNull();
+    expect(config.appIntendedProductionHost).toBe("www.varocheck.com");
+    expect(config.appCanonicalHostStatus).toBe("pending");
     expect(config.googleCallbackUrl).toBe("http://localhost:4000/api/v1/auth/google/callback");
     expect(config.frontendBaseUrl).toBe("http://localhost:3000");
   });
