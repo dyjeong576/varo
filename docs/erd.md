@@ -1,7 +1,7 @@
-# Verifi ERD
+# VARO ERD
 
 ## 1. 문서 목적
-이 문서는 Verifi 서비스 전체의 핵심 엔티티 관계와 데이터 흐름을 설명한다.  
+이 문서는 VARO 서비스 전체의 핵심 엔티티 관계와 데이터 흐름을 설명한다.  
 컬럼 상세 정의는 [Data Model](./data-model.md)을 기준으로 본다.
 
 ## 2. 서비스 전체 ERD
@@ -219,6 +219,6 @@ erDiagram
 
 ## 5. 설계 포인트
 - `users`를 중심으로 review, history, notifications, community가 연결된다.
-- review 도메인은 여전히 Verifi의 핵심 차별화 축이며, source와 evidence를 별도 엔티티로 유지한다.
+- review 도메인은 여전히 VARO의 핵심 차별화 축이며, source와 evidence를 별도 엔티티로 유지한다.
 - `notifications`, `popular_topics`, `user_history`는 서비스 경험을 연결하는 보조 도메인이다.
 - community는 별도 도메인이지만 실명 기반 사용자 모델과 연결된다.

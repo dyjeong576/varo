@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, MessageSquare, ThumbsUp, Send } from "lucide-react";
-import { CommunityPost, Comment } from "@/lib/api/types";
+import { CommunityComment, CommunityPost } from "@/lib/types/community";
 import { mockCommunityPosts, mockCommunityComments } from "@/lib/mock-data";
 
 interface PostDetailPageProps {
@@ -14,7 +14,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   const { postId } = use(params);
   const router = useRouter();
   const [post, setPost] = useState<CommunityPost | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<CommunityComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -23,9 +23,9 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
         await new Promise(resolve => setTimeout(resolve, 600));
         const foundPost = mockCommunityPosts.find(p => p.id === postId);
         if (foundPost) {
-          setPost(foundPost as any);
+          setPost(foundPost);
           const postComments = mockCommunityComments.filter(c => c.postId === postId);
-          setComments(postComments as any);
+          setComments(postComments);
         }
       } catch (error) {
         console.error("Failed to load post:", error);

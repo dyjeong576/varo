@@ -1,31 +1,35 @@
-import Image from "next/image";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { API_BASE_URL } from "@/lib/api/http";
+import { getServerSession } from "@/lib/auth/session";
 
 export const metadata = {
-  title: "로그인 - Verifi",
-  description: "Verifi에 로그인하여 진실을 검토해보세요.",
+  title: "로그인 - VARO",
+  description: "VARO에 로그인하여 근거 기반 검토를 시작하세요.",
 };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const session = await getServerSession();
+
+  if (session.isAuthenticated) {
+    redirect(session.profileComplete ? "/" : "/onboarding/profile");
+  }
+
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-white px-6 py-8">
-      {/* 화면 중앙 메인 영역 (flex-1은 아니고 전체 중앙 정렬) */}
       <div className="flex w-full max-w-sm flex-col items-center justify-center flex-1">
-        {/* 서비스 타이틀 */}
         <h1 className="mb-4 text-5xl font-bold tracking-tight text-blue-600">
-          Verifi
+          VARO
         </h1>
 
-        {/* 서비스 카피 */}
         <p className="mb-12 text-center text-lg text-gray-600 break-keep">
-          진실을 향한 가장 빠른 발걸음, 베리파이
+          수집된 출처를 바탕으로 판단의 맥락을 정리합니다
         </p>
 
-        {/* 단일 구글 로그인 CTA */}
-        <button
-          type="button"
+        <Link
+          href={`${API_BASE_URL}/api/v1/auth/google`}
           className="flex w-full items-center justify-center gap-3 rounded-full border border-gray-300 bg-white px-6 py-3.5 text-base font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
-          {/* 구글 아이콘 (인라인 SVG) */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -51,16 +55,15 @@ export default function LoginPage() {
             />
           </svg>
           Google 계정으로 시작하기
-        </button>
+        </Link>
       </div>
 
-      {/* 하단 약관 및 카피라이트 */}
       <div className="w-full max-w-sm shrink-0">
         <p className="mb-4 text-center text-xs leading-relaxed text-gray-500 break-keep">
-          로그인 시 Verifi의 서비스 약관 및 개인정보 처리방침에 동의하게 됩니다.
+          로그인 시 VARO의 서비스 약관 및 개인정보 처리방침에 동의하게 됩니다.
         </p>
         <p className="text-center text-xs text-gray-400">
-          &copy; 2024 Verifi. The Digital Curator.
+          &copy; 2024 VARO.
         </p>
       </div>
     </main>

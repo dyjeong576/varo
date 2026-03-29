@@ -34,11 +34,11 @@ export default function HomePage() {
         <h1 className="text-[26px] font-bold text-gray-900 mb-3 tracking-tight break-keep leading-tight">
           진실을 여는 가장 명확한 방법
         </h1>
-        <p className="text-[15px] font-semibold text-verifi-blue mb-4 break-keep">
+        <p className="mb-4 text-[15px] font-semibold text-primary break-keep">
           검증된 데이터를 통해 세상의 궁금증을 해결합니다
         </p>
         <p className="text-[13px] text-gray-500 break-keep leading-relaxed max-w-[90%]">
-          베리파이는 수집된 출처와 AI 기반 요약을 통해 정확하고 신뢰할 수 있는 정보를 정리합니다.
+          VARO는 수집된 출처와 구조화된 요약을 바탕으로 판단에 필요한 맥락을 정리합니다.
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export default function HomePage() {
             <button
               type="submit"
               disabled={!claim.trim() || isSubmitting}
-              className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-full bg-verifi-blue text-white shadow-md disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none transition-colors active:bg-blue-700"
+              className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-md disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none transition-colors active:bg-blue-700"
               aria-label="분석 시작"
             >
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}

@@ -2,72 +2,107 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { UserProfile, mockUserProfile } from "@/lib/mock-data";
 import { Loader2, Camera, ShieldAlert } from "lucide-react";
+import { api } from "@/lib/api/client";
+import type { UserMeResponse } from "@/lib/api/types";
 
 export function ProfileForm() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserMeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState({ country: '', city: '' });
+  const [formData, setFormData] = useState({ country: "", city: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // API mock load
-    const timer = setTimeout(() => {
-      setProfile(mockUserProfile);
-      setFormData({
-        country: mockUserProfile.country,
-        city: mockUserProfile.city,
-      });
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      try {
+        const response = await api.users.getMe();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setProfile(response);
+        setFormData({
+          country: response.profile.country ?? "",
+          city: response.profile.city ?? "",
+        });
+      } catch (loadError) {
+        if (isMounted) {
+          setError(loadError instanceof Error ? loadError.message : "프로필을 불러오지 못했습니다.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
     setIsSaving(true);
-    // Submit mock
-    setTimeout(() => {
+
+    try {
+      const response = await api.users.updateMyProfile({
+        country: formData.country,
+        city: formData.city,
+      });
+      setProfile(response);
+      setSuccessMessage("성공적으로 저장되었습니다.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "프로필 저장에 실패했습니다.");
+    } finally {
       setIsSaving(false);
-      // Optional: show a toast or notification success message
-      alert('성공적으로 저장되었습니다.');
-    }, 800);
+    }
   };
 
   if (isLoading || !profile) {
     return (
       <div className="flex justify-center items-center py-20">
-        <Loader2 className="w-8 h-8 text-verifi-blue animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
+  const displayName = profile.profile.realName ?? profile.user.displayName ?? "이름 미설정";
+  const email = profile.user.email;
+
   return (
     <form onSubmit={handleSave} className="flex flex-col">
-      {/* Avatar Section */}
       <div className="flex flex-col items-center mb-10">
         <div className="relative mb-4 group cursor-pointer">
           <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-50 shadow-sm">
-            <Image 
-              src={profile.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.name}`} 
-              alt="프로필 이미지" 
-              width={96} 
-              height={96} 
+            <Image
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`}
+              alt="프로필 이미지"
+              width={96}
+              height={96}
               unoptimized
               className="object-cover bg-blue-50"
             />
           </div>
-          <div className="absolute right-0 bottom-0 bg-white p-2 border border-gray-100 rounded-full shadow-md text-gray-500 group-hover:text-verifi-blue transition-colors">
+          <div className="absolute right-0 bottom-0 rounded-full border border-gray-100 bg-white p-2 text-gray-500 shadow-md transition-colors group-hover:text-primary">
             <Camera className="w-4 h-4" />
           </div>
         </div>
-        <h2 className="text-lg font-bold text-gray-900">{profile.name}</h2>
-        <p className="text-sm font-medium text-gray-500">{profile.email}</p>
+        <h2 className="text-lg font-bold text-gray-900">{displayName}</h2>
+        <p className="text-sm font-medium text-gray-500">{email}</p>
       </div>
 
       <div className="p-4 mb-6 bg-[#f8fbff] rounded-2xl border border-blue-100 flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-verifi-blue shrink-0 mt-0.5" />
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-[13px] text-blue-900/80 break-keep leading-relaxed font-medium">
           신뢰성 있는 커뮤니티 환경을 위해 이름, 성별, 연령대 등 본인인증을 통해 수집된 정보는 프로필에서 임의로 수정할 수 없습니다.
         </p>
@@ -80,20 +115,20 @@ export function ProfileForm() {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[12px] font-semibold text-gray-500">이름</label>
-              <input 
-                type="text" 
-                value={profile.name} 
-                disabled 
+              <input
+                type="text"
+                value={displayName}
+                disabled
                 className="w-full h-12 px-4 rounded-xl bg-gray-50 border-transparent text-gray-500 text-[14px] font-medium"
               />
             </div>
             
             <div className="flex flex-col gap-1.5">
               <label className="text-[12px] font-semibold text-gray-500">성별 · 연령대</label>
-              <input 
-                type="text" 
-                value={`${profile.gender} · ${profile.ageGroup}`} 
-                disabled 
+              <input
+                type="text"
+                value={`${profile.profile.gender ?? "-"} · ${profile.profile.ageRange ?? "-"}`}
+                disabled
                 className="w-full h-12 px-4 rounded-xl bg-gray-50 border-transparent text-gray-500 text-[14px] font-medium"
               />
             </div>
@@ -105,10 +140,10 @@ export function ProfileForm() {
           
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-gray-500">국가</label>
-            <select 
+            <select
               value={formData.country}
-              onChange={(e) => setFormData({...formData, country: e.target.value})}
-              className="w-full h-12 px-4 rounded-xl bg-white border border-gray-200 text-gray-900 text-[14px] font-medium focus:ring-2 focus:ring-verifi-blue/20 focus:border-verifi-blue outline-none transition-all appearance-none"
+              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+              className="h-12 w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 text-[14px] font-medium text-gray-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
               <option value="대한민국">대한민국</option>
               <option value="일본">일본</option>
@@ -118,22 +153,38 @@ export function ProfileForm() {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-gray-500">도시</label>
-            <input 
-              type="text" 
-              value={formData.city} 
-              onChange={(e) => setFormData({...formData, city: e.target.value})}
-              className="w-full h-12 px-4 rounded-xl bg-white border border-gray-200 text-gray-900 text-[14px] font-medium focus:ring-2 focus:ring-verifi-blue/20 focus:border-verifi-blue outline-none transition-all"
+            <input
+              type="text"
+              value={formData.city}
+              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              className="h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-[14px] font-medium text-gray-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>
       </div>
 
-      <button 
-        type="submit" 
-        disabled={isSaving || (formData.country === profile.country && formData.city === profile.city)}
+      {error ? (
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </p>
+      ) : null}
+
+      {successMessage ? (
+        <p className="mb-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          {successMessage}
+        </p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={
+          isSaving ||
+          (formData.country === (profile.profile.country ?? "") &&
+            formData.city === (profile.profile.city ?? ""))
+        }
         className="w-full mt-auto mb-4 h-14 rounded-2xl bg-gray-900 text-white font-bold text-[15px] flex items-center justify-center disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
       >
-        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : '저장하기'}
+        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : "저장하기"}
       </button>
     </form>
   );

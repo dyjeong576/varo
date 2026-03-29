@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CommunityPost } from "@/lib/api/types";
 import { mockCommunityPosts } from "@/lib/mock-data";
+import type { CommunityPost } from "@/lib/types/community";
 import { PostCard } from "./post-card";
 
 export function PostList() {
@@ -14,7 +14,7 @@ export function PostList() {
       try {
         // 실제 API 대신 Mock 데이터 시뮬레이션
         await new Promise(resolve => setTimeout(resolve, 800));
-        setPosts(mockCommunityPosts as any);
+        setPosts(mockCommunityPosts);
       } catch (error) {
         console.error("Failed to load posts:", error);
       } finally {

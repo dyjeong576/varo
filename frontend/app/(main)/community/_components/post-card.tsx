@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { MessageSquare, ThumbsUp } from "lucide-react";
-import { CommunityPost } from "@/lib/api/types";
+import type { CommunityPost } from "@/lib/types/community";
 
 interface PostCardProps {
   post: CommunityPost;

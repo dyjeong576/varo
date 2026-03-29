@@ -4,7 +4,7 @@ import { PopularTopicList } from '@/components/popular/PopularTopicList';
 import { mockPopularTopics } from '@/lib/mock-data';
 
 export const metadata = {
-  title: '인기 주제 | Verifi',
+  title: '인기 주제 | VARO',
   description: '지금 대한민국에서 가장 궁금해하는 팩트를 확인하세요.',
 };
 

@@ -1,7 +1,7 @@
-# Verifi Architecture Overview
+# VARO Architecture Overview
 
 ## 1. 문서 목적
-이 문서는 Verifi 서비스 전체의 핵심 기술 구조를 설명하는 루트 문서다.  
+이 문서는 VARO 서비스 전체의 핵심 기술 구조를 설명하는 루트 문서다.  
 기준 문서는 아래 3개다.
 
 - [AGENTS.md](../AGENTS.md)
@@ -13,7 +13,7 @@
 ## 2. 서비스 기술 원칙
 
 ### 2.1 근거 중심 원칙
-- Verifi는 절대적 진실 판정기가 아니다.
+- VARO는 절대적 진실 판정기가 아니다.
 - review 도메인의 결과는 항상 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - 기사 수만으로 결론을 내리지 않고, 출처 추적 가능성을 유지한다.
 - 사용자가 근거를 직접 열람할 수 있어야 한다.
@@ -35,7 +35,7 @@
   - OpenAI Responses API Structured Outputs
 
 ## 4. 서비스 도메인 구조
-Verifi는 아래 도메인으로 구성한다.
+VARO는 아래 도메인으로 구성한다.
 
 ### 4.1 Identity & Access
 - Google 로그인

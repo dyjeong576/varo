@@ -11,10 +11,13 @@ export function HistoryDrawer() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const openDrawer = () => {
+    setIsLoading(true);
+    setIsOpen(true);
+  };
+
   useEffect(() => {
-    // 서랍이 열릴 때마다 실시간으로 데이터를 가져오는 모의 통신
     if (isOpen) {
-      setIsLoading(true);
       api.reviews.getRecent().then((res) => {
         setReviews(res.data);
       }).finally(() => {
@@ -25,8 +28,8 @@ export function HistoryDrawer() {
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)}
+      <button
+        onClick={openDrawer}
         className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors" 
         aria-label="메뉴 열기"
       >
@@ -50,7 +53,7 @@ export function HistoryDrawer() {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-          <h2 className="text-xl font-black tracking-tight text-verifi-blue">Verifi</h2>
+          <h2 className="text-xl font-black tracking-tight text-primary">VARO</h2>
           <button 
             onClick={() => setIsOpen(false)}
             className="p-2 -mr-2 text-gray-400 hover:text-gray-700 rounded-full transition-colors"
@@ -74,13 +77,13 @@ export function HistoryDrawer() {
         <div className="flex-1 overflow-y-auto p-6">
           <h3 className="text-[14px] font-bold text-gray-900 mb-2">최근 검증 리포트</h3>
           <p className="text-[12px] text-gray-500 mb-5 break-keep leading-relaxed">
-            Verifi AI가 최근 분석한 이슈들의 실시간 팩트체크 현황입니다. 각 항목을 클릭하여 상세 근거를 확인하세요.
+            VARO가 최근 검토한 이슈들의 리포트입니다. 각 항목을 열어 출처와 판단 맥락을 확인하세요.
           </p>
 
           <div className="space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center p-8">
-                <Loader2 className="w-6 h-6 text-verifi-blue animate-spin" />
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : reviews.length === 0 ? (
               <div className="text-center p-4 text-sm text-gray-400 font-medium">데이터가 없습니다.</div>
@@ -101,7 +104,7 @@ export function HistoryDrawer() {
                 };
 
                 return (
-                  <Link key={review.id} href={`/reviews/${review.id}`} className="block p-4 rounded-2xl border border-gray-200 hover:border-verifi-blue/50 hover:bg-blue-50/30 transition-colors bg-white shadow-sm" onClick={() => setIsOpen(false)}>
+                  <Link key={review.id} href={`/reviews/${review.id}`} className="block rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/50 hover:bg-blue-50/30" onClick={() => setIsOpen(false)}>
                     <h4 className="text-[14px] font-bold text-gray-800 break-keep leading-[1.4]">
                       {review.claim}
                     </h4>
@@ -117,7 +120,7 @@ export function HistoryDrawer() {
         <div className="p-6 bg-[#F8FAFC] mt-auto border-t border-gray-100 shrink-0">
           <h4 className="text-[12px] font-extrabold text-gray-800 mb-1.5 tracking-tight">데이터로 증명하는 진실</h4>
           <p className="text-[11px] text-gray-500 break-keep leading-relaxed">
-            Verifi는 단순한 뉴스 분석을 넘어 공공 데이터와의 교차 검증을 통해 가장 정확한 정보를 큐레이션합니다.
+            VARO는 단정적인 결론보다, 출처와 근거를 먼저 비교할 수 있는 경험을 지향합니다.
           </p>
         </div>
       </div>

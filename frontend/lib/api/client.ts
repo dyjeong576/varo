@@ -1,4 +1,12 @@
-import { Review, MockApiResponse, CommunityPost } from "./types";
+import {
+  Review,
+  MockApiResponse,
+  CommunityPost,
+  SessionResponse,
+  UpdateProfilePayload,
+  UserMeResponse,
+} from "./types";
+import { apiRequest } from "./http";
 
 let MOCK_REVIEWS: Review[] = [
   {
@@ -25,6 +33,7 @@ const MOCK_POSTS: CommunityPost[] = [
   {
     id: "p-1",
     title: "최근 발표된 주택 정책에 대해 어떻게 생각하시나요?",
+    category: "Policy",
     content: "정부에서 발표한 이번 주택 공급 대책이 실제로 실효성이 있을지 의문입니다. 특히 30대 무주택자들에게 얼마나 혜택이 돌아갈지가 핵심인 것 같아요. 여러분의 의견이 궁금합니다.",
     author: { name: "김철수", gender: "Male", ageGroup: "30s" },
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
@@ -47,8 +56,9 @@ const MOCK_POSTS: CommunityPost[] = [
   },
   {
     id: "p-2",
-    title: "가짜 뉴스 판별을 위한 Verifi 서비스 활용 팁",
-    content: "요즘 자극적인 헤드라인이 너무 많은데, Verifi에서 근거 스니펫을 먼저 확인하는 습관을 들이니 판단하기가 훨씬 수월해졌습니다. 다들 어떻게 활용하고 계신가요?",
+    title: "가짜 뉴스 판별을 위한 VARO 활용 팁",
+    category: "FactCheck",
+    content: "요즘 자극적인 헤드라인이 너무 많은데, VARO에서 근거 스니펫을 먼저 확인하는 습관을 들이니 판단하기가 훨씬 수월해졌습니다. 다들 어떻게 활용하고 계신가요?",
     author: { name: "최민수", gender: "Male", ageGroup: "40s" },
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
     likeCount: 25,
@@ -87,5 +97,20 @@ export const api = {
       const post = MOCK_POSTS.find((p) => p.id === postId);
       return { data: post || null, status: post ? 200 : 404 };
     },
+  },
+  auth: {
+    getSession: async (): Promise<SessionResponse> =>
+      apiRequest<SessionResponse>("/api/v1/auth/session"),
+    logout: async (): Promise<void> =>
+      apiRequest<void>("/api/v1/auth/logout", { method: "POST", skipJson: true }),
+  },
+  users: {
+    getMe: async (): Promise<UserMeResponse> =>
+      apiRequest<UserMeResponse>("/api/v1/users/me"),
+    updateMyProfile: async (payload: UpdateProfilePayload): Promise<UserMeResponse> =>
+      apiRequest<UserMeResponse>("/api/v1/users/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
   },
 };

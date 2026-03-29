@@ -47,7 +47,7 @@ function LoadingContent() {
         <h1 className="text-[22px] font-extrabold text-gray-900 mb-2">
           팩트체크 분석 중
         </h1>
-        <h2 className="text-[15px] font-bold text-verifi-blue break-keep">
+        <h2 className="text-[15px] font-bold text-primary break-keep">
           {claimQuery}
         </h2>
         <p className="mt-4 text-[13px] text-gray-500">
@@ -67,14 +67,14 @@ function LoadingContent() {
                 {isCompleted ? (
                   <CheckCircle2 className="w-[18px] h-[18px] text-green-500 shrink-0" />
                 ) : isCurrent ? (
-                  <Loader2 className="w-[18px] h-[18px] text-verifi-blue animate-spin shrink-0" />
+                  <Loader2 className="h-[18px] w-[18px] shrink-0 animate-spin text-primary" />
                 ) : (
                   <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-200 shrink-0" />
                 )}
                 
                 <span className={`ml-4 text-[14px] font-semibold tracking-tight ${
                   isCompleted ? "text-gray-900" :
-                  isCurrent ? "text-verifi-blue" :
+                  isCurrent ? "text-primary" :
                   "text-gray-300"
                 }`}>
                   {stage}
@@ -129,7 +129,7 @@ export default function LoadingPage() {
   return (
     <Suspense fallback={
       <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFC]">
-        <Loader2 className="w-8 h-8 animate-spin text-verifi-blue" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     }>
       <LoadingContent />

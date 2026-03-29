@@ -1,5 +1,42 @@
 export type VerdictState = "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False";
 
+export interface SessionUser {
+  id: string;
+  email: string;
+  displayName: string | null;
+  authProvider: string;
+}
+
+export interface SessionProfile {
+  realName: string | null;
+  gender: string | null;
+  ageRange: string | null;
+  country: string | null;
+  city: string | null;
+}
+
+export interface SessionResponse {
+  isAuthenticated: boolean;
+  expiresAt: string | null;
+  profileComplete: boolean;
+  user: SessionUser | null;
+  profile: SessionProfile | null;
+}
+
+export interface UserMeResponse {
+  user: SessionUser;
+  profile: SessionProfile;
+  profileComplete: boolean;
+}
+
+export interface UpdateProfilePayload {
+  realName?: string;
+  gender?: string;
+  ageRange?: string;
+  country?: string;
+  city?: string;
+}
+
 export interface Review {
   id: string;
   claim: string;

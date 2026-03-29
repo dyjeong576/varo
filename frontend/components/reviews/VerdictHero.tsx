@@ -42,7 +42,7 @@ export default function VerdictHero({ claim, verdict, confidence }: VerdictHeroP
           </div>
           <div>
             <p className="text-[#0050cb] font-bold text-xl leading-none mb-1">{verdictLabels[verdict]}</p>
-            <p className="text-[#424656] text-sm">Verifi AI 분석 신뢰도 {confidence}%</p>
+            <p className="text-[#424656] text-sm">VARO 분석 신뢰도 {confidence}%</p>
           </div>
         </div>
       </div>

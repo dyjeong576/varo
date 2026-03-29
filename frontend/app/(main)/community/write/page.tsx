@@ -51,7 +51,7 @@ export default function WritePostPage() {
           
           <div className="min-h-[300px]">
             <textarea
-              placeholder="베리파이 커뮤니티는 객관적인 근거를 기반으로 한 토론을 환영합니다. 주장을 뒷받침할 링크나 데이터를 함께 공유해주시면 더욱 좋습니다."
+              placeholder="VARO 커뮤니티는 객관적인 근거를 기반으로 한 토론을 환영합니다. 주장을 뒷받침할 링크나 데이터를 함께 공유해주시면 더욱 좋습니다."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="w-full h-full min-h-[300px] text-[16px] text-[#191b24] placeholder:text-[#ced2e0] outline-none border-none bg-transparent resize-none leading-relaxed"

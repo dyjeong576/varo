@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.APP_ERROR_CODES = void 0;
+exports.APP_ERROR_CODES = {
+    AUTH_REQUIRED: "AUTH_REQUIRED",
+    FORBIDDEN: "FORBIDDEN",
+    INTERNAL_ERROR: "INTERNAL_ERROR",
+    INPUT_VALIDATION_ERROR: "INPUT_VALIDATION_ERROR",
+    CONFIG_VALIDATION_ERROR: "CONFIG_VALIDATION_ERROR",
+};

@@ -1,0 +1,55 @@
+import { buildFrontendRedirectUrl, buildGoogleCallbackUrl, getAppConfig } from "./app.config";
+
+describe("app.config", () => {
+  const originalEnv = process.env;
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("API_BASE_URL로 구글 콜백 URL을 계산한다", () => {
+    expect(buildGoogleCallbackUrl("http://localhost:4000")).toBe(
+      "http://localhost:4000/api/v1/auth/google/callback",
+    );
+  });
+
+  it("API_BASE_URL 끝의 slash를 정규화한다", () => {
+    expect(buildGoogleCallbackUrl("http://localhost:4000/")).toBe(
+      "http://localhost:4000/api/v1/auth/google/callback",
+    );
+  });
+
+  it("FRONTEND_BASE_URL로 프론트 절대 리다이렉트 URL을 계산한다", () => {
+    expect(buildFrontendRedirectUrl("http://localhost:3000", "/onboarding/profile")).toBe(
+      "http://localhost:3000/onboarding/profile",
+    );
+  });
+
+  it("FRONTEND_BASE_URL 끝의 slash를 정규화한다", () => {
+    expect(buildFrontendRedirectUrl("http://localhost:3000/", "/reviews/123?tab=evidence")).toBe(
+      "http://localhost:3000/reviews/123?tab=evidence",
+    );
+  });
+
+  it("getAppConfig가 정규화된 URL 설정을 노출한다", () => {
+    process.env = {
+      ...originalEnv,
+      PORT: "4000",
+      NODE_ENV: "development",
+      APP_ENV: "dev",
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/varo",
+      API_BASE_URL: "http://localhost:4000/",
+      FRONTEND_BASE_URL: "http://localhost:3000",
+      GOOGLE_CLIENT_ID: "google-client-id",
+      GOOGLE_CLIENT_SECRET: "google-client-secret",
+      SESSION_SECRET: "session-secret",
+      SESSION_COOKIE_NAME: "varo_session",
+      SESSION_TTL_DAYS: "30",
+    };
+
+    const config = getAppConfig();
+
+    expect(config.googleCallbackUrl).toBe("http://localhost:4000/api/v1/auth/google/callback");
+    expect(config.frontendBaseUrl).toBe("http://localhost:3000");
+  });
+});

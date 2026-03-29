@@ -1,13 +1,14 @@
-# Verifi Backend Spec
+# VARO Backend Spec
 
 ## 1. 문서 목적
-이 문서는 Verifi 서비스 전체의 백엔드 구조를 정의한다.  
+이 문서는 VARO 서비스 전체의 백엔드 구조를 정의한다.  
 대상은 NestJS 기반 API, 비동기 worker, 외부 연동, 공통 에러 처리, env 정책, 서비스 도메인별 서버 책임이다.
 
 ## 2. 백엔드 기술 스택
 - Framework: NestJS
 - Language: TypeScript
 - API style: REST
+- API 문서: Swagger / OpenAPI
 - Primary DB: PostgreSQL
 - Queue / Cache: Redis
 - External Auth: Google login
@@ -74,6 +75,9 @@
 
 ### 5.2 세션 처리
 - 로그인 성공 시 서버 세션 또는 동등한 secure session model 생성
+- 세션은 `HttpOnly`, `SameSite=Lax` 쿠키로 유지
+- `prod`에서만 `Secure=true` 적용
+- 세션 TTL은 기본 30일 고정
 - 보호 API는 세션 검증 이후에만 접근 허용
 - 세션 만료 시 재인증 필요
 
@@ -81,6 +85,12 @@
 - review 생성, history, community 작성, notifications 조회는 인증 사용자 기준
 - 커뮤니티는 익명 허용 없음
 - 사용자 정보 수정은 허용된 필드만 가능
+
+### 5.4 첫 로그인 프로필 보완
+- Google 로그인 성공 직후 필수 프로필이 비어 있으면 프로필 보완 화면으로 이동
+- 첫 로그인에서는 `real_name`, `gender`, `age_range`, `country`, `city`를 모두 입력해야 함
+- `real_name`, `gender`, `age_range`는 최초 1회만 설정 가능
+- 이후 수정 가능 필드는 `country`, `city`만 허용
 
 ## 6. review & evidence 파이프라인
 
@@ -158,6 +168,13 @@
 - 사용자 정보 조회
 - 프로필 수정
 
+### 8.3 API 문서화 원칙
+- Swagger 경로는 `/api/docs`
+- Swagger UI는 `APP_ENV=dev`에서만 노출
+- 제목, 설명, DTO 필드 설명, 응답 예시는 모두 한국어로 작성
+- 보호 API는 cookie session 인증 필요 여부를 명시
+- 에러 응답 예시에는 도메인 에러 코드와 한국어 설명을 포함
+
 #### Reviews
 - review 생성
 - review 상태 / 결과 조회
@@ -221,6 +238,10 @@
 ### 10.1 Google 로그인
 - 인증 provider
 - 세션 발급의 시작점
+- Google Cloud Console의 Authorized redirect URI는 `API_BASE_URL + /api/v1/auth/google/callback` 규칙으로 등록한다.
+- 로컬 예시는 `API_BASE_URL=http://localhost:4000` 이고 redirect URI는 `http://localhost:4000/api/v1/auth/google/callback` 이다.
+- Authorized JavaScript origins와 Authorized redirect URIs는 별개다. origin만 등록하고 redirect URI를 누락하면 `redirect_uri_mismatch`가 발생한다.
+- OAuth 콜백은 백엔드가 처리하지만, 콜백 완료 후 최종 화면 이동은 `FRONTEND_BASE_URL` 기준 절대 URL로 리다이렉트한다.
 
 ### 10.2 NAVER Search API
 - review 도메인의 source 후보 수집
@@ -272,10 +293,16 @@
 ### 12.2 필수 env 축
 - `NODE_ENV`
 - `APP_ENV`
+- `PORT`
 - `DATABASE_URL`
 - `REDIS_URL`
 - `API_BASE_URL`
 - `FRONTEND_BASE_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `SESSION_SECRET`
+- `SESSION_COOKIE_NAME`
+- `SESSION_TTL_DAYS`
 - `OPENAI_API_KEY`
 - `NAVER_SEARCH_CLIENT_ID`
 - `NAVER_SEARCH_CLIENT_SECRET`
