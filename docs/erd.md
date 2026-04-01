@@ -65,7 +65,6 @@ erDiagram
         string id
         text raw_text
         text normalized_text
-        string language_code
         timestamptz created_at
     }
 

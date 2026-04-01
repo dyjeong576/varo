@@ -15,24 +15,35 @@ coverage/
 .next/
 out/
 
-# production
+# nestjs / production
+dist/
 build/
 
 # misc
 .DS_Store
 *.pem
+Thumbs.db
+desktop.ini
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # typescript
 *.tsbuildinfo

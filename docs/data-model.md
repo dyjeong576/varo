@@ -124,7 +124,6 @@
 | `id` | uuid / text id | claim 식별자 |
 | `raw_text` | text | 사용자가 입력한 원문 |
 | `normalized_text` | text | 정규화 텍스트 |
-| `language_code` | varchar(8) | 기본값 `ko` |
 | `created_at` | timestamptz | 생성 시각 |
 
 ### 6.5 `review_jobs`

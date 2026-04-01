@@ -4,6 +4,7 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
@@ -12,11 +13,15 @@ import { AppException } from "../exceptions/app-exception";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request & { traceId?: string }>();
     const traceId = request.traceId ?? randomUUID();
+
+    this.logException(exception, request.url, traceId);
 
     if (exception instanceof AppException) {
       response.status(exception.getStatus()).json({
@@ -65,5 +70,37 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
     });
+  }
+
+  private logException(exception: unknown, path: string, traceId: string): void {
+    if (exception instanceof AppException) {
+      this.logger.error(
+        `[${traceId}] ${exception.code} ${exception.message} path=${path} details=${JSON.stringify(
+          exception.details ?? {},
+        )}`,
+        exception.stack,
+      );
+      return;
+    }
+
+    if (exception instanceof HttpException) {
+      this.logger.error(
+        `[${traceId}] HTTP_EXCEPTION ${exception.message} path=${path}`,
+        exception.stack,
+      );
+      return;
+    }
+
+    if (exception instanceof Error) {
+      this.logger.error(
+        `[${traceId}] UNHANDLED_EXCEPTION ${exception.message} path=${path}`,
+        exception.stack,
+      );
+      return;
+    }
+
+    this.logger.error(
+      `[${traceId}] UNKNOWN_EXCEPTION path=${path} payload=${JSON.stringify(exception)}`,
+    );
   }
 }

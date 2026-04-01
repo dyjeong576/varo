@@ -56,5 +56,10 @@ describe("app.config", () => {
     expect(config.appCanonicalHostStatus).toBe("pending");
     expect(config.googleCallbackUrl).toBe("http://localhost:4000/api/v1/auth/google/callback");
     expect(config.frontendBaseUrl).toBe("http://localhost:3000");
+    expect(config.reviewProviderMode).toBe("mock");
+    expect(config.openAiApiKey).toBeNull();
+    expect(config.tavilyApiKey).toBeNull();
+    expect(config.tavilySearchTimeoutMs).toBe(40000);
+    expect(config.tavilyExtractTimeoutMs).toBe(80000);
   });
 });

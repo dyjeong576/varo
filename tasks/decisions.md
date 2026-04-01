@@ -34,3 +34,18 @@
 - canonical host 상태는 도메인 연결 전까지 `pending`으로 유지한다.
 - 실제 배포 연결 전에는 canonical tag, live redirect, OAuth callback URL, sitemap host, CORS production origin을 `www.varocheck.com`으로 고정하지 않는다.
 - 위 항목은 모두 config를 통해 준비하고, 실제 도메인 연결 시점에만 활성화한다.
+
+## 2026-04-01
+
+### Review Query Processing
+- review query processing 1차 구현 범위는 `claim intake ~ evidence preparation`까지로 제한한다.
+- review query backend의 1차 공개 API는 `POST /api/v1/reviews/query-processing-preview`로 둔다.
+- query refinement와 relevance filtering의 출력 모델은 `primary / reference / discard` 3단계로 고정한다.
+- source traceability는 source별 `origin_query_ids[]`를 유지하는 방식으로 구현한다.
+- dev 환경의 review provider mode 기본값은 `mock`, prod 기본값은 `real`로 둔다.
+- 1차 extraction 대상은 `primary` 우선, 부족 시 `reference` 제한 승격으로 처리한다.
+- real provider 조합은 Tavily search/extract + OpenAI structured outputs로 고정한다.
+- query refinement와 relevance filtering의 OpenAI 모델은 모두 `gpt-5-mini`로 고정한다.
+- 인증 endpoint와 dev 테스트 endpoint는 같은 provider service 경로를 공유한다.
+- `real` 모드에서는 API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
+- `languageCode`는 claim 엔터티에 저장하지 않고, query refinement artifact와 preview API 응답에서만 유지한다.

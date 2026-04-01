@@ -19,6 +19,11 @@ export interface AppConfig {
   sessionSecret: string;
   sessionCookieName: string;
   sessionTtlDays: number;
+  reviewProviderMode: "mock" | "real";
+  openAiApiKey: string | null;
+  tavilyApiKey: string | null;
+  tavilySearchTimeoutMs: number;
+  tavilyExtractTimeoutMs: number;
 }
 
 export const GOOGLE_CALLBACK_PATH = "/api/v1/auth/google/callback";
@@ -65,6 +70,34 @@ function normalizeOptionalBaseUrl(name: string, value?: string): string | null {
 
 function readCanonicalHostStatus(value?: string): CanonicalHostStatus {
   return value === "live" ? "live" : "pending";
+}
+
+function readReviewProviderMode(value?: string, appEnv?: AppEnv): "mock" | "real" {
+  if (value === "real") {
+    return "real";
+  }
+
+  if (value === "mock") {
+    return "mock";
+  }
+
+  return appEnv === "prod" ? "real" : "mock";
+}
+
+function readPositiveInteger(name: string, fallback: number): number {
+  const rawValue = getOptional(name);
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name}는 1 이상의 정수여야 합니다.`);
+  }
+
+  return parsed;
 }
 
 export function buildGoogleCallbackUrl(apiBaseUrl: string): string {
@@ -120,5 +153,10 @@ export function getAppConfig(): AppConfig {
     sessionSecret: getRequired("SESSION_SECRET"),
     sessionCookieName: getRequired("SESSION_COOKIE_NAME"),
     sessionTtlDays: ttl,
+    reviewProviderMode: readReviewProviderMode(getOptional("REVIEW_PROVIDER_MODE"), appEnv),
+    openAiApiKey: getOptional("OPENAI_API_KEY") ?? null,
+    tavilyApiKey: getOptional("TAVILY_API_KEY") ?? null,
+    tavilySearchTimeoutMs: readPositiveInteger("TAVILY_SEARCH_TIMEOUT_MS", 40000),
+    tavilyExtractTimeoutMs: readPositiveInteger("TAVILY_EXTRACT_TIMEOUT_MS", 80000),
   };
 }

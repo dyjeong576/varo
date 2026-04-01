@@ -4,6 +4,7 @@ import { AuthModule } from "./auth/auth.module";
 import { TraceIdMiddleware } from "./common/middleware/trace-id.middleware";
 import { getAppConfig } from "./config/app.config";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ReviewsModule } from "./reviews/reviews.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -16,6 +17,7 @@ import { UsersModule } from "./users/users.module";
     PrismaModule,
     AuthModule,
     UsersModule,
+    ReviewsModule,
   ],
 })
 export class AppModule implements NestModule {

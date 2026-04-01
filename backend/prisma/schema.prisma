@@ -15,6 +15,7 @@ model User {
   createdAt    DateTime    @default(now()) @map("created_at")
   profile      UserProfile?
   sessions     Session[]
+  reviewJobs   ReviewJob[]
 
   @@map("users")
 }
@@ -42,4 +43,79 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+model Claim {
+  id             String      @id @default(uuid())
+  rawText        String      @map("raw_text")
+  normalizedText String      @map("normalized_text")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  reviewJobs     ReviewJob[]
+
+  @@map("claims")
+}
+
+model ReviewJob {
+  id                  String            @id @default(uuid())
+  userId              String            @map("user_id")
+  claimId             String            @map("claim_id")
+  status              String
+  currentStage        String            @map("current_stage")
+  searchedSourceCount Int               @default(0) @map("searched_source_count")
+  processedSourceCount Int              @default(0) @map("processed_source_count")
+  retryCount          Int               @default(0) @map("retry_count")
+  lastErrorCode       String?           @map("last_error_code")
+  queryRefinement     Json?             @map("query_refinement")
+  handoffPayload      Json?             @map("handoff_payload")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claim               Claim             @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sources             Source[]
+  evidenceSnippets    EvidenceSnippet[]
+
+  @@index([userId])
+  @@index([claimId])
+  @@map("review_jobs")
+}
+
+model Source {
+  id               String            @id @default(uuid())
+  reviewJobId      String            @map("review_job_id")
+  sourceType       String            @map("source_type")
+  publisherName    String?           @map("publisher_name")
+  publishedAt      DateTime?         @map("published_at")
+  canonicalUrl     String            @map("canonical_url")
+  originalUrl      String            @map("original_url")
+  rawTitle         String            @map("raw_title")
+  rawSnippet       String?           @map("raw_snippet")
+  normalizedHash   String            @map("normalized_hash")
+  fetchStatus      String            @map("fetch_status")
+  contentText      String?           @map("content_text")
+  isDuplicate      Boolean           @default(false) @map("is_duplicate")
+  duplicateGroupKey String?          @map("duplicate_group_key")
+  originQueryIds   Json?             @map("origin_query_ids")
+  relevanceTier    String?           @map("relevance_tier")
+  relevanceReason  String?           @map("relevance_reason")
+  reviewJob        ReviewJob         @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  evidenceSnippets EvidenceSnippet[]
+
+  @@index([reviewJobId])
+  @@map("sources")
+}
+
+model EvidenceSnippet {
+  id          String   @id @default(uuid())
+  reviewJobId String   @map("review_job_id")
+  sourceId    String   @map("source_id")
+  snippetText String   @map("snippet_text")
+  stance      String
+  startOffset Int?     @map("start_offset")
+  endOffset   Int?     @map("end_offset")
+  reviewJob   ReviewJob @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  source      Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([reviewJobId])
+  @@index([sourceId])
+  @@map("evidence_snippets")
 }
