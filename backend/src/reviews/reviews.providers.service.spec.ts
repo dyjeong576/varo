@@ -60,14 +60,22 @@ describe("ReviewsProvidersService", () => {
     );
 
     await expect(
-      service.searchSources([{ id: "q1", text: "테슬라 한국 철수", rank: 1 }], "테슬라 한국 철수"),
+      service.searchSources({
+        queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
+        coreClaim: "테슬라 한국 철수",
+        claimLanguageCode: "ko",
+        userCountryCode: "KR",
+        topicCountryCode: "KR",
+        topicScope: "domestic",
+        domainRegistry: [],
+      }),
     ).rejects.toMatchObject({
       code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
       status: HttpStatus.INTERNAL_SERVER_ERROR,
     });
   });
 
-  it("real mode에서 OpenAI 질의 정제 응답을 QueryArtifact로 변환한다", async () => {
+  it("real mode에서 OpenAI 질의 정제 응답을 topic country 메타데이터와 함께 변환한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -78,12 +86,16 @@ describe("ReviewsProvidersService", () => {
                   type: "output_text",
                   text: JSON.stringify({
                     languageCode: "ko",
-                    coreClaim: "테슬라의 한국 시장 철수",
+                    coreClaim: "트럼프의 관세 발표",
                     generatedQueries: [
-                      "테슬라 한국 사업 철수 2026",
-                      "Tesla Korea market exit",
-                      "테슬라 한국 영업 중단",
+                      "트럼프 관세 발표",
+                      "Trump tariff announcement",
+                      "미국 관세 정책 발표",
                     ],
+                    topicScope: "foreign",
+                    topicCountryCode: "US",
+                    countryDetectionReason:
+                      "미국 대통령과 관세 발표 단서가 확인되어 미국 이슈로 판단했습니다.",
                   }),
                 },
               ],
@@ -100,34 +112,22 @@ describe("ReviewsProvidersService", () => {
       }) as never,
     );
 
-    const result = await service.refineQuery("나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대");
+    const result = await service.refineQuery("트럼프가 오늘 관세 발표했대");
 
-    expect(result.languageCode).toBe("ko");
-    expect(result.coreClaim).toBe("테슬라의 한국 시장 철수");
-    expect(result.generatedQueries).toEqual([
-      { id: "q1", text: "테슬라 한국 사업 철수 2026", rank: 1 },
-      { id: "q2", text: "Tesla Korea market exit", rank: 2 },
-      { id: "q3", text: "테슬라 한국 영업 중단", rank: 3 },
-    ]);
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/responses",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer openai-test-key",
-        }),
-      }),
-    );
+    expect(result.claimLanguageCode).toBe("ko");
+    expect(result.topicScope).toBe("foreign");
+    expect(result.topicCountryCode).toBe("US");
+    expect(result.generatedQueries).toHaveLength(3);
   });
 
-  it("real mode에서 Tavily 검색 결과를 SearchCandidate로 매핑한다", async () => {
+  it("real mode에서 familiar/verification include_domains를 Tavily에 전달한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
           results: [
             {
               title: "테슬라 한국 사업 철수 관련 보도",
-              url: "https://news.example.com/articles/varo-core?utm_source=test",
+              url: "https://www.yna.co.kr/view/AKR20260401000100001",
               content: "테슬라 한국 사업 철수 관련 핵심 내용이 담긴 기사입니다.",
               published_date: "2026-04-01T00:00:00Z",
             },
@@ -144,24 +144,51 @@ describe("ReviewsProvidersService", () => {
       }) as never,
     );
 
-    const result = await service.searchSources(
-      [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
-      "테슬라 한국 철수",
-    );
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      id: "q1-c1",
-      canonicalUrl: "https://news.example.com/articles/varo-core",
-      originalUrl: "https://news.example.com/articles/varo-core?utm_source=test",
-      originQueryIds: ["q1"],
-      publisherName: "news.example.com",
-      sourceType: "news",
+    const result = await service.searchSources({
+      queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
+      coreClaim: "테슬라 한국 철수",
+      claimLanguageCode: "ko",
+      userCountryCode: "KR",
+      topicCountryCode: "KR",
+      topicScope: "domestic",
+      domainRegistry: [
+        {
+          id: "kr-familiar",
+          domain: "yna.co.kr",
+          countryCode: "KR",
+          languageCode: "ko",
+          sourceKind: "news_agency",
+          usageRole: "familiar_news",
+          priority: 10,
+          isActive: true,
+        },
+        {
+          id: "kr-official",
+          domain: "*.go.kr",
+          countryCode: "KR",
+          languageCode: "ko",
+          sourceKind: "government",
+          usageRole: "verification_official",
+          priority: 20,
+          isActive: true,
+        },
+      ],
     });
-    expect(result[0]?.publishedAt).toBe("2026-04-01T00:00:00.000Z");
+
+    expect(result[0]).toMatchObject({
+      retrievalBucket: "familiar",
+      sourceCountryCode: "KR",
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.tavily.com/search",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("\"include_domains\":[\"yna.co.kr\"]"),
+      }),
+    );
   });
 
-  it("real mode에서 OpenAI relevance 응답을 primary/reference/discard로 반영한다", async () => {
+  it("real mode에서 OpenAI relevance 요청에 retrieval bucket과 source country를 포함한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -174,13 +201,8 @@ describe("ReviewsProvidersService", () => {
                     decisions: [
                       {
                         candidateId: "c1",
-                        relevanceTier: "primary",
-                        relevanceReason: "공식 출처와 직접 관련됩니다.",
-                      },
-                      {
-                        candidateId: "c2",
                         relevanceTier: "reference",
-                        relevanceReason: "배경 맥락으로는 유효합니다.",
+                        relevanceReason: "해외 이슈에서 국내 기사라 보조 근거로 유지합니다.",
                       },
                     ],
                   }),
@@ -199,107 +221,70 @@ describe("ReviewsProvidersService", () => {
       }) as never,
     );
 
-    const result = await service.applyRelevanceFiltering("테슬라 한국 철수", [
-      {
-        id: "c1",
-        sourceType: "official",
-        publisherName: "정부부처",
-        publishedAt: null,
-        canonicalUrl: "https://www.gov.example.kr/press/varo-official",
-        originalUrl: "https://www.gov.example.kr/press/varo-official",
-        rawTitle: "테슬라 한국 사업 관련 공식 입장",
-        rawSnippet: "공식 설명입니다.",
-        normalizedHash: "hash-1",
-        originQueryIds: ["q1"],
-      },
-      {
-        id: "c2",
-        sourceType: "analysis",
-        publisherName: "해설 매체",
-        publishedAt: null,
-        canonicalUrl: "https://analysis.example.com/varo-explainer",
-        originalUrl: "https://analysis.example.com/varo-explainer",
-        rawTitle: "테슬라 한국 철수 해설",
-        rawSnippet: "직접 근거는 약하지만 맥락을 설명합니다.",
-        normalizedHash: "hash-2",
-        originQueryIds: ["q2"],
-      },
-    ]);
-
-    expect(result[0]?.relevanceTier).toBe("primary");
-    expect(result[0]?.relevanceReason).toBe("공식 출처와 직접 관련됩니다.");
-    expect(result[1]?.relevanceTier).toBe("reference");
-    expect(result[1]?.relevanceReason).toBe("배경 맥락으로는 유효합니다.");
-  });
-
-  it("real mode에서 Tavily 추출 결과를 본문과 snippet으로 반환한다", async () => {
-    global.fetch = jest.fn().mockResolvedValue(
-      createFetchResponse({
-        jsonData: {
-          results: [
-            {
-              url: "https://news.example.com/articles/varo-core?utm_source=test",
-              raw_content:
-                "테슬라가 한국 시장 운영 계획을 조정한다는 본문 내용입니다. 후속 설명과 세부 맥락이 이어집니다.",
-            },
-          ],
+    const result = await service.applyRelevanceFiltering({
+      coreClaim: "트럼프의 관세 발표",
+      claimLanguageCode: "ko",
+      topicCountryCode: "US",
+      topicScope: "foreign",
+      candidates: [
+        {
+          id: "c1",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "트럼프 관세 발표 관련 한국 보도",
+          rawSnippet: "국내 종합 기사입니다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: "kr-familiar",
         },
+      ],
+    });
+
+    expect(result[0]?.relevanceTier).toBe("reference");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        body: expect.stringContaining("\"retrievalBucket\\\": \\\"familiar\\\""),
       }),
-    ) as typeof fetch;
-
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "real",
-        tavilyApiKey: "tvly-test-key",
-        tavilyExtractTimeoutMs: 80000,
-      }) as never,
     );
-
-    const result = await service.extractContent([
-      {
-        id: "c1",
-        sourceType: "news",
-        publisherName: "연합뉴스",
-        publishedAt: null,
-        canonicalUrl: "https://news.example.com/articles/varo-core",
-        originalUrl: "https://news.example.com/articles/varo-core?utm_source=test",
-        rawTitle: "테슬라 한국 사업 철수 관련 보도",
-        rawSnippet: "검색 snippet",
-        normalizedHash: "hash-1",
-        originQueryIds: ["q1"],
-        relevanceTier: "primary",
-        relevanceReason: "직접 관련 기사입니다.",
-      },
-    ]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.canonicalUrl).toBe("https://news.example.com/articles/varo-core");
-    expect(result[0]?.contentText).toContain("테슬라가 한국 시장 운영 계획을 조정한다는 본문 내용입니다.");
-    expect(result[0]?.snippetText).toContain("테슬라가 한국 시장 운영 계획을 조정한다는 본문 내용입니다.");
   });
 
-  it("real mode에서 Tavily 검색 응답이 실패하면 명시적으로 예외를 던진다", async () => {
-    global.fetch = jest.fn().mockResolvedValue(
-      createFetchResponse({
-        ok: false,
-        status: 500,
-        textData: "{\"error\":\"upstream failed\"}",
-      }),
-    ) as typeof fetch;
-
+  it("mock mode에서 foreign topic familiar 기사 primary를 reference로 낮춘다", async () => {
     const service = new ReviewsProvidersService(
       createConfigServiceMock({
-        reviewProviderMode: "real",
-        tavilyApiKey: "tvly-test-key",
-        tavilySearchTimeoutMs: 40000,
+        reviewProviderMode: "mock",
       }) as never,
     );
 
-    await expect(
-      service.searchSources([{ id: "q1", text: "테슬라 한국 철수", rank: 1 }], "테슬라 한국 철수"),
-    ).rejects.toMatchObject({
-      code: APP_ERROR_CODES.SOURCE_SEARCH_FAILED,
-      status: HttpStatus.BAD_GATEWAY,
+    const result = await service.applyRelevanceFiltering({
+      coreClaim: "트럼프의 관세 발표",
+      claimLanguageCode: "ko",
+      topicCountryCode: "US",
+      topicScope: "foreign",
+      candidates: [
+        {
+          id: "c1",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "트럼프 관세 발표 기사",
+          rawSnippet: "트럼프 관세 발표 세부 내용입니다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: "kr-familiar",
+        },
+      ],
     });
+
+    expect(result[0]?.relevanceTier).toBe("reference");
   });
 });

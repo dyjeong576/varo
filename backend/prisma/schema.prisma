@@ -80,28 +80,51 @@ model ReviewJob {
 }
 
 model Source {
-  id               String            @id @default(uuid())
-  reviewJobId      String            @map("review_job_id")
-  sourceType       String            @map("source_type")
-  publisherName    String?           @map("publisher_name")
-  publishedAt      DateTime?         @map("published_at")
-  canonicalUrl     String            @map("canonical_url")
-  originalUrl      String            @map("original_url")
-  rawTitle         String            @map("raw_title")
-  rawSnippet       String?           @map("raw_snippet")
-  normalizedHash   String            @map("normalized_hash")
-  fetchStatus      String            @map("fetch_status")
-  contentText      String?           @map("content_text")
-  isDuplicate      Boolean           @default(false) @map("is_duplicate")
-  duplicateGroupKey String?          @map("duplicate_group_key")
-  originQueryIds   Json?             @map("origin_query_ids")
-  relevanceTier    String?           @map("relevance_tier")
-  relevanceReason  String?           @map("relevance_reason")
-  reviewJob        ReviewJob         @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  id               String               @id @default(uuid())
+  reviewJobId      String               @map("review_job_id")
+  sourceType       String               @map("source_type")
+  publisherName    String?              @map("publisher_name")
+  publishedAt      DateTime?            @map("published_at")
+  canonicalUrl     String               @map("canonical_url")
+  originalUrl      String               @map("original_url")
+  rawTitle         String               @map("raw_title")
+  rawSnippet       String?              @map("raw_snippet")
+  normalizedHash   String               @map("normalized_hash")
+  fetchStatus      String               @map("fetch_status")
+  contentText      String?              @map("content_text")
+  isDuplicate      Boolean              @default(false) @map("is_duplicate")
+  duplicateGroupKey String?             @map("duplicate_group_key")
+  originQueryIds   Json?                @map("origin_query_ids")
+  relevanceTier    String?              @map("relevance_tier")
+  relevanceReason  String?              @map("relevance_reason")
+  sourceCountryCode String?             @map("source_country_code")
+  retrievalBucket  String?              @map("retrieval_bucket")
+  domainRegistryId String?              @map("domain_registry_id")
+  reviewJob        ReviewJob            @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  domainRegistry   SourceDomainRegistry? @relation(fields: [domainRegistryId], references: [id], onDelete: SetNull)
   evidenceSnippets EvidenceSnippet[]
 
   @@index([reviewJobId])
+  @@index([domainRegistryId])
   @@map("sources")
+}
+
+model SourceDomainRegistry {
+  id           String   @id @default(uuid())
+  domain       String
+  countryCode  String   @map("country_code")
+  languageCode String?  @map("language_code")
+  sourceKind   String   @map("source_kind")
+  usageRole    String   @map("usage_role")
+  priority     Int      @default(100)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  sources      Source[]
+
+  @@index([countryCode, usageRole, isActive])
+  @@unique([domain, usageRole])
+  @@map("source_domain_registry")
 }
 
 model EvidenceSnippet {

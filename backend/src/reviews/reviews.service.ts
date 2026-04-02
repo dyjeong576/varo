@@ -7,8 +7,13 @@ import { CreateReviewQueryProcessingPreviewDto } from "./dto/create-review-query
 import { ReviewQueryProcessingPreviewResponseDto } from "./dto/review-query-processing-preview-response.dto";
 import { ReviewsProvidersService } from "./reviews.providers.service";
 import {
+  DomainRegistryEntry,
+  SearchCandidate,
+  countRelevantSources,
   deduplicateCandidates,
+  hasVerificationSource,
   normalizeClaimText,
+  normalizeCountryCode,
   selectExtractionCandidates,
 } from "./reviews.utils";
 
@@ -55,25 +60,45 @@ export class ReviewsService {
     });
 
     try {
-      const refinement =
-        await this.providersService.refineQuery(normalizedClaim);
-      const generatedQueries = refinement.generatedQueries.slice(
-        0,
-        QUERY_COUNT_LIMIT,
-      );
-      const rawCandidates = await this.providersService.searchSources(
-        generatedQueries,
-        refinement.coreClaim,
-      );
-      const dedupedCandidates = deduplicateCandidates(rawCandidates).slice(
-        0,
-        RELEVANCE_LIMIT,
-      );
-      const relevanceCandidates =
-        await this.providersService.applyRelevanceFiltering(
-          refinement.coreClaim,
-          dedupedCandidates,
+      const userCountryCode = await this.resolveUserCountryCode(userId);
+      const refinement = await this.providersService.refineQuery(normalizedClaim);
+      const generatedQueries = refinement.generatedQueries.slice(0, QUERY_COUNT_LIMIT);
+      const domainRegistry = await this.loadDomainRegistry();
+      const initialCandidates = await this.providersService.searchSources({
+        queries: generatedQueries,
+        coreClaim: refinement.coreClaim,
+        claimLanguageCode: refinement.claimLanguageCode,
+        userCountryCode,
+        topicCountryCode: refinement.topicCountryCode,
+        topicScope: refinement.topicScope,
+        domainRegistry,
+      });
+      let relevanceCandidates = await this.providersService.applyRelevanceFiltering({
+        coreClaim: refinement.coreClaim,
+        claimLanguageCode: refinement.claimLanguageCode,
+        topicCountryCode: refinement.topicCountryCode,
+        topicScope: refinement.topicScope,
+        candidates: deduplicateCandidates(initialCandidates).slice(0, RELEVANCE_LIMIT),
+      });
+
+      if (this.shouldRunFallbackSearch(relevanceCandidates)) {
+        const fallbackCandidates = await this.providersService.searchFallbackSources(
+          generatedQueries,
+          domainRegistry,
         );
+        const mergedCandidates = deduplicateCandidates([
+          ...relevanceCandidates,
+          ...fallbackCandidates,
+        ]).slice(0, RELEVANCE_LIMIT);
+
+        relevanceCandidates = await this.providersService.applyRelevanceFiltering({
+          coreClaim: refinement.coreClaim,
+          claimLanguageCode: refinement.claimLanguageCode,
+          topicCountryCode: refinement.topicCountryCode,
+          topicScope: refinement.topicScope,
+          candidates: mergedCandidates,
+        });
+      }
 
       const extractionTargets = selectExtractionCandidates(
         relevanceCandidates,
@@ -94,9 +119,7 @@ export class ReviewsService {
             reviewJobId: reviewJob.id,
             sourceType: candidate.sourceType,
             publisherName: candidate.publisherName,
-            publishedAt: candidate.publishedAt
-              ? new Date(candidate.publishedAt)
-              : null,
+            publishedAt: candidate.publishedAt ? new Date(candidate.publishedAt) : null,
             canonicalUrl: candidate.canonicalUrl,
             originalUrl: candidate.originalUrl,
             rawTitle: candidate.rawTitle,
@@ -109,6 +132,9 @@ export class ReviewsService {
             originQueryIds: candidate.originQueryIds as Prisma.InputJsonValue,
             relevanceTier: candidate.relevanceTier ?? "discard",
             relevanceReason: candidate.relevanceReason ?? null,
+            sourceCountryCode: candidate.sourceCountryCode,
+            retrievalBucket: candidate.retrievalBucket,
+            domainRegistryId: candidate.domainRegistryId,
           };
         });
 
@@ -122,9 +148,7 @@ export class ReviewsService {
 
       const evidenceSnippets = await Promise.all(
         createdSources
-          .filter(
-            (source) => source.fetchStatus === "fetched" && source.contentText,
-          )
+          .filter((source) => source.fetchStatus === "fetched" && source.contentText)
           .map((source) => {
             const extracted = extractedSourceMap.get(source.canonicalUrl);
 
@@ -148,12 +172,11 @@ export class ReviewsService {
       const discardedSourceCount = createdSources.filter(
         (source) => source.relevanceTier === "discard",
       ).length;
-      const insufficiencyReason =
-        evidenceSnippets.length === 0
-          ? "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다."
-          : extractionTargets.length < PRIMARY_EXTRACTION_LIMIT
-            ? "primary source가 충분하지 않아 reference 일부가 제한적으로 승격되었습니다."
-            : null;
+      const insufficiencyReason = this.buildInsufficiencyReason(
+        evidenceSnippets.length,
+        extractionTargets.length,
+        relevanceCandidates,
+      );
       const handoffSourceIds = createdSources
         .filter((source) =>
           evidenceSnippets.some((snippet) => snippet.sourceId === source.id),
@@ -161,13 +184,18 @@ export class ReviewsService {
         .map((source) => source.id);
 
       const queryRefinementPayload = {
-        languageCode: refinement.languageCode,
+        claimLanguageCode: refinement.claimLanguageCode,
+        languageCode: refinement.claimLanguageCode,
         coreClaim: refinement.coreClaim,
         generatedQueries: generatedQueries.map((query) => ({
           id: query.id,
           text: query.text,
           rank: query.rank,
         })),
+        topicScope: refinement.topicScope,
+        topicCountryCode: refinement.topicCountryCode,
+        countryDetectionReason: refinement.countryDetectionReason,
+        userCountryCode,
       } as Prisma.InputJsonValue;
 
       const handoffPayload = {
@@ -187,9 +215,7 @@ export class ReviewsService {
           queryRefinement: queryRefinementPayload,
           handoffPayload,
           lastErrorCode:
-            evidenceSnippets.length === 0
-              ? APP_ERROR_CODES.REVIEW_PARTIAL
-              : null,
+            evidenceSnippets.length === 0 ? APP_ERROR_CODES.REVIEW_PARTIAL : null,
         },
       });
 
@@ -199,8 +225,12 @@ export class ReviewsService {
         status: "partial",
         currentStage: "handoff_ready",
         normalizedClaim,
-        languageCode: refinement.languageCode,
+        claimLanguageCode: refinement.claimLanguageCode,
+        languageCode: refinement.claimLanguageCode,
         coreClaim: refinement.coreClaim,
+        topicScope: refinement.topicScope,
+        topicCountryCode: refinement.topicCountryCode,
+        countryDetectionReason: refinement.countryDetectionReason,
         generatedQueries,
         sources: createdSources.map((source) => ({
           id: source.id,
@@ -212,6 +242,9 @@ export class ReviewsService {
           relevanceTier: source.relevanceTier ?? "discard",
           relevanceReason: source.relevanceReason,
           originQueryIds: this.parseOriginQueryIds(source.originQueryIds),
+          sourceCountryCode: source.sourceCountryCode,
+          retrievalBucket: source.retrievalBucket,
+          domainRegistryMatched: Boolean(source.domainRegistryId),
         })),
         evidenceSnippets: evidenceSnippets.map((snippet) => ({
           id: snippet.id,
@@ -235,9 +268,7 @@ export class ReviewsService {
           status: "failed",
           currentStage: "failed",
           lastErrorCode:
-            error instanceof AppException
-              ? error.code
-              : APP_ERROR_CODES.INTERNAL_ERROR,
+            error instanceof AppException ? error.code : APP_ERROR_CODES.INTERNAL_ERROR,
         },
       });
 
@@ -253,6 +284,66 @@ export class ReviewsService {
     return this.createQueryProcessingPreview(previewUser.id, payload);
   }
 
+  private shouldRunFallbackSearch(candidates: SearchCandidate[]): boolean {
+    return (
+      countRelevantSources(candidates) < PRIMARY_EXTRACTION_LIMIT ||
+      !hasVerificationSource(candidates)
+    );
+  }
+
+  private buildInsufficiencyReason(
+    evidenceSnippetCount: number,
+    extractionTargetCount: number,
+    candidates: SearchCandidate[],
+  ): string | null {
+    if (evidenceSnippetCount === 0) {
+      return "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.";
+    }
+
+    if (!hasVerificationSource(candidates)) {
+      return "verification bucket source가 부족해 친숙한 국내 기사 중심으로 handoff 됩니다.";
+    }
+
+    if (extractionTargetCount < PRIMARY_EXTRACTION_LIMIT) {
+      return "primary source가 충분하지 않아 reference 일부가 제한적으로 승격되었습니다.";
+    }
+
+    return null;
+  }
+
+  private async loadDomainRegistry(): Promise<DomainRegistryEntry[]> {
+    const entries = await this.prisma.sourceDomainRegistry.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: [{ priority: "asc" }, { countryCode: "asc" }],
+    });
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      domain: entry.domain,
+      countryCode: entry.countryCode,
+      languageCode: entry.languageCode,
+      sourceKind: entry.sourceKind,
+      usageRole: entry.usageRole,
+      priority: entry.priority,
+      isActive: entry.isActive,
+    }));
+  }
+
+  private async resolveUserCountryCode(userId: string): Promise<string | null> {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        country: true,
+      },
+    });
+
+    return normalizeCountryCode(profile?.country);
+  }
+
   private parseOriginQueryIds(value: unknown): string[] {
     return Array.isArray(value)
       ? value.filter((item): item is string => typeof item === "string")
@@ -266,32 +357,31 @@ export class ReviewsService {
       },
       update: {
         displayName: "VARO Preview API",
+        profile: {
+          upsert: {
+            update: {
+              country: "KR",
+            },
+            create: {
+              country: "KR",
+            },
+          },
+        },
       },
       create: {
         email: "preview-api@varo.local",
         displayName: "VARO Preview API",
         authProvider: "preview",
         profile: {
-          create: {},
+          create: {
+            country: "KR",
+          },
         },
       },
       select: {
         id: true,
-        profile: {
-          select: {
-            userId: true,
-          },
-        },
       },
     });
-
-    if (!previewUser.profile) {
-      await this.prisma.userProfile.create({
-        data: {
-          userId: previewUser.id,
-        },
-      });
-    }
 
     return {
       id: previewUser.id,

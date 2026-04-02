@@ -49,3 +49,10 @@
 - 인증 endpoint와 dev 테스트 endpoint는 같은 provider service 경로를 공유한다.
 - `real` 모드에서는 API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
 - `languageCode`는 claim 엔터티에 저장하지 않고, query refinement artifact와 preview API 응답에서만 유지한다.
+
+### Country-Aware Domain Routing
+- review query processing은 언어와 별도로 `topicCountryCode` / `topicScope`를 LLM이 판정한다.
+- 국가별 trusted domain registry를 DB로 관리하고, Tavily `include_domains`로 familiar / verification pass를 분리한다.
+- 한국 사용자에게는 한국 familiar domain을 우선 제공하되, 해외 이슈에서는 verification source 확보를 우선한다.
+- retrieval bucket은 `familiar / verification / fallback` 3단계로 고정한다.
+- 국가별 domain registry는 MVP에서 소수 핵심 도메인만 큐레이션한다.

@@ -1,6 +1,19 @@
 import { createHash } from "node:crypto";
 
 export type ReviewRelevanceTier = "primary" | "reference" | "discard";
+export type TopicScope = "domestic" | "foreign" | "multi_country" | "unknown";
+export type RetrievalBucket = "familiar" | "verification" | "fallback";
+
+export interface DomainRegistryEntry {
+  id: string;
+  domain: string;
+  countryCode: string;
+  languageCode: string | null;
+  sourceKind: string;
+  usageRole: string;
+  priority: number;
+  isActive: boolean;
+}
 
 export interface QueryArtifact {
   id: string;
@@ -19,6 +32,9 @@ export interface SearchCandidate {
   rawSnippet: string | null;
   normalizedHash: string;
   originQueryIds: string[];
+  sourceCountryCode: string | null;
+  retrievalBucket: RetrievalBucket;
+  domainRegistryId: string | null;
   relevanceTier?: ReviewRelevanceTier;
   relevanceReason?: string | null;
   contentText?: string | null;
@@ -66,6 +82,9 @@ export function deduplicateCandidates(candidates: SearchCandidate[]): SearchCand
       rawSnippet: existing.rawSnippet ?? candidate.rawSnippet,
       publisherName: existing.publisherName ?? candidate.publisherName,
       publishedAt: existing.publishedAt ?? candidate.publishedAt,
+      sourceCountryCode: existing.sourceCountryCode ?? candidate.sourceCountryCode,
+      domainRegistryId: existing.domainRegistryId ?? candidate.domainRegistryId,
+      retrievalBucket: pickPreferredBucket(existing.retrievalBucket, candidate.retrievalBucket),
     });
   }
 
@@ -120,6 +139,141 @@ export function buildMockQueries(coreClaim: string, languageCode: string): Query
   ];
 }
 
+export function normalizeCountryCode(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const mappedCodes: Record<string, string> = {
+    kr: "KR",
+    korea: "KR",
+    "south korea": "KR",
+    "republic of korea": "KR",
+    한국: "KR",
+    대한민국: "KR",
+    us: "US",
+    usa: "US",
+    "united states": "US",
+    america: "US",
+    미국: "US",
+    jp: "JP",
+    japan: "JP",
+    일본: "JP",
+    cn: "CN",
+    china: "CN",
+    중국: "CN",
+    gb: "GB",
+    uk: "GB",
+    "united kingdom": "GB",
+    영국: "GB",
+    global: "GLOBAL",
+    international: "GLOBAL",
+  };
+
+  if (mappedCodes[normalized]) {
+    return mappedCodes[normalized];
+  }
+
+  if (/^[a-z]{2}$/i.test(normalized)) {
+    return normalized.toUpperCase();
+  }
+
+  return null;
+}
+
+export function extractHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function matchesDomainPattern(
+  hostname: string | null,
+  pattern: string | null | undefined,
+): boolean {
+  if (!hostname || !pattern) {
+    return false;
+  }
+
+  const normalizedPattern = pattern.trim().toLowerCase().replace(/^www\./, "");
+
+  if (!normalizedPattern) {
+    return false;
+  }
+
+  if (normalizedPattern.startsWith("*.")) {
+    const suffix = normalizedPattern.slice(2);
+    return hostname === suffix || hostname.endsWith(`.${suffix}`);
+  }
+
+  return hostname === normalizedPattern;
+}
+
+export function inferCountryCodeFromUrl(url: string): string | null {
+  const hostname = extractHostname(url);
+
+  if (!hostname) {
+    return null;
+  }
+
+  if (hostname.endsWith(".kr")) {
+    return "KR";
+  }
+
+  if (hostname.endsWith(".jp")) {
+    return "JP";
+  }
+
+  if (hostname.endsWith(".cn")) {
+    return "CN";
+  }
+
+  if (hostname.endsWith(".uk")) {
+    return "GB";
+  }
+
+  if (hostname.endsWith(".gov") || hostname.endsWith(".mil")) {
+    return "US";
+  }
+
+  return null;
+}
+
+export function matchDomainRegistryEntry(
+  url: string,
+  registry: DomainRegistryEntry[],
+): DomainRegistryEntry | null {
+  const hostname = extractHostname(url);
+
+  if (!hostname) {
+    return null;
+  }
+
+  const matched = registry
+    .filter((entry) => entry.isActive && matchesDomainPattern(hostname, entry.domain))
+    .sort((left, right) => {
+      if (left.countryCode === "GLOBAL" && right.countryCode !== "GLOBAL") {
+        return 1;
+      }
+
+      if (left.countryCode !== "GLOBAL" && right.countryCode === "GLOBAL") {
+        return -1;
+      }
+
+      return left.priority - right.priority;
+    });
+
+  return matched[0] ?? null;
+}
+
 export function selectExtractionCandidates(
   candidates: SearchCandidate[],
   primaryLimit: number,
@@ -127,15 +281,56 @@ export function selectExtractionCandidates(
 ): SearchCandidate[] {
   const primary = candidates.filter((candidate) => candidate.relevanceTier === "primary");
   const reference = candidates.filter((candidate) => candidate.relevanceTier === "reference");
+  const selected = [
+    ...primary.slice(0, primaryLimit),
+    ...reference.slice(
+      0,
+      Math.min(Math.max(primaryLimit - primary.length, 0), referencePromotionLimit),
+    ),
+  ];
 
-  if (primary.length >= primaryLimit) {
-    return primary.slice(0, primaryLimit);
+  if (
+    selected.some((candidate) => candidate.retrievalBucket === "verification")
+  ) {
+    return selected;
   }
 
-  const remainingSlots = primaryLimit - primary.length;
+  const verificationCandidate = [...primary, ...reference].find(
+    (candidate) => candidate.retrievalBucket === "verification",
+  );
 
-  return [
-    ...primary,
-    ...reference.slice(0, Math.min(remainingSlots, referencePromotionLimit)),
-  ];
+  if (!verificationCandidate) {
+    return selected;
+  }
+
+  const replaced = selected.filter(
+    (candidate) => candidate.canonicalUrl !== verificationCandidate.canonicalUrl,
+  );
+
+  return [verificationCandidate, ...replaced].slice(0, primaryLimit + referencePromotionLimit);
+}
+
+export function hasVerificationSource(candidates: SearchCandidate[]): boolean {
+  return candidates.some(
+    (candidate) =>
+      candidate.relevanceTier !== "discard" &&
+      candidate.retrievalBucket === "verification",
+  );
+}
+
+export function countRelevantSources(candidates: SearchCandidate[]): number {
+  return candidates.filter((candidate) => candidate.relevanceTier !== "discard").length;
+}
+
+function pickPreferredBucket(
+  left: RetrievalBucket,
+  right: RetrievalBucket,
+): RetrievalBucket {
+  const precedence: Record<RetrievalBucket, number> = {
+    verification: 3,
+    familiar: 2,
+    fallback: 1,
+  };
+
+  return precedence[left] >= precedence[right] ? left : right;
 }

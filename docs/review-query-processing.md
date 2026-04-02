@@ -54,19 +54,26 @@ Provider 전략은 아래로 고정한다.
 ### 2. Query Refinement
 
 - OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`과 검색 쿼리 3개를 생성한다.
+- OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`도 생성한다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
   - 고유명사, 날짜, 수치가 있으면 우선 반영한다.
   - 검색 엔진 친화적인 명사형 질의로 변환한다.
+- `topic_country_code`는 언어가 아니라 claim 의미 기준의 중심 국가를 판정한다.
 - 이 단계의 출력은 이후 search와 relevance filtering의 기준 입력이 된다.
 
 ### 3. Source Search
 
-- Review API는 생성된 query 3개를 Tavily에 순차 또는 병렬로 요청한다.
-- 각 query의 검색 결과는 하나의 candidate pool로 병합한다.
+- Review API는 `user country`와 `topic_country_code` 기준으로 국가별 trusted domain registry를 조회한다.
+- Tavily 검색은 최대 3개의 pass로 구성한다.
+  - `familiar pass`: 한국 사용자면 한국 familiar news 도메인을 `include_domains`에 넣어 검색한다.
+  - `verification pass`: `topic_country_code` 기준 공식/현지 trusted domain과 global reference domain을 `include_domains`에 넣어 검색한다.
+  - `fallback pass`: 앞선 pass 결과만으로 관련 source가 부족하면 일반 Tavily 검색으로 확장한다.
+- 각 pass 결과는 하나의 candidate pool로 병합한다.
 - 이 단계에서는 결과를 최대한 넓게 받되, 후속 relevance filtering이 가능하도록 title, snippet, canonical URL, publisher metadata를 유지한다.
 - 각 source candidate에는 어떤 query에서 수집되었는지 추적할 수 있도록 `origin_query_ids[]`를 연결한다.
+- 각 source candidate에는 `retrieval_bucket`, `source_country_code`, `domain_registry_matched` 여부를 함께 유지한다.
 
 ### 4. Candidate Normalization and Deduplication
 
@@ -77,6 +84,7 @@ Provider 전략은 아래로 고정한다.
 ### 5. Relevance Filtering
 
 - OpenAI는 각 candidate의 제목, snippet, `core_claim`을 입력으로 받아 해당 source가 검토 대상 주장과 관련 있는지 판정한다.
+- relevance 입력에는 `topic_scope`, `topic_country_code`, `retrieval_bucket`, `source_country_code`도 포함한다.
 - relevance 출력은 아래 3단계 모델로 고정한다.
   - `primary`: 즉시 extraction 대상으로 사용
   - `reference`: 1차 대상은 아니지만 primary 부족 시 승격 가능
@@ -84,10 +92,12 @@ Provider 전략은 아래로 고정한다.
 - 각 source candidate에는 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`를 유지한다.
 - `reference` 단계는 official statement, correction article, low-signal title처럼 제목 신호는 약하지만 claim 검토에는 의미가 있는 source를 조기에 버리지 않기 위해 둔다.
 - 이 단계는 검색 recall을 유지하면서 downstream 노이즈를 줄이는 핵심 필터 역할을 한다.
+- 해외 이슈에서는 한국 familiar 기사만으로 `primary`를 과대 부여하지 않는다.
 
 ### 6. Relevant Source Selection
 
 - 1차 extraction 대상은 `primary` source만 사용한다.
+- 가능하면 extraction 대상에 `verification bucket` source를 최소 1개 포함한다.
 - `primary` source가 부족하면 fallback search를 시도할 수 있다.
 - fallback 이후에도 부족하면 `reference` source를 제한적으로 승격할 수 있다.
 - `reference` 승격 이후에도 관련 source가 충분하지 않으면 근거 부족 상태를 유지한 채 다음 단계로 전달한다.
@@ -113,6 +123,7 @@ sequenceDiagram
     participant Frontend as "Frontend"
     participant ReviewAPI as "Review API"
     participant QueryRefiner as "OpenAI Query Refiner"
+    participant DomainRegistry as "Domain Registry"
     participant Tavily as "Tavily Search"
     participant RelevanceFilter as "OpenAI Relevance Filter"
     participant Extractor as "Content Extractor"
@@ -121,38 +132,48 @@ sequenceDiagram
     User->>Frontend: claim 제출
     Frontend->>ReviewAPI: review 생성 요청
     ReviewAPI->>DB: claim / review job 저장
-    ReviewAPI->>QueryRefiner: raw claim 기반 core_claim + queries[3] 요청
+    ReviewAPI->>QueryRefiner: raw claim 기반 core_claim + queries[3] + topic country 판정 요청
     QueryRefiner-->>ReviewAPI: structured JSON 반환
-    ReviewAPI->>DB: core_claim / generated_queries 저장
+    ReviewAPI->>DB: core_claim / generated_queries / topic country 저장
 
-    loop query 3개
-        ReviewAPI->>Tavily: query별 검색 요청
-        Tavily-->>ReviewAPI: search results 반환
+    ReviewAPI->>DomainRegistry: userCountry + topicCountryCode 기준 trusted domains 조회
+    DomainRegistry-->>ReviewAPI: familiar / verification domain sets 반환
+
+    opt familiar pass
+        loop query 3개
+            ReviewAPI->>Tavily: include_domains=familiar domains 검색
+            Tavily-->>ReviewAPI: familiar results 반환
+        end
     end
 
-    ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거
-    ReviewAPI->>RelevanceFilter: candidate relevance 판정 요청
-    RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
-    ReviewAPI->>DB: relevance_tier / relevance_reason / origin_query_ids 저장
+    opt verification pass
+        loop query 3개
+            ReviewAPI->>Tavily: include_domains=verification domains 검색
+            Tavily-->>ReviewAPI: verification results 반환
+        end
+    end
 
-    alt relevant source가 충분한 경우
-        ReviewAPI->>Extractor: primary source만 본문 추출 요청
-        Extractor-->>ReviewAPI: content / snippet 후보 반환
-    else relevant source가 부족한 경우
+    ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / retrieval bucket 부여
+    ReviewAPI->>RelevanceFilter: topic country + bucket metadata 기반 relevance 판정 요청
+    RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
+
+    alt relevant source가 부족한 경우
         ReviewAPI->>Tavily: fallback search 요청
         Tavily-->>ReviewAPI: fallback results 반환
         ReviewAPI->>RelevanceFilter: fallback candidate 재판정 요청
         RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
-        opt fallback 이후에도 부족한 경우
-            ReviewAPI->>ReviewAPI: reference 제한 승격 또는 근거 부족 상태 유지
-        end
     end
 
+    ReviewAPI->>DB: relevance / origin_query_ids / retrievalBucket / sourceCountryCode 저장
+
     alt extract 대상이 있는 경우
-        ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
-    else extract 대상이 없는 경우
-        ReviewAPI->>DB: evidence 부족 handoff / audit 저장
+        ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
+        Extractor-->>ReviewAPI: content / snippet 후보 반환
+    else extract 대상이 부족한 경우
+        ReviewAPI->>ReviewAPI: verification source 부족 또는 evidence 부족 상태 유지
     end
+
+    ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
 ```
 
 ## 단계별 입출력 아티팩트
@@ -160,10 +181,10 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]` |
-| Source Search | `generated_queries[]` | title, snippet, canonical URL, publisher metadata를 포함한 search candidates |
+| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason` |
+| Source Search | `generated_queries[]`, user country, domain registry | title, snippet, canonical URL, publisher metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]` |
-| Relevance Filtering | `core_claim`, title, snippet, candidate metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]` |
+| Relevance Filtering | `core_claim`, title, snippet, candidate metadata, country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]` |
 | Relevant Source Selection | relevance 판정 결과 | extraction 대상 source 목록 |
 | Content Extraction and Evidence Preparation | extraction 대상 source | content, snippet 후보 |
 | Handoff to Interpretation | `core_claim`, source, snippet 후보, audit 정보 | `interpretation_handoff_payload` |
@@ -174,10 +195,16 @@ sequenceDiagram
 
 - `raw_claim`
 - `core_claim`
+- `claim_language_code`
 - `generated_queries`
+- `topic_scope`
+- `topic_country_code`
+- `country_detection_reason`
 - source별 `origin_query_ids`
 - source별 `relevance_tier`
 - source별 `relevance_reason`
+- source별 `retrieval_bucket`
+- source별 `source_country_code`
 
 이 정보는 사용자에게 모두 직접 노출할 필요는 없지만, 아래 목적을 위해 내부적으로 추적 가능해야 한다.
 
@@ -194,6 +221,7 @@ sequenceDiagram
 - relevance 판정 대상: 최대 15개
 - 1차 extraction 대상: `primary` 최대 5개
 - `reference` 승격 대상: 최대 3개
+- `include_domains` 목록은 pass별 최대 8개로 제한
 
 ## 실패/예외 처리 원칙
 

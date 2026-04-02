@@ -3,19 +3,25 @@ import { ConfigService } from "@nestjs/config";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
 import {
+  DomainRegistryEntry,
   QueryArtifact,
+  RetrievalBucket,
   ReviewRelevanceTier,
   SearchCandidate,
+  TopicScope,
   buildCanonicalUrl,
   buildMockCoreClaim,
   buildMockQueries,
   buildNormalizedHash,
   classifySourceType,
+  inferCountryCodeFromUrl,
+  matchDomainRegistryEntry,
+  normalizeCountryCode,
 } from "./reviews.utils";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
-const OPENAI_TIMEOUT_MS = 30000;
+const OPENAI_TIMEOUT_MS = 300000;
 const TAVILY_SEARCH_URL = "https://api.tavily.com/search";
 const TAVILY_EXTRACT_URL = "https://api.tavily.com/extract";
 const TAVILY_RESULTS_PER_QUERY = 5;
@@ -23,9 +29,30 @@ const MAX_EXTRACTION_CONTENT_LENGTH = 20000;
 const MAX_SNIPPET_LENGTH = 320;
 
 interface QueryRefinementResult {
-  languageCode: string;
+  claimLanguageCode: string;
   coreClaim: string;
   generatedQueries: QueryArtifact[];
+  topicScope: TopicScope;
+  topicCountryCode: string | null;
+  countryDetectionReason: string;
+}
+
+interface SearchSourcesInput {
+  queries: QueryArtifact[];
+  coreClaim: string;
+  claimLanguageCode: string;
+  userCountryCode: string | null;
+  topicCountryCode: string | null;
+  topicScope: TopicScope;
+  domainRegistry: DomainRegistryEntry[];
+}
+
+interface RelevanceFilteringInput {
+  coreClaim: string;
+  claimLanguageCode: string;
+  topicCountryCode: string | null;
+  topicScope: TopicScope;
+  candidates: SearchCandidate[];
 }
 
 interface ExtractedSource {
@@ -38,6 +65,9 @@ interface OpenAiQueryRefinementPayload {
   languageCode: string;
   coreClaim: string;
   generatedQueries: string[];
+  topicScope: TopicScope;
+  topicCountryCode: string | null;
+  countryDetectionReason: string;
 }
 
 interface OpenAiRelevanceDecision {
@@ -68,6 +98,15 @@ interface TavilyExtractResponse {
   }>;
 }
 
+interface SearchSingleQueryInput {
+  apiKey: string;
+  query: QueryArtifact;
+  timeoutMs: number;
+  bucket: RetrievalBucket;
+  includeDomains?: string[];
+  registry: DomainRegistryEntry[];
+}
+
 @Injectable()
 export class ReviewsProvidersService {
   constructor(private readonly configService: ConfigService) {}
@@ -82,7 +121,14 @@ export class ReviewsProvidersService {
           schema: {
             type: "object",
             additionalProperties: false,
-            required: ["languageCode", "coreClaim", "generatedQueries"],
+            required: [
+              "languageCode",
+              "coreClaim",
+              "generatedQueries",
+              "topicScope",
+              "topicCountryCode",
+              "countryDetectionReason",
+            ],
             properties: {
               languageCode: { type: "string" },
               coreClaim: { type: "string" },
@@ -92,14 +138,32 @@ export class ReviewsProvidersService {
                 minItems: 3,
                 maxItems: 3,
               },
+              topicScope: {
+                type: "string",
+                enum: ["domestic", "foreign", "multi_country", "unknown"],
+              },
+              topicCountryCode: {
+                anyOf: [{ type: "string" }, { type: "null" }],
+              },
+              countryDetectionReason: { type: "string" },
             },
           },
         },
         [
           {
             role: "system",
-            content:
-              "사용자 발화에서 팩트체크가 필요한 핵심 주장을 추출하고 뉴스 검색에 최적화된 쿼리 3개를 JSON으로 반환하세요. 언어는 원문 언어를 유지하세요. 구어체는 제거하고 고유명사, 날짜, 수치, 기관명은 우선 포함하세요. 검색 엔진 친화적인 명사형 쿼리로 변환하세요.",
+            content: `사용자 발화에서 팩트체크가 필요한 핵심 주장을 추출하고 뉴스 검색에 최적화된 쿼리 3개를 JSON으로 반환하세요.
+
+쿼리 작성 규칙:
+- 2~4개 핵심 명사만 사용 (조사, 부사, 메타 표현 제거)
+  - 나쁜 예: "테슬라 한국 완전 철수 공식 발표 여부"
+  - 좋은 예: "테슬라 한국 철수"
+- "여부", "가능성", "공식", "발표", "관련" 같은 메타 표현은 절대 포함하지 마세요
+- 3개 쿼리는 서로 다른 각도로 작성 (동의어 변형, 주체 변경 등)
+  - 예: "테슬라 한국 철수" / "테슬라 코리아 사업 중단" / "테슬라 한국 매장 폐점"
+- 고유명사(기업명, 인명, 지명)는 원문 그대로 유지
+
+languageCode는 원문 언어를 유지하세요. topicCountryCode는 핵심 뉴스/주장의 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요. topicScope는 domestic, foreign, multi_country, unknown 중 하나만 선택하세요. countryDetectionReason에는 왜 그렇게 판정했는지 짧게 설명하세요.`,
           },
           {
             role: "user",
@@ -110,13 +174,26 @@ export class ReviewsProvidersService {
       );
 
     const queries = payload.generatedQueries
-      .map((query, index) => query.trim())
+      .map((query) =>
+        query
+          .trim()
+          .split(/\s+/)
+          .map((word) => (word.length >= 2 ? `"${word}"` : word))
+          .join(" "),
+      )
       .filter(Boolean);
+    const topicCountryCode = normalizeCountryCode(payload.topicCountryCode);
 
     if (
       typeof payload.languageCode !== "string" ||
       typeof payload.coreClaim !== "string" ||
+      typeof payload.countryDetectionReason !== "string" ||
       !payload.languageCode.trim() ||
+      !payload.coreClaim.trim() ||
+      !payload.countryDetectionReason.trim() ||
+      !["domestic", "foreign", "multi_country", "unknown"].includes(
+        payload.topicScope,
+      ) ||
       queries.length !== 3
     ) {
       throw new AppException(
@@ -127,32 +204,69 @@ export class ReviewsProvidersService {
     }
 
     return {
-      languageCode: payload.languageCode.trim(),
+      claimLanguageCode: payload.languageCode.trim(),
       coreClaim: payload.coreClaim.trim(),
       generatedQueries: queries.map((query, index) => ({
         id: `q${index + 1}`,
         text: query,
         rank: index + 1,
       })),
+      topicScope: payload.topicScope,
+      topicCountryCode,
+      countryDetectionReason: payload.countryDetectionReason.trim(),
     };
   }
 
-  async searchSources(
+  async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
+    const apiKey = this.getRequiredTavilyApiKey();
+    const timeoutMs = this.getTavilySearchTimeoutMs();
+    const requests: Promise<SearchCandidate[]>[] = [];
+    const verificationDomains = this.selectDomainsForBucket(
+      input.domainRegistry,
+      "verification",
+      input.userCountryCode,
+      input.topicCountryCode,
+    );
+
+    requests.push(
+      ...input.queries.map((query) =>
+        this.searchSingleQuery({
+          apiKey,
+          query,
+          timeoutMs,
+          bucket: "verification",
+          includeDomains: verificationDomains,
+          registry: input.domainRegistry,
+        }),
+      ),
+    );
+
+    return requests.length ? (await Promise.all(requests)).flat() : [];
+  }
+
+  async searchFallbackSources(
     queries: QueryArtifact[],
-    coreClaim: string,
+    domainRegistry: DomainRegistryEntry[],
   ): Promise<SearchCandidate[]> {
     const apiKey = this.getRequiredTavilyApiKey();
     const timeoutMs = this.getTavilySearchTimeoutMs();
     const queryResults = await Promise.all(
-      queries.map((query) => this.searchSingleQuery(apiKey, query, timeoutMs)),
+      queries.map((query) =>
+        this.searchSingleQuery({
+          apiKey,
+          query,
+          timeoutMs,
+          bucket: "fallback",
+          registry: domainRegistry,
+        }),
+      ),
     );
 
     return queryResults.flat();
   }
 
   async applyRelevanceFiltering(
-    coreClaim: string,
-    candidates: SearchCandidate[],
+    input: RelevanceFilteringInput,
   ): Promise<SearchCandidate[]> {
     const apiKey = this.getRequiredOpenAiApiKey();
     const payload =
@@ -188,20 +302,25 @@ export class ReviewsProvidersService {
           {
             role: "system",
             content:
-              "당신은 뉴스 검토용 relevance filter입니다. core claim, 기사 제목, snippet, 출처 유형을 보고 extraction 이전 단계에서 source를 분류하세요. primary는 직접 검증 근거, reference는 공식 입장문·정정 기사·배경 해설처럼 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
+              "당신은 뉴스 검토용 relevance filter입니다. core claim, 기사 제목, snippet, 출처 유형, retrieval bucket, source country를 보고 extraction 이전 단계에서 source를 분류하세요. foreign topic에서는 한국 familiar 기사만으로 primary를 과대 부여하지 말고, verification source를 우선하세요. primary는 직접 검증 근거, reference는 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
           },
           {
             role: "user",
             content: JSON.stringify(
               {
-                coreClaim,
-                candidates: candidates.map((candidate) => ({
+                coreClaim: input.coreClaim,
+                claimLanguageCode: input.claimLanguageCode,
+                topicCountryCode: input.topicCountryCode,
+                topicScope: input.topicScope,
+                candidates: input.candidates.map((candidate) => ({
                   candidateId: candidate.id,
                   title: candidate.rawTitle,
                   snippet: candidate.rawSnippet,
                   publisherName: candidate.publisherName,
                   sourceType: candidate.sourceType,
                   canonicalUrl: candidate.canonicalUrl,
+                  retrievalBucket: candidate.retrievalBucket,
+                  sourceCountryCode: candidate.sourceCountryCode,
                 })),
               },
               null,
@@ -212,7 +331,7 @@ export class ReviewsProvidersService {
         "관련성 필터링 요청에 실패했습니다.",
       );
 
-    if (!this.isValidRelevancePayload(payload, candidates)) {
+    if (!this.isValidRelevancePayload(payload, input.candidates)) {
       throw new AppException(
         APP_ERROR_CODES.LLM_SCHEMA_ERROR,
         "관련성 필터링 결과가 요구 형식을 충족하지 않습니다.",
@@ -224,7 +343,7 @@ export class ReviewsProvidersService {
       payload.decisions.map((decision) => [decision.candidateId, decision]),
     );
 
-    return candidates.map((candidate) => {
+    return input.candidates.map((candidate) => {
       const decision = decisions.get(candidate.id);
 
       return {
@@ -301,6 +420,35 @@ export class ReviewsProvidersService {
     return extracted;
   }
 
+  private selectDomainsForBucket(
+    registry: DomainRegistryEntry[],
+    bucket: "familiar" | "verification",
+    userCountryCode: string | null,
+    topicCountryCode: string | null,
+  ): string[] {
+    const usageRoles =
+      bucket === "familiar"
+        ? ["familiar_news"]
+        : ["verification_official", "verification_news", "global_reference"];
+    const allowedCountries =
+      bucket === "familiar"
+        ? [userCountryCode].filter((value): value is string => Boolean(value))
+        : [topicCountryCode, "GLOBAL"].filter((value): value is string =>
+            Boolean(value),
+          );
+
+    return registry
+      .filter(
+        (entry) =>
+          entry.isActive &&
+          usageRoles.includes(entry.usageRole) &&
+          allowedCountries.includes(entry.countryCode),
+      )
+      .sort((left, right) => left.priority - right.priority)
+      .map((entry) => entry.domain)
+      .filter((domain, index, domains) => domains.indexOf(domain) === index);
+  }
+
   private getRequiredOpenAiApiKey(): string {
     const apiKey = this.configService.get<string | null>("openAiApiKey", null);
 
@@ -373,29 +521,30 @@ export class ReviewsProvidersService {
   }
 
   private async searchSingleQuery(
-    apiKey: string,
-    query: QueryArtifact,
-    timeoutMs: number,
+    input: SearchSingleQueryInput,
   ): Promise<SearchCandidate[]> {
+    const httpState = {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: input.query.text,
+        topic: "news",
+        search_depth: "advanced",
+        include_answer: false,
+        include_raw_content: false,
+        max_results: TAVILY_RESULTS_PER_QUERY,
+        time_range: "year",
+        exact_match: true,
+        include_domains: input.includeDomains ?? [],
+      }),
+    };
     const response = await this.postJson<TavilySearchResponse>(
       TAVILY_SEARCH_URL,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: query.text,
-          topic: "news",
-          search_depth: "advanced",
-          include_answer: false,
-          include_raw_content: false,
-          max_results: TAVILY_RESULTS_PER_QUERY,
-          time_range: "year",
-        }),
-      },
-      timeoutMs,
+      httpState,
+      input.timeoutMs,
       APP_ERROR_CODES.SOURCE_SEARCH_FAILED,
       "Tavily 검색 요청에 실패했습니다.",
     );
@@ -416,9 +565,13 @@ export class ReviewsProvidersService {
           typeof result.content === "string"
             ? this.normalizeSnippet(result.content)
             : null;
+        const registryMatch = matchDomainRegistryEntry(
+          canonicalUrl,
+          input.registry,
+        );
 
         return {
-          id: `${query.id}-c${index + 1}`,
+          id: `${input.query.id}-${input.bucket}-c${index + 1}`,
           sourceType: classifySourceType(canonicalUrl, rawTitle),
           publisherName: this.inferPublisherName(canonicalUrl),
           publishedAt: this.readPublishedAt(result),
@@ -427,7 +580,14 @@ export class ReviewsProvidersService {
           rawTitle,
           rawSnippet,
           normalizedHash: buildNormalizedHash(canonicalUrl),
-          originQueryIds: [query.id],
+          originQueryIds: [input.query.id],
+          sourceCountryCode:
+            registryMatch?.countryCode === "GLOBAL"
+              ? null
+              : (registryMatch?.countryCode ??
+                inferCountryCodeFromUrl(canonicalUrl)),
+          retrievalBucket: input.bucket,
+          domainRegistryId: registryMatch?.id ?? null,
         };
       })
       .filter((candidate): candidate is SearchCandidate => candidate !== null);
@@ -682,73 +842,77 @@ export class ReviewsProvidersService {
   }
 
   private buildMockRefinement(rawClaim: string): QueryRefinementResult {
-    const languageCode = /[가-힣]/.test(rawClaim) ? "ko" : "en";
+    const claimLanguageCode = /[가-힣]/.test(rawClaim) ? "ko" : "en";
     const coreClaim = buildMockCoreClaim(rawClaim);
-    const generatedQueries = buildMockQueries(coreClaim, languageCode);
+    const normalizedClaim = rawClaim.toLowerCase();
+    let topicScope: TopicScope = "unknown";
+    let topicCountryCode: string | null = null;
+    let countryDetectionReason =
+      "명시적인 국가 단서가 부족해 unknown으로 처리했습니다.";
 
-    if (generatedQueries.length !== 3) {
-      throw new AppException(
-        APP_ERROR_CODES.LLM_SCHEMA_ERROR,
-        "질의 정제 결과가 요구 형식을 충족하지 않습니다.",
-        HttpStatus.BAD_GATEWAY,
-      );
+    if (/(한국|대한민국|국내|대통령실|정부|서울)/u.test(rawClaim)) {
+      topicScope = "domestic";
+      topicCountryCode = "KR";
+      countryDetectionReason =
+        "한국 관련 고유명사와 기관 표현이 확인되어 국내 이슈로 판단했습니다.";
+    } else if (
+      /(미국|트럼프|백악관|washington|united states|america)/i.test(
+        normalizedClaim,
+      )
+    ) {
+      topicScope = "foreign";
+      topicCountryCode = "US";
+      countryDetectionReason =
+        "미국 정치 또는 기관 단서가 확인되어 미국 이슈로 판단했습니다.";
+    } else if (/(일본|도쿄|기시다|japan|tokyo)/i.test(normalizedClaim)) {
+      topicScope = "foreign";
+      topicCountryCode = "JP";
+      countryDetectionReason =
+        "일본 관련 고유명사 단서가 확인되어 일본 이슈로 판단했습니다.";
     }
 
     return {
-      languageCode,
+      claimLanguageCode,
       coreClaim,
-      generatedQueries,
+      generatedQueries: buildMockQueries(coreClaim, claimLanguageCode),
+      topicScope,
+      topicCountryCode,
+      countryDetectionReason,
     };
   }
 
-  private buildMockSearchResults(
+
+  private buildMockFallbackSearchResults(
     queries: QueryArtifact[],
-    coreClaim: string,
+    domainRegistry: DomainRegistryEntry[],
   ): SearchCandidate[] {
-    const safeClaim = coreClaim || queries[0]?.text || "검토 대상 주장";
-    const baseResults = [
+    const fallbackResults = [
       {
-        publisherName: "연합뉴스",
-        title: `${safeClaim} 관련 보도`,
-        snippet: `${safeClaim}와 관련해 주요 사실관계와 배경을 설명하는 기사입니다.`,
-        url: "https://news.example.com/articles/varo-core",
+        title: "국제 통신 보도",
+        snippet: "fallback 검색으로 확보한 국제 보도입니다.",
+        url: "https://www.reuters.com/world/fallback-coverage",
       },
       {
-        publisherName: "정부부처 보도자료",
-        title: `${safeClaim} 공식 입장`,
-        snippet: `${safeClaim}와 관련된 공식 설명과 기준 문장을 포함합니다.`,
-        url: "https://www.gov.example.kr/press/varo-official",
-      },
-      {
-        publisherName: "해설 매체",
-        title: `${safeClaim} 해설`,
-        snippet: `${safeClaim}의 맥락을 설명하지만 직접 검증 근거는 제한적일 수 있습니다.`,
-        url: "https://analysis.example.com/varo-explainer",
-      },
-      {
-        publisherName: "무관한 블로그",
-        title: `${safeClaim.split(" ")[0] ?? safeClaim} 투자 전략`,
-        snippet:
-          "동일 키워드를 포함하지만 검토 대상 주장과 직접 관련 없는 글입니다.",
-        url: "https://blog.example.com/off-topic",
+        title: "공식 기관 업데이트",
+        snippet: "fallback 검색으로 확보한 공식 출처입니다.",
+        url: "https://www.whitehouse.gov/briefing-room/fallback-update",
       },
     ];
 
     return queries.flatMap((query, index) =>
-      baseResults.slice(0, index === 0 ? 4 : 3).map((result, resultIndex) => {
-        const canonicalUrl =
-          resultIndex === 0 && index > 0
-            ? buildCanonicalUrl(
-                "https://news.example.com/articles/varo-core?utm_source=dup",
-              )
-            : buildCanonicalUrl(result.url);
+      fallbackResults.map((result, resultIndex) => {
+        const canonicalUrl = buildCanonicalUrl(result.url);
+        const registryMatch = matchDomainRegistryEntry(
+          canonicalUrl,
+          domainRegistry,
+        );
 
         return {
-          id: `${query.id}-c${resultIndex + 1}`,
+          id: `${query.id}-fallback-c${index + resultIndex + 1}`,
           sourceType: classifySourceType(canonicalUrl, result.title),
-          publisherName: result.publisherName,
+          publisherName: this.inferPublisherName(canonicalUrl),
           publishedAt: new Date(
-            Date.now() - (index + resultIndex + 1) * 60 * 60 * 1000,
+            Date.now() - (index + resultIndex + 1) * 30 * 60 * 1000,
           ).toISOString(),
           canonicalUrl,
           originalUrl: result.url,
@@ -756,54 +920,15 @@ export class ReviewsProvidersService {
           rawSnippet: result.snippet,
           normalizedHash: buildNormalizedHash(canonicalUrl),
           originQueryIds: [query.id],
+          sourceCountryCode:
+            registryMatch?.countryCode === "GLOBAL"
+              ? null
+              : (registryMatch?.countryCode ??
+                inferCountryCodeFromUrl(canonicalUrl)),
+          retrievalBucket: "fallback",
+          domainRegistryId: registryMatch?.id ?? null,
         };
       }),
     );
-  }
-
-  private buildMockRelevance(
-    coreClaim: string,
-    candidates: SearchCandidate[],
-  ): SearchCandidate[] {
-    return candidates.map((candidate) => {
-      const combined =
-        `${candidate.rawTitle} ${candidate.rawSnippet ?? ""}`.toLowerCase();
-      const coreTokens = coreClaim.toLowerCase().split(/\s+/).filter(Boolean);
-      const matchedTokens = coreTokens.filter((token) =>
-        combined.includes(token),
-      ).length;
-
-      let relevanceTier: ReviewRelevanceTier = "discard";
-      let reason = "검토 대상 주장과 직접 관련된 근거 신호가 부족합니다.";
-
-      if (candidate.sourceType === "official" || matchedTokens >= 2) {
-        relevanceTier = "primary";
-        reason =
-          "핵심 claim과 직접 관련된 제목 또는 공식 출처 신호가 확인됩니다.";
-      } else if (matchedTokens === 1 || candidate.sourceType === "analysis") {
-        relevanceTier = "reference";
-        reason = "직접성은 약하지만 보조 맥락으로 검토할 가치가 있습니다.";
-      }
-
-      return {
-        ...candidate,
-        relevanceTier,
-        relevanceReason: reason,
-      };
-    });
-  }
-
-  private async buildMockExtraction(
-    candidates: SearchCandidate[],
-  ): Promise<ExtractedSource[]> {
-    return candidates.map((candidate) => ({
-      canonicalUrl: candidate.canonicalUrl,
-      contentText:
-        candidate.rawSnippet ??
-        `${candidate.rawTitle}에 대한 추출 본문이 생성되지 않아 snippet을 본문 대체값으로 사용합니다.`,
-      snippetText:
-        candidate.rawSnippet ??
-        `${candidate.rawTitle} 관련 핵심 문장을 추출했습니다.`,
-    }));
   }
 }

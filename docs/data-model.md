@@ -157,6 +157,12 @@
 | `content_text` | text nullable | 정제된 본문 |
 | `is_duplicate` | boolean | 중복 여부 |
 | `duplicate_group_key` | varchar(128) nullable | 중복 묶음 키 |
+| `origin_query_ids` | jsonb nullable | source를 찾은 query id 목록 |
+| `relevance_tier` | varchar(32) nullable | `primary / reference / discard` |
+| `relevance_reason` | text nullable | relevance 판정 이유 |
+| `source_country_code` | varchar(16) nullable | source 국가 코드 |
+| `retrieval_bucket` | varchar(32) nullable | `familiar / verification / fallback` |
+| `domain_registry_id` | fk nullable | 매칭된 trusted domain registry |
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |
@@ -196,7 +202,21 @@
 | `duration_ms` | integer | 소요 시간 |
 | `trace_id` | varchar(128) | 추적 id |
 
-### 6.10 `community_posts`
+### 6.10 `source_domain_registry`
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | uuid / text id | registry 식별자 |
+| `domain` | text | 도메인 또는 wildcard 패턴 |
+| `country_code` | varchar(16) | 국가 코드 |
+| `language_code` | varchar(16) nullable | 주요 언어 코드 |
+| `source_kind` | varchar(64) | `government`, `news_agency` 등 |
+| `usage_role` | varchar(64) | `familiar_news`, `verification_official`, `verification_news`, `global_reference` |
+| `priority` | integer | 검색 우선순위 |
+| `is_active` | boolean | 활성 여부 |
+| `created_at` | timestamptz | 생성 시각 |
+| `updated_at` | timestamptz | 갱신 시각 |
+
+### 6.11 `community_posts`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | 게시글 식별자 |
@@ -207,7 +227,7 @@
 | `created_at` | timestamptz | 생성 시각 |
 | `updated_at` | timestamptz | 갱신 시각 |
 
-### 6.11 `community_comments`
+### 6.12 `community_comments`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | 댓글 식별자 |
@@ -216,7 +236,7 @@
 | `body` | text | 본문 |
 | `created_at` | timestamptz | 생성 시각 |
 
-### 6.12 `community_reactions`
+### 6.13 `community_reactions`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | 반응 식별자 |
@@ -226,7 +246,7 @@
 | `reaction_type` | varchar(32) | 반응 유형 |
 | `created_at` | timestamptz | 생성 시각 |
 
-### 6.13 `notifications`
+### 6.14 `notifications`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | 알림 식별자 |

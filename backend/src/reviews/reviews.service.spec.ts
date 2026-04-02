@@ -36,13 +36,45 @@ describe("ReviewsService", () => {
           }),
         ),
     },
+    userProfile: {
+      findUnique: jest.fn().mockResolvedValue({
+        country: "KR",
+      }),
+      create: jest.fn().mockResolvedValue(undefined),
+    },
+    sourceDomainRegistry: {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "kr-familiar",
+          domain: "yna.co.kr",
+          countryCode: "KR",
+          languageCode: "ko",
+          sourceKind: "news_agency",
+          usageRole: "familiar_news",
+          priority: 10,
+          isActive: true,
+        },
+        {
+          id: "us-verification",
+          domain: "reuters.com",
+          countryCode: "US",
+          languageCode: "en",
+          sourceKind: "news_agency",
+          usageRole: "verification_news",
+          priority: 20,
+          isActive: true,
+        },
+      ]),
+    },
+    user: {
+      upsert: jest.fn().mockResolvedValue({
+        id: "preview-user-1",
+      }),
+    },
   });
 
   it("빈 claim이면 입력 검증 예외를 던진다", async () => {
-    const service = new ReviewsService(
-      createPrismaMock() as never,
-      {} as never,
-    );
+    const service = new ReviewsService(createPrismaMock() as never, {} as never);
 
     await expect(
       service.createQueryProcessingPreview("user-1", {
@@ -53,52 +85,71 @@ describe("ReviewsService", () => {
     });
   });
 
-  it("query processing preview를 저장하고 handoff payload를 반환한다", async () => {
+  it("country-aware query processing preview를 저장하고 응답 메타데이터를 반환한다", async () => {
     const prisma = createPrismaMock();
     const providers = {
       refineQuery: jest.fn().mockResolvedValue({
-        languageCode: "ko",
-        coreClaim: "테슬라의 한국 시장 철수",
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
         generatedQueries: [
-          { id: "q1", text: "테슬라 한국 철수", rank: 1 },
-          { id: "q2", text: "테슬라 한국 공식 발표", rank: 2 },
-          { id: "q3", text: "테슬라 한국 정정 해명", rank: 3 },
+          { id: "q1", text: "트럼프 관세 발표", rank: 1 },
+          { id: "q2", text: "Trump tariff announcement", rank: 2 },
+          { id: "q3", text: "미국 관세 정책 발표", rank: 3 },
         ],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason:
+          "미국 대통령과 관세 정책 단서가 확인되어 미국 이슈로 판단했습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([
         {
           id: "c1",
-          sourceType: "official",
-          publisherName: "정부부처 보도자료",
+          sourceType: "news",
+          publisherName: "연합뉴스",
           publishedAt: "2026-04-01T00:00:00.000Z",
-          canonicalUrl: "https://www.gov.example.kr/press/varo-official",
-          originalUrl: "https://www.gov.example.kr/press/varo-official?utm_source=x",
-          rawTitle: "테슬라 한국 사업 관련 공식 입장",
-          rawSnippet: "공식 설명입니다.",
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "트럼프 관세 발표 관련 한국 보도",
+          rawSnippet: "국내 종합 기사입니다.",
           normalizedHash: "hash-1",
-          originQueryIds: ["q1", "q2"],
-          relevanceTier: "primary",
-          relevanceReason: "공식 출처입니다.",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: "kr-familiar",
         },
         {
           id: "c2",
-          sourceType: "analysis",
-          publisherName: "해설 매체",
+          sourceType: "news",
+          publisherName: "Reuters",
           publishedAt: "2026-04-01T01:00:00.000Z",
-          canonicalUrl: "https://analysis.example.com/varo-explainer",
-          originalUrl: "https://analysis.example.com/varo-explainer",
-          rawTitle: "테슬라 한국 철수 해설",
-          rawSnippet: "직접 근거는 약하지만 배경 설명입니다.",
+          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          rawTitle: "Trump tariff announcement update",
+          rawSnippet: "원문 검증 보도입니다.",
           normalizedHash: "hash-2",
-          originQueryIds: ["q3"],
-          relevanceTier: "reference",
-          relevanceReason: "보조 맥락입니다.",
+          originQueryIds: ["q2"],
+          sourceCountryCode: "US",
+          retrievalBucket: "verification",
+          domainRegistryId: "us-verification",
         },
       ]),
-      applyRelevanceFiltering: jest.fn().mockImplementation(async (_coreClaim, candidates) => candidates),
+      searchFallbackSources: jest.fn().mockResolvedValue([]),
+      applyRelevanceFiltering: jest
+        .fn()
+        .mockImplementation(async ({ candidates }) =>
+          candidates.map((candidate: Record<string, unknown>) => ({
+            ...candidate,
+            relevanceTier:
+              candidate.retrievalBucket === "verification" ? "primary" : "reference",
+            relevanceReason:
+              candidate.retrievalBucket === "verification"
+                ? "원문 검증 source입니다."
+                : "국내 친숙형 보도로 보조 근거입니다.",
+          })),
+        ),
       extractContent: jest.fn().mockResolvedValue([
         {
-          canonicalUrl: "https://www.gov.example.kr/press/varo-official",
+          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
           contentText: "추출 본문",
           snippetText: "추출 snippet",
         },
@@ -107,101 +158,154 @@ describe("ReviewsService", () => {
     const service = new ReviewsService(prisma as never, providers as never);
 
     const result = await service.createQueryProcessingPreview("user-1", {
-      claim: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
+      claim: "트럼프가 오늘 관세 발표했대",
     });
 
     expect(result.reviewId).toBe("review-1");
-    expect(result.claimId).toBe("claim-1");
+    expect(result.claimLanguageCode).toBe("ko");
+    expect(result.topicScope).toBe("foreign");
+    expect(result.topicCountryCode).toBe("US");
+    expect(result.countryDetectionReason).toContain("미국");
     expect(result.generatedQueries).toHaveLength(3);
     expect(result.sources).toHaveLength(2);
+    expect(result.sources[0]?.retrievalBucket).toBe("familiar");
+    expect(result.sources[1]?.retrievalBucket).toBe("verification");
+    expect(result.sources[1]?.domainRegistryMatched).toBe(true);
     expect(result.evidenceSnippets).toHaveLength(1);
-    expect(result.evidenceSnippets[0]?.snippetText).toBe("추출 snippet");
-    expect(result.handoff.sourceIds).toHaveLength(1);
-    expect(prisma.claim.create).toHaveBeenCalledWith({
-      data: {
-        rawText: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
-        normalizedText: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
-      },
+    expect(prisma.userProfile.findUnique).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      select: { country: true },
     });
-    expect(prisma.reviewJob.update).toHaveBeenCalledWith(
+    expect(providers.searchSources).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "review-1" },
-        data: expect.objectContaining({
-          status: "partial",
-          currentStage: "handoff_ready",
-        }),
+        userCountryCode: "KR",
+        topicCountryCode: "US",
       }),
     );
   });
 
-  it("중복 source를 canonical URL 기준으로 병합하면서 origin query lineage를 유지한다", async () => {
+  it("verification source가 부족하면 fallback search를 수행한다", async () => {
     const prisma = createPrismaMock();
     const providers = {
       refineQuery: jest.fn().mockResolvedValue({
-        languageCode: "ko",
-        coreClaim: "테슬라의 한국 시장 철수",
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
         generatedQueries: [
-          { id: "q1", text: "테슬라 한국 철수", rank: 1 },
-          { id: "q2", text: "Tesla Korea market exit", rank: 2 },
-          { id: "q3", text: "테슬라 한국 영업 중단", rank: 3 },
+          { id: "q1", text: "트럼프 관세 발표", rank: 1 },
+          { id: "q2", text: "Trump tariff announcement", rank: 2 },
+          { id: "q3", text: "미국 관세 정책 발표", rank: 3 },
         ],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([
         {
           id: "c1",
           sourceType: "news",
           publisherName: "연합뉴스",
-          publishedAt: "2026-04-01T00:00:00.000Z",
-          canonicalUrl: "https://news.example.com/articles/varo-core",
-          originalUrl: "https://news.example.com/articles/varo-core?utm_source=q1",
-          rawTitle: "테슬라 한국 사업 철수 보도",
-          rawSnippet: "첫 번째 검색 결과입니다.",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "트럼프 관세 발표 관련 한국 보도",
+          rawSnippet: "국내 종합 기사입니다.",
           normalizedHash: "hash-1",
           originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: "kr-familiar",
         },
+      ]),
+      searchFallbackSources: jest.fn().mockResolvedValue([
         {
           id: "c2",
           sourceType: "news",
-          publisherName: "연합뉴스",
-          publishedAt: "2026-04-01T01:00:00.000Z",
-          canonicalUrl: "https://news.example.com/articles/varo-core",
-          originalUrl: "https://news.example.com/articles/varo-core?utm_source=q2",
-          rawTitle: "테슬라 한국 사업 철수 보도",
-          rawSnippet: "두 번째 검색 결과입니다.",
-          normalizedHash: "hash-1",
+          publisherName: "Reuters",
+          publishedAt: null,
+          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          rawTitle: "Trump tariff announcement update",
+          rawSnippet: "원문 검증 보도입니다.",
+          normalizedHash: "hash-2",
           originQueryIds: ["q2"],
+          sourceCountryCode: "US",
+          retrievalBucket: "fallback",
+          domainRegistryId: "us-verification",
         },
       ]),
-      applyRelevanceFiltering: jest.fn().mockImplementation(async (_coreClaim, candidates) =>
-        candidates.map((candidate: { canonicalUrl: string }) => ({
-          ...candidate,
-          relevanceTier: "primary",
-          relevanceReason: "관련 보도입니다.",
-        })),
-      ),
+      applyRelevanceFiltering: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: "c1",
+            sourceType: "news",
+            publisherName: "연합뉴스",
+            publishedAt: null,
+            canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+            originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+            rawTitle: "트럼프 관세 발표 관련 한국 보도",
+            rawSnippet: "국내 종합 기사입니다.",
+            normalizedHash: "hash-1",
+            originQueryIds: ["q1"],
+            sourceCountryCode: "KR",
+            retrievalBucket: "familiar",
+            domainRegistryId: "kr-familiar",
+            relevanceTier: "reference",
+            relevanceReason: "보조 근거입니다.",
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "c1",
+            sourceType: "news",
+            publisherName: "연합뉴스",
+            publishedAt: null,
+            canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+            originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+            rawTitle: "트럼프 관세 발표 관련 한국 보도",
+            rawSnippet: "국내 종합 기사입니다.",
+            normalizedHash: "hash-1",
+            originQueryIds: ["q1"],
+            sourceCountryCode: "KR",
+            retrievalBucket: "familiar",
+            domainRegistryId: "kr-familiar",
+            relevanceTier: "reference",
+            relevanceReason: "보조 근거입니다.",
+          },
+          {
+            id: "c2",
+            sourceType: "news",
+            publisherName: "Reuters",
+            publishedAt: null,
+            canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+            originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+            rawTitle: "Trump tariff announcement update",
+            rawSnippet: "원문 검증 보도입니다.",
+            normalizedHash: "hash-2",
+            originQueryIds: ["q2"],
+            sourceCountryCode: "US",
+            retrievalBucket: "fallback",
+            domainRegistryId: "us-verification",
+            relevanceTier: "primary",
+            relevanceReason: "fallback으로 확보한 검증 source입니다.",
+          },
+        ]),
       extractContent: jest.fn().mockResolvedValue([
         {
-          canonicalUrl: "https://news.example.com/articles/varo-core",
+          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
           contentText: "추출 본문",
-          snippetText: "핵심 스니펫",
+          snippetText: "추출 snippet",
         },
       ]),
     };
     const service = new ReviewsService(prisma as never, providers as never);
 
     const result = await service.createQueryProcessingPreview("user-1", {
-      claim: "테슬라가 한국에서 완전 철수한대",
+      claim: "트럼프가 오늘 관세 발표했대",
     });
 
-    expect(result.sources).toHaveLength(1);
-    expect(result.sources[0]?.originQueryIds).toEqual(["q1", "q2"]);
-    expect(result.evidenceSnippets[0]?.snippetText).toBe("핵심 스니펫");
-    expect(prisma.claim.create).toHaveBeenCalledWith({
-      data: {
-        rawText: "테슬라가 한국에서 완전 철수한대",
-        normalizedText: "테슬라가 한국에서 완전 철수한대",
-      },
-    });
+    expect(providers.searchFallbackSources).toHaveBeenCalledTimes(1);
+    expect(result.sources.some((source) => source.retrievalBucket === "fallback")).toBe(true);
   });
 
   it("refinement가 실패해도 claim은 남기고 review job을 failed로 기록한다", async () => {
