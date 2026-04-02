@@ -59,6 +59,7 @@ model ReviewJob {
   id                  String            @id @default(uuid())
   userId              String            @map("user_id")
   claimId             String            @map("claim_id")
+  clientRequestId     String?           @map("client_request_id")
   status              String
   currentStage        String            @map("current_stage")
   searchedSourceCount Int               @default(0) @map("searched_source_count")
@@ -76,6 +77,7 @@ model ReviewJob {
 
   @@index([userId])
   @@index([claimId])
+  @@unique([userId, clientRequestId])
   @@map("review_jobs")
 }
 

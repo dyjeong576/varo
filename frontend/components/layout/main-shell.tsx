@@ -1,15 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Bell, Home, TrendingUp, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HistoryDrawer } from "@/components/ui/history-drawer";
 import { APP_NAME } from "@/lib/config/app";
+import {
+  getUnreadNotificationCount,
+  subscribeNotifications,
+} from "@/lib/notifications/store";
 
 export function MainShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isNotificationsPage = pathname === "/notifications";
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  useEffect(() => {
+    setUnreadNotificationCount(getUnreadNotificationCount());
+
+    return subscribeNotifications(() => {
+      setUnreadNotificationCount(getUnreadNotificationCount());
+    });
+  }, []);
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
@@ -35,7 +49,11 @@ export function MainShell({ children }: { children: React.ReactNode }) {
               aria-label="알림"
             >
               <Bell className="w-6 h-6" />
-              <div className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-blue-600 border-2 border-white rounded-full"></div>
+              {unreadNotificationCount > 0 ? (
+                <div className="absolute top-2.5 right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 border-2 border-white text-[10px] font-bold text-white flex items-center justify-center">
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </div>
+              ) : null}
             </Link>
           </div>
         </header>

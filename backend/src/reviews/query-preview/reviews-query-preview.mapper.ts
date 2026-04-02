@@ -8,6 +8,54 @@ import {
 } from "../reviews.types";
 import { hasVerificationSource } from "../reviews.utils";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
+import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
+
+interface ReviewClaimRecord {
+  id: string;
+  rawText: string;
+  normalizedText: string;
+}
+
+interface StoredReviewPreviewRecord {
+  id: string;
+  status: string;
+  currentStage: string;
+  searchedSourceCount: number;
+  lastErrorCode: string | null;
+  createdAt: Date;
+  claim: ReviewClaimRecord;
+  queryRefinement: Prisma.JsonValue | null;
+  handoffPayload: Prisma.JsonValue | null;
+  sources: Source[];
+  evidenceSnippets: EvidenceSnippet[];
+}
+
+interface StoredReviewPreviewSummaryRecord {
+  id: string;
+  status: string;
+  currentStage: string;
+  lastErrorCode: string | null;
+  createdAt: Date;
+  claim: Pick<ReviewClaimRecord, "rawText">;
+  sources: Array<Pick<Source, "fetchStatus">>;
+}
+
+interface QueryRefinementPayload {
+  claimLanguageCode: string;
+  languageCode: string;
+  coreClaim: string;
+  generatedQueries: QueryArtifact[];
+  topicScope: string;
+  topicCountryCode: string | null;
+  countryDetectionReason: string;
+}
+
+interface HandoffPayload {
+  coreClaim: string;
+  sourceIds: string[];
+  snippetIds: string[];
+  insufficiencyReason: string | null;
+}
 
 export function buildSourceCreateInputs(
   reviewJobId: string,
@@ -172,7 +220,8 @@ export function parseOriginQueryIds(value: unknown): string[] {
 
 export function mapPreviewResponse(params: {
   reviewJob: Pick<ReviewJob, "id">;
-  claimId: string;
+  claim: Pick<ReviewClaimRecord, "id" | "rawText">;
+  createdAt: Date;
   normalizedClaim: string;
   refinement: QueryRefinementResult;
   generatedQueries: QueryArtifact[];
@@ -185,7 +234,9 @@ export function mapPreviewResponse(params: {
 }): ReviewQueryProcessingPreviewResponseDto {
   return {
     reviewId: params.reviewJob.id,
-    claimId: params.claimId,
+    claimId: params.claim.id,
+    rawClaim: params.claim.rawText,
+    createdAt: params.createdAt.toISOString(),
     status: "partial",
     currentStage: "handoff_ready",
     normalizedClaim: params.normalizedClaim,
@@ -201,6 +252,8 @@ export function mapPreviewResponse(params: {
       sourceType: source.sourceType,
       publisherName: source.publisherName,
       canonicalUrl: source.canonicalUrl,
+      originalUrl: source.originalUrl,
+      publishedAt: source.publishedAt?.toISOString() ?? null,
       rawTitle: source.rawTitle,
       rawSnippet: source.rawSnippet,
       relevanceTier: source.relevanceTier ?? "discard",
@@ -224,5 +277,188 @@ export function mapPreviewResponse(params: {
       snippetIds: params.evidenceSnippets.map((snippet) => snippet.id),
       insufficiencyReason: params.insufficiencyReason,
     },
+  };
+}
+
+function parseJsonRecord(value: Prisma.JsonValue | null): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function parseString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function parseNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function parseGeneratedQueries(value: unknown): QueryArtifact[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const id = parseString(record.id);
+    const text = parseString(record.text);
+    const rank =
+      typeof record.rank === "number" && Number.isFinite(record.rank)
+        ? record.rank
+        : 0;
+
+    if (!id || !text || rank <= 0) {
+      return [];
+    }
+
+    return [{ id, text, rank }];
+  });
+}
+
+function parseStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function parseQueryRefinementPayload(
+  value: Prisma.JsonValue | null,
+  normalizedClaim: string,
+): QueryRefinementPayload {
+  const payload = parseJsonRecord(value);
+
+  if (!payload) {
+    return {
+      claimLanguageCode: "unknown",
+      languageCode: "unknown",
+      coreClaim: normalizedClaim,
+      generatedQueries: [],
+      topicScope: "unknown",
+      topicCountryCode: null,
+      countryDetectionReason: "주제 국가 판정 전입니다.",
+    };
+  }
+
+  const claimLanguageCode = parseString(payload.claimLanguageCode, "unknown");
+
+  return {
+    claimLanguageCode,
+    languageCode: parseString(payload.languageCode, claimLanguageCode),
+    coreClaim: parseString(payload.coreClaim, normalizedClaim),
+    generatedQueries: parseGeneratedQueries(payload.generatedQueries),
+    topicScope: parseString(payload.topicScope, "unknown"),
+    topicCountryCode: parseNullableString(payload.topicCountryCode),
+    countryDetectionReason: parseString(
+      payload.countryDetectionReason,
+      "주제 국가 판정 전입니다.",
+    ),
+  };
+}
+
+function parseHandoffPayload(
+  value: Prisma.JsonValue | null,
+  fallbackCoreClaim: string,
+  evidenceSnippets: EvidenceSnippet[],
+): HandoffPayload {
+  const payload = parseJsonRecord(value);
+
+  if (!payload) {
+    return {
+      coreClaim: fallbackCoreClaim,
+      sourceIds: evidenceSnippets.map((snippet) => snippet.sourceId),
+      snippetIds: evidenceSnippets.map((snippet) => snippet.id),
+      insufficiencyReason: null,
+    };
+  }
+
+  return {
+    coreClaim: parseString(payload.coreClaim, fallbackCoreClaim),
+    sourceIds: parseStringArray(payload.sourceIds),
+    snippetIds: parseStringArray(payload.snippetIds),
+    insufficiencyReason: parseNullableString(payload.insufficiencyReason),
+  };
+}
+
+export function mapStoredPreviewSummary(
+  reviewJob: StoredReviewPreviewSummaryRecord,
+): ReviewPreviewSummaryResponseDto {
+  return {
+    reviewId: reviewJob.id,
+    rawClaim: reviewJob.claim.rawText,
+    status: reviewJob.status,
+    currentStage: reviewJob.currentStage,
+    createdAt: reviewJob.createdAt.toISOString(),
+    selectedSourceCount: reviewJob.sources.filter(
+      (source) => source.fetchStatus === "fetched",
+    ).length,
+    lastErrorCode: reviewJob.lastErrorCode,
+  };
+}
+
+export function mapStoredPreviewResponse(
+  reviewJob: StoredReviewPreviewRecord,
+): ReviewQueryProcessingPreviewResponseDto {
+  const refinement = parseQueryRefinementPayload(
+    reviewJob.queryRefinement,
+    reviewJob.claim.normalizedText,
+  );
+  const handoff = parseHandoffPayload(
+    reviewJob.handoffPayload,
+    refinement.coreClaim,
+    reviewJob.evidenceSnippets,
+  );
+
+  return {
+    reviewId: reviewJob.id,
+    claimId: reviewJob.claim.id,
+    rawClaim: reviewJob.claim.rawText,
+    createdAt: reviewJob.createdAt.toISOString(),
+    status: reviewJob.status,
+    currentStage: reviewJob.currentStage,
+    normalizedClaim: reviewJob.claim.normalizedText,
+    claimLanguageCode: refinement.claimLanguageCode,
+    languageCode: refinement.languageCode,
+    coreClaim: refinement.coreClaim,
+    topicScope: refinement.topicScope,
+    topicCountryCode: refinement.topicCountryCode,
+    countryDetectionReason: refinement.countryDetectionReason,
+    generatedQueries: refinement.generatedQueries,
+    sources: reviewJob.sources.map((source) => ({
+      id: source.id,
+      sourceType: source.sourceType,
+      publisherName: source.publisherName,
+      canonicalUrl: source.canonicalUrl,
+      originalUrl: source.originalUrl,
+      publishedAt: source.publishedAt?.toISOString() ?? null,
+      rawTitle: source.rawTitle,
+      rawSnippet: source.rawSnippet,
+      relevanceTier: source.relevanceTier ?? "discard",
+      relevanceReason: source.relevanceReason,
+      originQueryIds: parseOriginQueryIds(source.originQueryIds),
+      sourceCountryCode: source.sourceCountryCode,
+      retrievalBucket: source.retrievalBucket,
+      domainRegistryMatched: Boolean(source.domainRegistryId),
+    })),
+    evidenceSnippets: reviewJob.evidenceSnippets.map((snippet) => ({
+      id: snippet.id,
+      sourceId: snippet.sourceId,
+      snippetText: snippet.snippetText,
+    })),
+    searchedSourceCount:
+      reviewJob.searchedSourceCount > 0
+        ? reviewJob.searchedSourceCount
+        : reviewJob.sources.length,
+    selectedSourceCount: reviewJob.sources.filter(
+      (source) => source.fetchStatus === "fetched",
+    ).length,
+    discardedSourceCount: reviewJob.sources.filter(
+      (source) => source.relevanceTier === "discard",
+    ).length,
+    handoff,
   };
 }

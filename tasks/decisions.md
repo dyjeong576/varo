@@ -56,3 +56,19 @@
 - 한국 사용자에게는 한국 familiar domain을 우선 제공하되, 해외 이슈에서는 verification source 확보를 우선한다.
 - retrieval bucket은 `familiar / verification / fallback` 3단계로 고정한다.
 - 국가별 domain registry는 MVP에서 소수 핵심 도메인만 큐레이션한다.
+
+## 2026-04-02
+
+### Reviews Preview Integration
+- `/reviews/[reviewId]`는 최종 verdict 화면이 아니라 `query-processing-preview` 결과를 보여주는 evidence-first preview 화면으로 연결한다.
+- interpretation과 verdict가 아직 생성되지 않은 단계는 UI에서 명시적으로 안내한다.
+- preview 연동용 읽기 API는 `GET /api/v1/reviews`, `GET /api/v1/reviews/:reviewId`로 둔다.
+- `POST /api/v1/reviews/query-processing-preview`와 `GET /api/v1/reviews/:reviewId`는 같은 preview detail 계약을 공유한다.
+- review preview detail 계약에는 `rawClaim`, `createdAt`, source `originalUrl`, source `publishedAt`을 포함한다.
+- history drawer는 verdict 대신 `status/currentStage` 기반 상태 라벨을 노출한다.
+
+### Frontend Review Task Flow
+- review preview 생성 요청의 소유권은 `loading` 페이지가 아니라 프론트 전역 review task store가 가진다.
+- active review task가 진행 중이면 `Home` 진입 시 입력 화면 대신 기존 `/loading`으로 복귀시켜 중복 요청을 막는다.
+- history는 `claim + 시간` 휴리스틱 대신 `draftId -> reviewId` 승격 방식으로 중복 없이 병합한다.
+- review completion 알림은 `loading` 화면이 아니라 review task 성공 전이에서 1회 생성한다.

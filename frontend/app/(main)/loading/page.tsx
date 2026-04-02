@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { Loader2, CheckCircle2 } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Loader2, CheckCircle2, RefreshCw, ArrowRight } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  getActiveReviewTask,
+  getReviewTask,
+  startReviewTask,
+  subscribeReviewTasks,
+} from "@/lib/reviews/task-store";
 
 const STAGES = [
   "준비 중",
@@ -11,72 +17,144 @@ const STAGES = [
   "소셜 정리 중",
   "커뮤니티 반응 분석 대기",
   "시각화 생성 중",
-  "신뢰 지수 산출 대기"
+  "신뢰 지수 산출 대기",
 ];
 
 function LoadingContent() {
-  const [currentStage, setCurrentStage] = useState(0);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const claimQuery = searchParams.get("q") || "입력된 주장 분석 중...";
+  const draftId = searchParams.get("draft") ?? "";
+  const [currentStage, setCurrentStage] = useState(0);
+  const task = useSyncExternalStore(
+    subscribeReviewTasks,
+    () => (draftId ? getReviewTask(draftId) : null),
+    () => null,
+  );
 
-  // 단계별 트래커 시뮬레이션을 위한 mock 타이머
+  const claimQuery = task?.claim ?? "";
+  const errorMessage = task?.errorMessage ?? null;
+  const isSubmitting =
+    task?.status === "pending" || task?.status === "submitting";
+  const isCompleted = task?.status === "succeeded" && Boolean(task.reviewId);
+
+  const activeStageIndex = useMemo(() => {
+    if (isCompleted) {
+      return STAGES.length - 1;
+    }
+
+    if (task?.status === "failed") {
+      return currentStage;
+    }
+
+    return currentStage;
+  }, [currentStage, isCompleted, task?.status]);
+
   useEffect(() => {
+    const resolvedDraftId = draftId || getActiveReviewTask()?.draftId;
+
+    if (!resolvedDraftId) {
+      router.replace("/");
+      return;
+    }
+
+    if (!draftId) {
+      router.replace(`/loading?draft=${encodeURIComponent(resolvedDraftId)}`);
+      return;
+    }
+
+    const loadTask = () => getReviewTask(resolvedDraftId);
+    const initialTask = loadTask();
+
+    if (!initialTask) {
+      router.replace("/");
+      return;
+    }
+
+    if (!initialTask.reviewId && initialTask.status !== "failed") {
+      void startReviewTask(resolvedDraftId).catch(() => undefined);
+    }
+
+    return undefined;
+  }, [draftId, router]);
+
+  useEffect(() => {
+    if (!isSubmitting || errorMessage) {
+      return;
+    }
+
     const timer = setInterval(() => {
-      setCurrentStage((prev) => {
-        if (prev < STAGES.length - 1) return prev + 1;
-        clearInterval(timer);
-        
-        // 분석 완료 후 결과 페이지로 이동 (약 1초 뒤)
-        setTimeout(() => {
-          router.push(`/reviews/mock-1`);
-        }, 1000);
-        
-        return prev;
-      });
+      setCurrentStage((prev) => (prev < STAGES.length - 1 ? prev + 1 : prev));
     }, 1500);
 
     return () => clearInterval(timer);
-  }, [router]);
+  }, [errorMessage, isSubmitting]);
+
+  const handleRetry = async () => {
+    if (!draftId) {
+      router.replace("/");
+      return;
+    }
+
+    setCurrentStage(0);
+
+    try {
+      await startReviewTask(draftId);
+    } catch {
+      return;
+    }
+  };
+
+  if (!task) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFC]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-full px-6 pt-8 pb-8 bg-[#F8FAFC] font-sans">
-      
-      {/* 상단 헤더 영역 */}
       <div className="mb-10 text-center mt-2">
         <h1 className="text-[22px] font-extrabold text-gray-900 mb-2">
           팩트체크 분석 중
         </h1>
         <h2 className="text-[15px] font-bold text-primary break-keep">
-          {claimQuery}
+          {claimQuery || "입력된 주장 분석 중..."}
         </h2>
         <p className="mt-4 text-[13px] text-gray-500">
           신뢰할 수 있는 정보를 위해 다각도로 검증 중입니다.
         </p>
       </div>
 
-      {/* 검증 진행 트래커 */}
       <div className="w-full max-w-sm mx-auto bg-white rounded-[20px] p-6 mb-8 shadow-sm border border-gray-100/60">
         <div className="space-y-[22px]">
           {STAGES.map((stage, index) => {
-            const isCompleted = index < currentStage;
-            const isCurrent = index === currentStage;
+            const hasCompleted = index < activeStageIndex || isCompleted;
+            const isCurrent = index === activeStageIndex && isSubmitting;
 
             return (
               <div key={index} className="flex items-center">
-                {isCompleted ? (
+                {hasCompleted ? (
                   <CheckCircle2 className="w-[18px] h-[18px] text-green-500 shrink-0" />
                 ) : isCurrent ? (
                   <Loader2 className="h-[18px] w-[18px] shrink-0 animate-spin text-primary" />
+                ) : !isSubmitting && errorMessage ? (
+                  <div className="w-[18px] h-[18px] rounded-full border-2 border-red-200 bg-red-50 shrink-0" />
                 ) : (
                   <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-200 shrink-0" />
                 )}
-                
-                <span className={`ml-4 text-[14px] font-semibold tracking-tight ${
-                  isCompleted ? "text-gray-900" :
-                  isCurrent ? "text-primary" :
-                  "text-gray-300"
-                }`}>
+
+                <span
+                  className={`ml-4 text-[14px] font-semibold tracking-tight ${
+                    hasCompleted
+                      ? "text-gray-900"
+                      : isCurrent
+                        ? "text-primary"
+                        : !isSubmitting && errorMessage
+                          ? "text-gray-400"
+                          : "text-gray-300"
+                  }`}
+                >
                   {stage}
                 </span>
               </div>
@@ -85,12 +163,55 @@ function LoadingContent() {
         </div>
       </div>
 
-      {/* Curator Insights */}
+      {isCompleted && task.reviewId ? (
+        <div className="w-full max-w-sm mx-auto mb-6 rounded-[18px] border border-blue-100 bg-blue-50 px-5 py-4">
+          <p className="text-sm font-semibold text-blue-800">
+            근거 수집이 완료되었습니다. 결과를 열어 source와 evidence를 확인할 수 있습니다.
+          </p>
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => router.push(`/reviews/${task.reviewId}`)}
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
+            >
+              결과 보기
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700"
+            >
+              계속 둘러보기
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {errorMessage ? (
+        <div className="w-full max-w-sm mx-auto mb-6 rounded-[18px] border border-red-100 bg-red-50 px-5 py-4">
+          <p className="text-sm font-semibold text-red-700">{errorMessage}</p>
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={handleRetry}
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
+            >
+              <RefreshCw className="h-4 w-4" />
+              다시 시도
+            </button>
+            <button
+              onClick={() => router.replace("/")}
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700"
+            >
+              홈으로 이동
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="w-full max-w-sm mx-auto mb-6">
         <h3 className="text-[11px] font-extrabold text-gray-400 mb-3 px-1 tracking-wider uppercase">
           Curator&apos;s Insights
         </h3>
-        
+
         <div className="space-y-[14px]">
           <div className="bg-white p-[18px] rounded-[18px] border border-gray-100 shadow-sm relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400" />
@@ -101,7 +222,7 @@ function LoadingContent() {
               공식 보도자료와 실시간 뉴스를 대조합니다.
             </p>
           </div>
-          
+
           <div className="bg-white p-[18px] rounded-[18px] border border-gray-100 shadow-sm relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400" />
             <p className="text-[14px] font-bold text-gray-800 mb-2 break-keep leading-snug">
@@ -114,24 +235,24 @@ function LoadingContent() {
         </div>
       </div>
 
-      {/* 하단 Disclaimer */}
       <div className="mt-auto text-center pt-8 pb-2">
         <p className="text-[12px] text-gray-400 font-medium tracking-tight">
-          분석이 길어지면 알림을 보내드립니다
+          완료되면 알림과 히스토리에서 다시 결과를 열 수 있습니다
         </p>
       </div>
-
     </div>
   );
 }
 
 export default function LoadingPage() {
   return (
-    <Suspense fallback={
-      <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFC]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFC]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
       <LoadingContent />
     </Suspense>
   );

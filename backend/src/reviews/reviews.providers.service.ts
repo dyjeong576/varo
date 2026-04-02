@@ -35,6 +35,7 @@ export class ReviewsProvidersService {
       "verification",
       input.userCountryCode,
       input.topicCountryCode,
+      input.topicScope,
     );
 
     return this.tavilyClient.searchSources({

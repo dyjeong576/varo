@@ -1,5 +1,4 @@
 import {
-  Review,
   MockApiResponse,
   CommunityPost,
   SessionResponse,
@@ -7,27 +6,16 @@ import {
   UserMeResponse,
 } from "./types";
 import { apiRequest } from "./http";
-
-let MOCK_REVIEWS: Review[] = [
-  {
-    id: "r-1",
-    claim: "서울시 대중교통 무제한 이용권, 정말 세계 최초인가요?",
-    verdict: null,
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: "r-2",
-    claim: "전기차 지하 주차장 출입 전면 금지 조례안 사실 여부",
-    verdict: "Unclear",
-    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-  },
-  {
-    id: "r-3",
-    claim: "모바일 신분증 도입 후 기존 실물 신분증 효력 상실?",
-    verdict: "Likely False",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-];
+import {
+  mapReviewPreviewDetail,
+  mapReviewPreviewSummary,
+} from "@/lib/reviews/mappers";
+import type {
+  ReviewPreviewDetail,
+  ReviewPreviewDetailResponse,
+  ReviewPreviewSummary,
+  ReviewPreviewSummaryResponse,
+} from "@/lib/reviews/types";
 
 const MOCK_POSTS: CommunityPost[] = [
   {
@@ -70,21 +58,33 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const api = {
   reviews: {
-    getRecent: async (): Promise<MockApiResponse<Review[]>> => {
-      await delay(600); // 네트워크 대기시간 모의
-      return { data: MOCK_REVIEWS, status: 200 };
+    getRecent: async (): Promise<ReviewPreviewSummary[]> => {
+      const response = await apiRequest<ReviewPreviewSummaryResponse[]>(
+        "/api/v1/reviews",
+      );
+
+      return response.map(mapReviewPreviewSummary);
     },
-    create: async (claim: string): Promise<MockApiResponse<{ id: string }>> => {
-      await delay(1200); // 1.2초 대기
-      const newReview: Review = {
-        id: `r-${Date.now()}`,
-        claim,
-        verdict: null,
-        createdAt: new Date().toISOString(),
-      };
-      // 목록 맨 첫번째로 삽입
-      MOCK_REVIEWS = [newReview, ...MOCK_REVIEWS];
-      return { data: { id: newReview.id }, status: 201 };
+    create: async (
+      claim: string,
+      clientRequestId?: string,
+    ): Promise<ReviewPreviewDetail> => {
+      const response = await apiRequest<ReviewPreviewDetailResponse>(
+        "/api/v1/reviews/query-processing-preview",
+        {
+          method: "POST",
+          body: JSON.stringify({ claim, clientRequestId }),
+        },
+      );
+
+      return mapReviewPreviewDetail(response);
+    },
+    getDetail: async (reviewId: string): Promise<ReviewPreviewDetail> => {
+      const response = await apiRequest<ReviewPreviewDetailResponse>(
+        `/api/v1/reviews/${encodeURIComponent(reviewId)}`,
+      );
+
+      return mapReviewPreviewDetail(response);
     },
   },
   community: {

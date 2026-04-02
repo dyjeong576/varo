@@ -1,5 +1,11 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import type { Claim, EvidenceSnippet, ReviewJob, Source } from "@prisma/client";
+import {
+  Claim,
+  EvidenceSnippet,
+  Prisma,
+  ReviewJob,
+  Source,
+} from "@prisma/client";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -43,19 +49,67 @@ export interface PersistedQueryPreviewArtifacts {
   insufficiencyReason: string | null;
 }
 
+type ReviewPreviewRecord = Prisma.ReviewJobGetPayload<{
+  include: {
+    claim: true;
+    sources: true;
+    evidenceSnippets: true;
+  };
+}>;
+
+type ReviewPreviewSummaryRecord = Prisma.ReviewJobGetPayload<{
+  include: {
+    claim: true;
+    sources: {
+      select: {
+        fetchStatus: true;
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class ReviewsQueryPreviewPersistenceService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findQueryProcessingPreviewByClientRequestId(
+    userId: string,
+    clientRequestId: string,
+  ): Promise<ReviewPreviewRecord | null> {
+    return this.prisma.reviewJob.findFirst({
+      where: {
+        userId,
+        clientRequestId,
+      },
+      include: {
+        claim: true,
+        sources: {
+          orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+        },
+        evidenceSnippets: {
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+  }
 
   async createClaimAndReviewJob(params: {
     userId: string;
     rawClaim: string;
     normalizedClaim: string;
-  }): Promise<{ claim: Pick<Claim, "id">; reviewJob: Pick<ReviewJob, "id"> }> {
+    clientRequestId?: string;
+  }): Promise<{
+    claim: Pick<Claim, "id" | "rawText">;
+    reviewJob: Pick<ReviewJob, "id" | "createdAt">;
+  }> {
     const claim = await this.prisma.claim.create({
       data: {
         rawText: params.rawClaim,
         normalizedText: params.normalizedClaim,
+      },
+      select: {
+        id: true,
+        rawText: true,
       },
     });
 
@@ -63,12 +117,94 @@ export class ReviewsQueryPreviewPersistenceService {
       data: {
         userId: params.userId,
         claimId: claim.id,
+        clientRequestId: params.clientRequestId,
         status: "searching",
         currentStage: "query_refinement",
+      },
+      select: {
+        id: true,
+        createdAt: true,
       },
     });
 
     return { claim, reviewJob };
+  }
+
+  async resetQueryProcessingPreview(reviewJobId: string): Promise<void> {
+    await this.prisma.evidenceSnippet.deleteMany({
+      where: {
+        reviewJobId,
+      },
+    });
+    await this.prisma.source.deleteMany({
+      where: {
+        reviewJobId,
+      },
+    });
+    await this.prisma.reviewJob.update({
+      where: { id: reviewJobId },
+      data: {
+        status: "searching",
+        currentStage: "query_refinement",
+        searchedSourceCount: 0,
+        processedSourceCount: 0,
+        retryCount: {
+          increment: 1,
+        },
+        lastErrorCode: null,
+        queryRefinement: Prisma.DbNull,
+        handoffPayload: Prisma.DbNull,
+      },
+    });
+  }
+
+  async listRecentQueryProcessingPreviews(
+    userId: string,
+  ): Promise<ReviewPreviewSummaryRecord[]> {
+    return this.prisma.reviewJob.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      include: {
+        claim: true,
+        sources: {
+          select: {
+            fetchStatus: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getQueryProcessingPreview(
+    userId: string,
+    reviewId: string,
+  ): Promise<ReviewPreviewRecord> {
+    const reviewJob = await this.prisma.reviewJob.findFirst({
+      where: {
+        id: reviewId,
+        userId,
+      },
+      include: {
+        claim: true,
+        sources: {
+          orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+        },
+        evidenceSnippets: {
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+
+    if (!reviewJob) {
+      throw new AppException(
+        APP_ERROR_CODES.NOT_FOUND,
+        "리뷰를 찾을 수 없습니다.",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return reviewJob;
   }
 
   async persistQueryPreviewResult(
@@ -151,10 +287,12 @@ export class ReviewsQueryPreviewPersistenceService {
   async loadSearchDomainRegistry(params: {
     userCountryCode: string | null;
     topicCountryCode: string | null;
+    topicScope: QueryRefinementResult["topicScope"];
   }): Promise<DomainRegistryEntry[]> {
     const criteria = collectSearchDomainRegistryCriteria(
       params.userCountryCode,
       params.topicCountryCode,
+      params.topicScope,
     );
     const entries = await this.prisma.sourceDomainRegistry.findMany({
       where: {

@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString, MaxLength, MinLength } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 export class CreateReviewQueryProcessingPreviewDto {
   @ApiProperty({
@@ -10,4 +10,14 @@ export class CreateReviewQueryProcessingPreviewDto {
   @MinLength(1)
   @MaxLength(500)
   claim!: string;
+
+  @ApiPropertyOptional({
+    description:
+      "동일 브라우저 draft 재시도 시 같은 review preview로 수렴시키기 위한 클라이언트 요청 식별자",
+    example: "pending:0c4f2cf4-9f2f-4eb2-a5fb-e36f4f4dd8db",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  clientRequestId?: string;
 }

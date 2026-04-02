@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
@@ -8,15 +9,20 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     claim: {
       create: jest.fn().mockResolvedValue({
         id: "claim-1",
+        rawText: "트럼프가 오늘 관세 발표했대",
       }),
     },
     reviewJob: {
       create: jest.fn().mockResolvedValue({
         id: "review-1",
+        createdAt: new Date("2026-04-01T02:00:00.000Z"),
       }),
       update: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     source: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest
         .fn()
         .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -27,6 +33,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         ),
     },
     evidenceSnippet: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest
         .fn()
         .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -49,6 +56,92 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         id: "preview-user-1",
       }),
     },
+  });
+
+  it("clientRequestId를 포함해 claim과 review job을 생성한다", async () => {
+    const prisma = createPrismaMock();
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    const result = await service.createClaimAndReviewJob({
+      userId: "user-1",
+      rawClaim: "트럼프가 오늘 관세 발표했대",
+      normalizedClaim: "트럼프가 오늘 관세 발표했대",
+      clientRequestId: "pending:review-1",
+    });
+
+    expect(prisma.reviewJob.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        claimId: "claim-1",
+        clientRequestId: "pending:review-1",
+        status: "searching",
+        currentStage: "query_refinement",
+      },
+      select: {
+        id: true,
+        createdAt: true,
+      },
+    });
+    expect(result.reviewJob.id).toBe("review-1");
+  });
+
+  it("clientRequestId로 기존 review preview를 조회한다", async () => {
+    const prisma = createPrismaMock();
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    await service.findQueryProcessingPreviewByClientRequestId(
+      "user-1",
+      "pending:review-1",
+    );
+
+    expect(prisma.reviewJob.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        clientRequestId: "pending:review-1",
+      },
+      include: {
+        claim: true,
+        sources: {
+          orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+        },
+        evidenceSnippets: {
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+  });
+
+  it("searching review를 재실행하기 전에 artifact와 집계 상태를 초기화한다", async () => {
+    const prisma = createPrismaMock();
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    await service.resetQueryProcessingPreview("review-1");
+
+    expect(prisma.evidenceSnippet.deleteMany).toHaveBeenCalledWith({
+      where: {
+        reviewJobId: "review-1",
+      },
+    });
+    expect(prisma.source.deleteMany).toHaveBeenCalledWith({
+      where: {
+        reviewJobId: "review-1",
+      },
+    });
+    expect(prisma.reviewJob.update).toHaveBeenCalledWith({
+      where: { id: "review-1" },
+      data: {
+        status: "searching",
+        currentStage: "query_refinement",
+        searchedSourceCount: 0,
+        processedSourceCount: 0,
+        retryCount: {
+          increment: 1,
+        },
+        lastErrorCode: null,
+        queryRefinement: Prisma.DbNull,
+        handoffPayload: Prisma.DbNull,
+      },
+    });
   });
 
   it("source와 evidence를 저장하고 review job handoff 상태를 업데이트한다", async () => {
@@ -148,7 +241,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
     const result = await service.loadSearchDomainRegistry({
       userCountryCode: "KR",
-      topicCountryCode: "US",
+      topicCountryCode: "KR",
+      topicScope: "domestic",
     });
 
     expect(prisma.sourceDomainRegistry.findMany).toHaveBeenCalledWith({
@@ -163,7 +257,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           ],
         },
         countryCode: {
-          in: ["KR", "US", "GLOBAL"],
+          in: ["KR"],
         },
       },
       orderBy: [{ priority: "asc" }, { countryCode: "asc" }],
@@ -199,6 +293,69 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         status: "failed",
         currentStage: "failed",
         lastErrorCode: APP_ERROR_CODES.LLM_SCHEMA_ERROR,
+      },
+    });
+  });
+
+  it("사용자 기준 최근 review preview 목록을 조회한다", async () => {
+    const prisma = createPrismaMock();
+    prisma.reviewJob.findMany.mockResolvedValue([
+      {
+        id: "review-1",
+        status: "partial",
+        currentStage: "handoff_ready",
+        lastErrorCode: null,
+        createdAt: new Date("2026-04-01T02:00:00.000Z"),
+        claim: {
+          rawText: "트럼프가 오늘 관세 발표했대",
+        },
+        sources: [{ fetchStatus: "fetched" }, { fetchStatus: "pending" }],
+      },
+    ]);
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    const result = await service.listRecentQueryProcessingPreviews("user-1");
+
+    expect(prisma.reviewJob.findMany).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      include: {
+        claim: true,
+        sources: {
+          select: {
+            fetchStatus: true,
+          },
+        },
+      },
+    });
+    expect(result).toHaveLength(1);
+  });
+
+  it("본인 소유가 아닌 review preview 상세는 404를 반환한다", async () => {
+    const prisma = createPrismaMock();
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    await expect(
+      service.getQueryProcessingPreview("user-2", "review-404"),
+    ).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: APP_ERROR_CODES.NOT_FOUND,
+    });
+
+    expect(prisma.reviewJob.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "review-404",
+        userId: "user-2",
+      },
+      include: {
+        claim: true,
+        sources: {
+          orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+        },
+        evidenceSnippets: {
+          orderBy: { id: "asc" },
+        },
       },
     });
   });

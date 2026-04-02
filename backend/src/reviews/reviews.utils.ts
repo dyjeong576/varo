@@ -4,6 +4,7 @@ import {
   QueryArtifact,
   RetrievalBucket,
   SearchCandidate,
+  TopicScope,
 } from "./reviews.types";
 
 export function normalizeClaimText(rawClaim: string): string {
@@ -291,6 +292,7 @@ export function countRelevantSources(candidates: SearchCandidate[]): number {
 export function collectSearchDomainRegistryCriteria(
   userCountryCode: string | null,
   topicCountryCode: string | null,
+  topicScope: TopicScope,
 ): {
   usageRoles: string[];
   countryCodes: string[];
@@ -299,11 +301,13 @@ export function collectSearchDomainRegistryCriteria(
     "familiar",
     userCountryCode,
     topicCountryCode,
+    topicScope,
   );
   const verificationCriteria = buildDomainSelectionCriteria(
     "verification",
     userCountryCode,
     topicCountryCode,
+    topicScope,
   );
 
   return {
@@ -319,11 +323,13 @@ export function selectDomainsForBucket(
   bucket: "familiar" | "verification",
   userCountryCode: string | null,
   topicCountryCode: string | null,
+  topicScope: TopicScope,
 ): string[] {
   const criteria = buildDomainSelectionCriteria(
     bucket,
     userCountryCode,
     topicCountryCode,
+    topicScope,
   );
 
   return registry
@@ -342,10 +348,13 @@ function buildDomainSelectionCriteria(
   bucket: "familiar" | "verification",
   userCountryCode: string | null,
   topicCountryCode: string | null,
+  topicScope: TopicScope,
 ): {
   usageRoles: string[];
   countryCodes: string[];
 } {
+  const includeGlobalReference = bucket === "verification" && topicScope !== "domestic";
+
   return {
     usageRoles:
       bucket === "familiar"
@@ -354,8 +363,8 @@ function buildDomainSelectionCriteria(
     countryCodes:
       bucket === "familiar"
         ? [userCountryCode].filter((value): value is string => Boolean(value))
-        : [topicCountryCode, "GLOBAL"].filter((value): value is string =>
-            Boolean(value),
+        : [topicCountryCode, includeGlobalReference ? "GLOBAL" : null].filter(
+            (value): value is string => Boolean(value),
           ),
   };
 }

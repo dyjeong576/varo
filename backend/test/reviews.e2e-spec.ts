@@ -8,6 +8,8 @@ describe("ReviewsController (e2e)", () => {
       createQueryProcessingPreview: jest.fn().mockResolvedValue({
         reviewId: "review-1",
         claimId: "claim-1",
+        rawClaim: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
+        createdAt: "2026-04-01T02:00:00.000Z",
         status: "partial",
         currentStage: "handoff_ready",
         normalizedClaim: "테슬라가 한국에서 완전 철수한대",
@@ -46,12 +48,14 @@ describe("ReviewsController (e2e)", () => {
       },
       {
         claim: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
+        clientRequestId: "pending:review-1",
       },
     );
 
     expect(result.reviewId).toBe("review-1");
     expect(reviewsService.createQueryProcessingPreview).toHaveBeenCalledWith("user-1", {
       claim: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
+      clientRequestId: "pending:review-1",
     });
   });
 
@@ -60,6 +64,8 @@ describe("ReviewsController (e2e)", () => {
       createTestQueryProcessingPreview: jest.fn().mockResolvedValue({
         reviewId: "review-1",
         claimId: "claim-1",
+        rawClaim: "테슬라가 한국에서 완전 철수한대",
+        createdAt: "2026-04-01T02:00:00.000Z",
         status: "partial",
         currentStage: "handoff_ready",
         normalizedClaim: "테슬라가 한국에서 완전 철수한대",
@@ -124,5 +130,81 @@ describe("ReviewsController (e2e)", () => {
     ).rejects.toMatchObject({
       status: 403,
     });
+  });
+
+  it("review preview 목록 조회를 서비스에 위임한다", async () => {
+    const reviewsService = {
+      listQueryProcessingPreviews: jest.fn().mockResolvedValue([
+        {
+          reviewId: "review-1",
+          rawClaim: "트럼프가 오늘 관세 발표했대",
+          status: "partial",
+          currentStage: "handoff_ready",
+          createdAt: "2026-04-01T02:00:00.000Z",
+          selectedSourceCount: 1,
+          lastErrorCode: null,
+        },
+      ]),
+    } as unknown as ReviewsService;
+    const configService = {} as ConfigService;
+    const controller = new ReviewsController(reviewsService, configService);
+
+    const result = await controller.listQueryProcessingPreviews({
+      user: {
+        id: "user-1",
+      },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(reviewsService.listQueryProcessingPreviews).toHaveBeenCalledWith("user-1");
+  });
+
+  it("review preview 상세 조회를 서비스에 위임한다", async () => {
+    const reviewsService = {
+      getQueryProcessingPreview: jest.fn().mockResolvedValue({
+        reviewId: "review-1",
+        claimId: "claim-1",
+        rawClaim: "트럼프가 오늘 관세 발표했대",
+        createdAt: "2026-04-01T02:00:00.000Z",
+        status: "partial",
+        currentStage: "handoff_ready",
+        normalizedClaim: "트럼프가 오늘 관세 발표했대",
+        claimLanguageCode: "ko",
+        languageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+        generatedQueries: [],
+        sources: [],
+        evidenceSnippets: [],
+        searchedSourceCount: 0,
+        selectedSourceCount: 0,
+        discardedSourceCount: 0,
+        handoff: {
+          coreClaim: "트럼프의 관세 발표",
+          sourceIds: [],
+          snippetIds: [],
+          insufficiencyReason: null,
+        },
+      }),
+    } as unknown as ReviewsService;
+    const configService = {} as ConfigService;
+    const controller = new ReviewsController(reviewsService, configService);
+
+    const result = await controller.getQueryProcessingPreview(
+      {
+        user: {
+          id: "user-1",
+        },
+      },
+      "review-1",
+    );
+
+    expect(result.reviewId).toBe("review-1");
+    expect(reviewsService.getQueryProcessingPreview).toHaveBeenCalledWith(
+      "user-1",
+      "review-1",
+    );
   });
 });

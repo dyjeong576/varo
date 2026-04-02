@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Notification, mockNotifications } from "@/lib/mock-data";
+import { AppNotification } from "@/lib/notifications/types";
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  subscribeNotifications,
+} from "@/lib/notifications/store";
 import { 
   FileCheck, 
   MessageSquare, 
@@ -13,19 +19,26 @@ import {
 } from "lucide-react";
 
 export function NotificationList() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate API call
     const timer = setTimeout(() => {
-      setNotifications(mockNotifications);
+      setNotifications(getNotifications());
       setIsLoading(false);
     }, 600);
-    return () => clearTimeout(timer);
+
+    const unsubscribe = subscribeNotifications(() => {
+      setNotifications(getNotifications());
+    });
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
-  const getIcon = (type: Notification['type'], isRead: boolean) => {
+  const getIcon = (type: AppNotification["type"], isRead: boolean) => {
     switch(type) {
       case 'analysis':
         return <FileCheck className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-blue-600'}`} />;
@@ -38,7 +51,7 @@ export function NotificationList() {
     }
   };
 
-  const getIconBg = (type: Notification['type'], isRead: boolean) => {
+  const getIconBg = (type: AppNotification["type"], isRead: boolean) => {
     if (isRead) return "bg-[#ecedfa]";
     switch(type) {
       case 'analysis':
@@ -65,7 +78,7 @@ export function NotificationList() {
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    markAllNotificationsRead();
   };
 
   if (isLoading) {
@@ -99,7 +112,7 @@ export function NotificationList() {
   const unreadNotifications = notifications.filter(n => !n.isRead);
   const readNotifications = notifications.filter(n => n.isRead);
 
-  const renderNotificationItem = (notif: Notification) => {
+  const renderNotificationItem = (notif: AppNotification) => {
     const content = (
       <>
         <div className={`relative flex-shrink-0 w-12 h-12 rounded-2xl ${getIconBg(notif.type, notif.isRead)} flex items-center justify-center`}>
@@ -130,7 +143,12 @@ export function NotificationList() {
 
     if (notif.link) {
       return (
-        <Link key={notif.id} href={notif.link} className={itemClasses}>
+        <Link
+          key={notif.id}
+          href={notif.link}
+          className={itemClasses}
+          onClick={() => markNotificationRead(notif.id)}
+        >
           {content}
         </Link>
       );

@@ -15,12 +15,15 @@ describe("ReviewsQueryPreviewService", () => {
         );
       }
     }),
+    findQueryProcessingPreviewByClientRequestId: jest.fn().mockResolvedValue(null),
     createClaimAndReviewJob: jest.fn().mockResolvedValue({
       claim: {
         id: "claim-1",
+        rawText: "트럼프가 오늘 관세 발표했대",
       },
       reviewJob: {
         id: "review-1",
+        createdAt: new Date("2026-04-01T02:00:00.000Z"),
       },
     }),
     resolveUserCountryCode: jest.fn().mockResolvedValue("KR"),
@@ -46,11 +49,14 @@ describe("ReviewsQueryPreviewService", () => {
         isActive: true,
       },
     ]),
+    resetQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
     persistQueryPreviewResult: jest.fn(),
     markReviewJobFailed: jest.fn().mockResolvedValue(undefined),
     ensurePreviewUser: jest.fn().mockResolvedValue({
       id: "preview-user-1",
     }),
+    listRecentQueryProcessingPreviews: jest.fn().mockResolvedValue([]),
+    getQueryProcessingPreview: jest.fn(),
   });
 
   it("빈 claim이면 입력 검증 예외를 던진다", async () => {
@@ -196,11 +202,13 @@ describe("ReviewsQueryPreviewService", () => {
     });
 
     expect(result.reviewId).toBe("review-1");
+    expect(result.rawClaim).toBe("트럼프가 오늘 관세 발표했대");
+    expect(result.createdAt).toBe("2026-04-01T02:00:00.000Z");
     expect(result.claimLanguageCode).toBe("ko");
     expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
     expect(result.countryDetectionReason).toContain("미국");
-    expect(result.generatedQueries).toHaveLength(3);
+    expect(result.generatedQueries).toHaveLength(1);
     expect(result.sources).toHaveLength(2);
     expect(result.sources[0]?.retrievalBucket).toBe("familiar");
     expect(result.sources[1]?.retrievalBucket).toBe("verification");
@@ -216,7 +224,254 @@ describe("ReviewsQueryPreviewService", () => {
     expect(persistence.loadSearchDomainRegistry).toHaveBeenCalledWith({
       userCountryCode: "KR",
       topicCountryCode: "US",
+      topicScope: "foreign",
     });
+  });
+
+  it("같은 clientRequestId로 다시 호출하면 같은 reviewId를 재사용한다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.findQueryProcessingPreviewByClientRequestId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "review-1",
+        status: "partial",
+        currentStage: "handoff_ready",
+        searchedSourceCount: 1,
+        lastErrorCode: null,
+        createdAt: new Date("2026-04-01T02:00:00.000Z"),
+        claim: {
+          id: "claim-1",
+          rawText: "트럼프가 오늘 관세 발표했대",
+          normalizedText: "트럼프가 오늘 관세 발표했대",
+        },
+        queryRefinement: {
+          claimLanguageCode: "ko",
+          languageCode: "ko",
+          coreClaim: "트럼프의 관세 발표",
+          generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+          topicScope: "foreign",
+          topicCountryCode: "US",
+          countryDetectionReason: "미국 이슈로 판단했습니다.",
+        },
+        handoffPayload: {
+          coreClaim: "트럼프의 관세 발표",
+          sourceIds: [],
+          snippetIds: [],
+          insufficiencyReason: null,
+        },
+        sources: [],
+        evidenceSnippets: [],
+      });
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: [],
+      insufficiencyReason: "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
+    });
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+      }),
+      searchSources: jest.fn().mockResolvedValue([]),
+      searchFallbackSources: jest.fn().mockResolvedValue([]),
+      applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
+      extractContent: jest.fn().mockResolvedValue([]),
+    } as unknown as ReviewsProvidersService;
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const firstResult = await service.createQueryProcessingPreview("user-1", {
+      claim: "트럼프가 오늘 관세 발표했대",
+      clientRequestId: "pending:review-1",
+    });
+    const secondResult = await service.createQueryProcessingPreview("user-1", {
+      claim: "트럼프가 오늘 관세 발표했대",
+      clientRequestId: "pending:review-1",
+    });
+
+    expect(firstResult.reviewId).toBe("review-1");
+    expect(secondResult.reviewId).toBe("review-1");
+    expect(persistence.createClaimAndReviewJob).toHaveBeenCalledTimes(1);
+    expect(persistence.resetQueryProcessingPreview).not.toHaveBeenCalled();
+  });
+
+  it("같은 clientRequestId의 searching review는 초기화 후 같은 reviewId로 재실행한다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.findQueryProcessingPreviewByClientRequestId.mockResolvedValue({
+      id: "review-1",
+      status: "searching",
+      currentStage: "query_refinement",
+      searchedSourceCount: 0,
+      lastErrorCode: null,
+      createdAt: new Date("2026-04-01T02:00:00.000Z"),
+      claim: {
+        id: "claim-1",
+        rawText: "트럼프가 오늘 관세 발표했대",
+        normalizedText: "트럼프가 오늘 관세 발표했대",
+      },
+      queryRefinement: null,
+      handoffPayload: null,
+      sources: [],
+      evidenceSnippets: [],
+    });
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: [],
+      insufficiencyReason: "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
+    });
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+      }),
+      searchSources: jest.fn().mockResolvedValue([]),
+      searchFallbackSources: jest.fn().mockResolvedValue([]),
+      applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
+      extractContent: jest.fn().mockResolvedValue([]),
+    } as unknown as ReviewsProvidersService;
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const result = await service.createQueryProcessingPreview("user-1", {
+      claim: "트럼프가 오늘 관세 발표했대",
+      clientRequestId: "pending:review-1",
+    });
+
+    expect(result.reviewId).toBe("review-1");
+    expect(persistence.createClaimAndReviewJob).not.toHaveBeenCalled();
+    expect(persistence.resetQueryProcessingPreview).toHaveBeenCalledWith("review-1");
+  });
+
+  it("저장된 review preview 목록을 summary 응답으로 매핑한다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.listRecentQueryProcessingPreviews.mockResolvedValue([
+      {
+        id: "review-1",
+        status: "partial",
+        currentStage: "handoff_ready",
+        lastErrorCode: null,
+        createdAt: new Date("2026-04-01T02:00:00.000Z"),
+        claim: {
+          rawText: "트럼프가 오늘 관세 발표했대",
+        },
+        sources: [{ fetchStatus: "fetched" }, { fetchStatus: "pending" }],
+      },
+    ]);
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      {} as never,
+    );
+
+    const result = await service.listQueryProcessingPreviews("user-1");
+
+    expect(result).toEqual([
+      {
+        reviewId: "review-1",
+        rawClaim: "트럼프가 오늘 관세 발표했대",
+        status: "partial",
+        currentStage: "handoff_ready",
+        createdAt: "2026-04-01T02:00:00.000Z",
+        selectedSourceCount: 1,
+        lastErrorCode: null,
+      },
+    ]);
+  });
+
+  it("저장된 review preview 상세를 응답 DTO로 매핑한다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.getQueryProcessingPreview.mockResolvedValue({
+      id: "review-1",
+      status: "partial",
+      currentStage: "handoff_ready",
+      searchedSourceCount: 2,
+      lastErrorCode: null,
+      createdAt: new Date("2026-04-01T02:00:00.000Z"),
+      claim: {
+        id: "claim-1",
+        rawText: "트럼프가 오늘 관세 발표했대",
+        normalizedText: "트럼프가 오늘 관세 발표했대",
+      },
+      queryRefinement: {
+        claimLanguageCode: "ko",
+        languageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+      },
+      handoffPayload: {
+        coreClaim: "트럼프의 관세 발표",
+        sourceIds: ["source-2"],
+        snippetIds: ["snippet-1"],
+        insufficiencyReason: null,
+      },
+      sources: [
+        {
+          id: "source-2",
+          reviewJobId: "review-1",
+          sourceType: "news",
+          publisherName: "Reuters",
+          publishedAt: new Date("2026-04-01T01:00:00.000Z"),
+          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          rawTitle: "Trump tariff announcement update",
+          rawSnippet: "원문 검증 보도입니다.",
+          normalizedHash: "hash-2",
+          fetchStatus: "fetched",
+          contentText: "추출 본문",
+          isDuplicate: false,
+          duplicateGroupKey: null,
+          originQueryIds: ["q1"],
+          relevanceTier: "primary",
+          relevanceReason: "원문 검증 source입니다.",
+          sourceCountryCode: "US",
+          retrievalBucket: "verification",
+          domainRegistryId: "us-verification",
+        },
+      ],
+      evidenceSnippets: [
+        {
+          id: "snippet-1",
+          reviewJobId: "review-1",
+          sourceId: "source-2",
+          snippetText: "추출 snippet",
+          stance: "neutral",
+          startOffset: null,
+          endOffset: null,
+        },
+      ],
+    });
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      {} as never,
+    );
+
+    const result = await service.getQueryProcessingPreview("user-1", "review-1");
+
+    expect(result.reviewId).toBe("review-1");
+    expect(result.rawClaim).toBe("트럼프가 오늘 관세 발표했대");
+    expect(result.sources[0]?.originalUrl).toBe(
+      "https://www.reuters.com/world/us/trump-tariff-update",
+    );
+    expect(result.sources[0]?.publishedAt).toBe("2026-04-01T01:00:00.000Z");
+    expect(result.handoff.sourceIds).toEqual(["source-2"]);
   });
 
   it("verification source가 부족하면 fallback search를 수행한다", async () => {

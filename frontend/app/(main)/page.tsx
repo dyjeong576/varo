@@ -1,30 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Loader2 } from "lucide-react";
-import { api } from "@/lib/api/client";
+import {
+  createReviewTask,
+  getActiveReviewTask,
+  startReviewTask,
+  subscribeReviewTasks,
+} from "@/lib/reviews/task-store";
 
 export default function HomePage() {
   const [claim, setClaim] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const activeTask = useSyncExternalStore(
+    subscribeReviewTasks,
+    getActiveReviewTask,
+    () => null,
+  );
+
+  useEffect(() => {
+    if (activeTask) {
+      router.replace(`/loading?draft=${encodeURIComponent(activeTask.draftId)}`);
+    }
+  }, [activeTask, router]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!claim.trim() || isSubmitting) return;
 
-    setIsSubmitting(true);
-    try {
-      // 1. API Call 모의 처리
-      await api.reviews.create(claim);
-      // 2. URL 파라미터로 검색 결과 페이지로 연결
-      router.push(`/loading?q=${encodeURIComponent(claim)}`);
-    } catch (err) {
-      console.error(err);
-      setIsSubmitting(false); // 실패 시 초기화
+    const normalizedClaim = claim.trim();
+    const activeTask = getActiveReviewTask();
+
+    if (activeTask) {
+      router.push(`/loading?draft=${encodeURIComponent(activeTask.draftId)}`);
+      return;
     }
+
+    setIsSubmitting(true);
+
+    const draftId = createReviewTask(normalizedClaim);
+    void startReviewTask(draftId);
+
+    router.push(`/loading?draft=${encodeURIComponent(draftId)}`);
   };
+
+  if (activeTask) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-white px-6">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center px-6 pt-12 pb-8 flex-1 bg-white font-sans w-full">

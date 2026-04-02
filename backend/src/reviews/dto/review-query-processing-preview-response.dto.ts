@@ -24,6 +24,16 @@ export class ReviewCandidateDto {
   @ApiProperty({ description: "정규화 URL", example: "https://news.example.com/articles/varo-core" })
   canonicalUrl!: string;
 
+  @ApiProperty({ description: "원문 URL", example: "https://news.example.com/articles/varo-core?from=search" })
+  originalUrl!: string;
+
+  @ApiProperty({
+    description: "발행 시각",
+    example: "2026-04-01T01:00:00.000Z",
+    nullable: true,
+  })
+  publishedAt!: string | null;
+
   @ApiProperty({ description: "원문 제목", example: "테슬라 한국 사업 관련 공식 입장" })
   rawTitle!: string;
 
@@ -123,6 +133,18 @@ export class ReviewQueryProcessingPreviewResponseDto {
 
   @ApiProperty({ description: "claim 식별자", example: "claim-1" })
   claimId!: string;
+
+  @ApiProperty({
+    description: "사용자가 입력한 claim 원문",
+    example: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
+  })
+  rawClaim!: string;
+
+  @ApiProperty({
+    description: "review job 생성 시각",
+    example: "2026-04-01T02:00:00.000Z",
+  })
+  createdAt!: string;
 
   @ApiProperty({ description: "review 상태", example: "partial" })
   status!: string;

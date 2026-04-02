@@ -1,10 +1,11 @@
-import { Body, Controller, HttpStatus, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpStatus, Param, Post, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiCookieAuth,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -17,6 +18,7 @@ import { SessionAuthGuard } from "../common/guards/session-auth.guard";
 import { ApiErrorResponseDto } from "../shared/dto/api-error-response.dto";
 import { CreateReviewQueryProcessingPreviewDto } from "./dto/create-review-query-processing-preview.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "./dto/review-query-processing-preview-response.dto";
+import { ReviewPreviewSummaryResponseDto } from "./dto/review-preview-summary-response.dto";
 import { ReviewsService } from "./reviews.service";
 
 @ApiTags("리뷰 / 질의 처리")
@@ -56,6 +58,54 @@ export class ReviewsController {
     @Body() payload: CreateReviewQueryProcessingPreviewDto,
   ): Promise<ReviewQueryProcessingPreviewResponseDto> {
     return this.reviewsService.createQueryProcessingPreview(current.user.id, payload);
+  }
+
+  @Get()
+  @ApiCookieAuth("sessionAuth")
+  @UseGuards(SessionAuthGuard)
+  @ApiOperation({
+    summary: "최근 review preview 목록 조회",
+    description: "로그인한 사용자의 최근 review query processing preview 목록을 반환합니다.",
+  })
+  @ApiOkResponse({
+    description: "review preview 목록 조회 성공",
+    type: ReviewPreviewSummaryResponseDto,
+    isArray: true,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  async listQueryProcessingPreviews(
+    @CurrentUser() current: { user: { id: string } },
+  ): Promise<ReviewPreviewSummaryResponseDto[]> {
+    return this.reviewsService.listQueryProcessingPreviews(current.user.id);
+  }
+
+  @Get(":reviewId")
+  @ApiCookieAuth("sessionAuth")
+  @UseGuards(SessionAuthGuard)
+  @ApiOperation({
+    summary: "review query processing preview 상세 조회",
+    description: "로그인한 사용자의 review preview 상세와 수집된 evidence/source를 반환합니다.",
+  })
+  @ApiOkResponse({
+    description: "review preview 상세 조회 성공",
+    type: ReviewQueryProcessingPreviewResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: "해당 review를 찾을 수 없음",
+    type: ApiErrorResponseDto,
+  })
+  async getQueryProcessingPreview(
+    @CurrentUser() current: { user: { id: string } },
+    @Param("reviewId") reviewId: string,
+  ): Promise<ReviewQueryProcessingPreviewResponseDto> {
+    return this.reviewsService.getQueryProcessingPreview(current.user.id, reviewId);
   }
 
   @Post("query-processing-preview/test")

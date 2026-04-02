@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { CreateReviewQueryProcessingPreviewDto } from "../dto/create-review-query-processing-preview.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
 import { ReviewsProvidersService } from "../reviews.providers.service";
+import { QueryRefinementResult } from "../reviews.types";
 import {
   countRelevantSources,
   deduplicateCandidates,
@@ -10,7 +11,12 @@ import {
   selectExtractionCandidates,
 } from "../reviews.utils";
 import { mapPreviewResponse } from "./reviews-query-preview.mapper";
+import {
+  mapStoredPreviewResponse,
+  mapStoredPreviewSummary,
+} from "./reviews-query-preview.mapper";
 import { ReviewsQueryPreviewPersistenceService } from "./reviews-query-preview.persistence.service";
+import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
 
 const QUERY_COUNT_LIMIT = 1;
 const RELEVANCE_LIMIT = 15;
@@ -31,12 +37,38 @@ export class ReviewsQueryPreviewService {
     const normalizedClaim = normalizeClaimText(payload.claim);
     this.persistenceService.validateNormalizedClaim(normalizedClaim);
 
-    const { claim, reviewJob } =
-      await this.persistenceService.createClaimAndReviewJob({
+    const existingReview =
+      payload.clientRequestId &&
+      (await this.persistenceService.findQueryProcessingPreviewByClientRequestId(
         userId,
-        rawClaim: payload.claim,
-        normalizedClaim,
-      });
+        payload.clientRequestId,
+      ));
+
+    if (existingReview && existingReview.status !== "searching") {
+      return mapStoredPreviewResponse(existingReview);
+    }
+
+    const { claim, reviewJob } = existingReview
+      ? {
+          claim: {
+            id: existingReview.claim.id,
+            rawText: existingReview.claim.rawText,
+          },
+          reviewJob: {
+            id: existingReview.id,
+            createdAt: existingReview.createdAt,
+          },
+        }
+      : await this.persistenceService.createClaimAndReviewJob({
+          userId,
+          rawClaim: payload.claim,
+          normalizedClaim,
+          clientRequestId: payload.clientRequestId,
+        });
+
+    if (existingReview) {
+      await this.persistenceService.resetQueryProcessingPreview(reviewJob.id);
+    }
 
     try {
       const userCountryCode =
@@ -46,6 +78,7 @@ export class ReviewsQueryPreviewService {
       const domainRegistry = await this.loadSearchDomainRegistry(
         userCountryCode,
         refinement.topicCountryCode,
+        refinement.topicScope,
       );
       const initialCandidates = await this.providersService.searchSources({
         queries: generatedQueries,
@@ -105,7 +138,8 @@ export class ReviewsQueryPreviewService {
 
       return mapPreviewResponse({
         reviewJob,
-        claimId: claim.id,
+        claim,
+        createdAt: reviewJob.createdAt,
         normalizedClaim,
         refinement,
         generatedQueries,
@@ -130,6 +164,27 @@ export class ReviewsQueryPreviewService {
     return this.createQueryProcessingPreview(previewUser.id, payload);
   }
 
+  async listQueryProcessingPreviews(
+    userId: string,
+  ): Promise<ReviewPreviewSummaryResponseDto[]> {
+    const reviewJobs =
+      await this.persistenceService.listRecentQueryProcessingPreviews(userId);
+
+    return reviewJobs.map(mapStoredPreviewSummary);
+  }
+
+  async getQueryProcessingPreview(
+    userId: string,
+    reviewId: string,
+  ): Promise<ReviewQueryProcessingPreviewResponseDto> {
+    const reviewJob = await this.persistenceService.getQueryProcessingPreview(
+      userId,
+      reviewId,
+    );
+
+    return mapStoredPreviewResponse(reviewJob);
+  }
+
   private shouldRunFallbackSearch(
     candidates: Parameters<typeof countRelevantSources>[0],
   ): boolean {
@@ -142,10 +197,12 @@ export class ReviewsQueryPreviewService {
   private loadSearchDomainRegistry(
     userCountryCode: string | null,
     topicCountryCode: string | null,
+    topicScope: QueryRefinementResult["topicScope"],
   ) {
     return this.persistenceService.loadSearchDomainRegistry({
       userCountryCode,
       topicCountryCode,
+      topicScope,
     });
   }
 }

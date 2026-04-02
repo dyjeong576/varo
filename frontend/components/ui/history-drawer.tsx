@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X, Settings, Loader2 } from "lucide-react";
+import { Menu, X, Settings, History } from "lucide-react";
 import { api } from "@/lib/api/client";
-import { Review } from "@/lib/api/types";
 import { APP_NAME, APP_TAGLINE } from "@/lib/config/app";
+import { ReviewPreviewSummary } from "@/lib/reviews/types";
+import { getMergedReviewSummaries } from "@/lib/reviews/history";
+import { subscribeReviewTasks } from "@/lib/reviews/task-store";
+import { ReviewHistoryList } from "@/components/reviews/ReviewHistoryList";
 
 export function HistoryDrawer() {
   const [isOpen, setIsOpen] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<ReviewPreviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const openDrawer = () => {
@@ -18,9 +21,21 @@ export function HistoryDrawer() {
   };
 
   useEffect(() => {
+    return subscribeReviewTasks(() => {
+      if (!isOpen) {
+        return;
+      }
+
+      void getMergedReviewSummaries(api.reviews.getRecent).then((result) => {
+        setReviews(result);
+      });
+    });
+  }, [isOpen]);
+
+  useEffect(() => {
     if (isOpen) {
-      api.reviews.getRecent().then((res) => {
-        setReviews(res.data);
+      getMergedReviewSummaries(api.reviews.getRecent).then((res) => {
+        setReviews(res);
       }).finally(() => {
         setIsLoading(false);
       });
@@ -71,6 +86,10 @@ export function HistoryDrawer() {
 
         {/* Navigation Links */}
         <div className="py-2 shrink-0">
+          <Link href="/history" className="flex items-center gap-4 px-6 py-[18px] hover:bg-gray-50 text-gray-700 transition-colors" onClick={() => setIsOpen(false)}>
+            <History className="w-5 h-5 text-gray-400" />
+            <span className="font-semibold text-[15px]">히스토리</span>
+          </Link>
           <Link href="/settings" className="flex items-center gap-4 px-6 py-[18px] hover:bg-gray-50 text-gray-700 transition-colors" onClick={() => setIsOpen(false)}>
             <Settings className="w-5 h-5 text-gray-400" />
             <span className="font-semibold text-[15px]">설정</span>
@@ -86,40 +105,11 @@ export function HistoryDrawer() {
             {APP_NAME}가 최근 검토한 이슈들의 리포트입니다. 각 항목을 열어 출처와 판단 맥락을 확인하세요.
           </p>
 
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : reviews.length === 0 ? (
-              <div className="text-center p-4 text-sm text-gray-400 font-medium">데이터가 없습니다.</div>
-            ) : (
-              reviews.map((review) => {
-                const getVerdictBadge = (verdict: string | null) => {
-                  if (!verdict) return null;
-                  if (verdict === "Likely False") {
-                    return <div className="inline-flex mt-2 items-center px-2 py-1 rounded-md bg-red-50 text-red-600 border border-red-100 text-[11px] font-bold tracking-tight">대체로 허위</div>;
-                  }
-                  if (verdict === "Likely True") {
-                    return <div className="inline-flex mt-2 items-center px-2 py-1 rounded-md bg-green-50 text-green-600 border border-green-100 text-[11px] font-bold tracking-tight">대체로 사실</div>;
-                  }
-                  if (verdict === "Mixed Evidence") {
-                    return <div className="inline-flex mt-2 items-center px-2 py-1 rounded-md bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-bold tracking-tight">상충되는 근거</div>;
-                  }
-                  return <div className="inline-flex mt-2 items-center px-2 py-1 rounded-md bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-bold tracking-tight">판별 불가</div>;
-                };
-
-                return (
-                  <Link key={review.id} href={`/reviews/${review.id}`} className="block rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/50 hover:bg-blue-50/30" onClick={() => setIsOpen(false)}>
-                    <h4 className="text-[14px] font-bold text-gray-800 break-keep leading-[1.4]">
-                      {review.claim}
-                    </h4>
-                    {getVerdictBadge(review.verdict)}
-                  </Link>
-                );
-              })
-            )}
-          </div>
+          <ReviewHistoryList
+            reviews={reviews}
+            isLoading={isLoading}
+            onNavigate={() => setIsOpen(false)}
+          />
         </div>
 
         {/* Footer Callout */}

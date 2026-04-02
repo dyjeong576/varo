@@ -122,7 +122,7 @@ describe("ReviewsProvidersService", () => {
     expect(result.generatedQueries).toHaveLength(3);
   });
 
-  it("real mode에서 familiar/verification include_domains를 Tavily에 전달한다", async () => {
+  it("real mode에서 verification include_domains를 Tavily에 전달한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -176,14 +176,14 @@ describe("ReviewsProvidersService", () => {
     });
 
     expect(result[0]).toMatchObject({
-      retrievalBucket: "familiar",
+      retrievalBucket: "verification",
       sourceCountryCode: "KR",
     });
     expect(global.fetch).toHaveBeenCalledWith(
       "https://api.tavily.com/search",
       expect.objectContaining({
         method: "POST",
-        body: expect.stringContaining("\"include_domains\":[\"yna.co.kr\"]"),
+        body: expect.stringContaining("\"include_domains\":[\"*.go.kr\"]"),
       }),
     );
   });
@@ -252,12 +252,14 @@ describe("ReviewsProvidersService", () => {
     );
   });
 
-  it("mock mode에서 foreign topic familiar 기사 primary를 reference로 낮춘다", async () => {
+  it("applyRelevanceFiltering은 OpenAI API key가 없으면 실패한다", async () => {
     const service = createService({
       reviewProviderMode: "mock",
+      openAiApiKey: null,
     });
 
-    const result = await service.applyRelevanceFiltering({
+    await expect(
+      service.applyRelevanceFiltering({
       coreClaim: "트럼프의 관세 발표",
       claimLanguageCode: "ko",
       topicCountryCode: "US",
@@ -279,8 +281,10 @@ describe("ReviewsProvidersService", () => {
           domainRegistryId: "kr-familiar",
         },
       ],
+    }),
+    ).rejects.toMatchObject({
+      code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
     });
-
-    expect(result[0]?.relevanceTier).toBe("reference");
   });
 });

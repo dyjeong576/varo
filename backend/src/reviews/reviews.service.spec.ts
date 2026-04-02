@@ -6,17 +6,23 @@ describe("ReviewsService", () => {
     const queryPreviewService = {
       createQueryProcessingPreview: jest.fn().mockResolvedValue({ reviewId: "review-1" }),
       createTestQueryProcessingPreview: jest.fn(),
+      listQueryProcessingPreviews: jest.fn(),
+      getQueryProcessingPreview: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(queryPreviewService);
 
     const result = await service.createQueryProcessingPreview("user-1", {
       claim: "테슬라가 한국에서 철수한대",
+      clientRequestId: "pending:review-1",
     });
 
     expect(result).toEqual({ reviewId: "review-1" });
     expect(queryPreviewService.createQueryProcessingPreview).toHaveBeenCalledWith(
       "user-1",
-      { claim: "테슬라가 한국에서 철수한대" },
+      {
+        claim: "테슬라가 한국에서 철수한대",
+        clientRequestId: "pending:review-1",
+      },
     );
   });
 
@@ -26,6 +32,8 @@ describe("ReviewsService", () => {
       createTestQueryProcessingPreview: jest
         .fn()
         .mockResolvedValue({ reviewId: "review-1" }),
+      listQueryProcessingPreviews: jest.fn(),
+      getQueryProcessingPreview: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(queryPreviewService);
 
@@ -37,5 +45,44 @@ describe("ReviewsService", () => {
     expect(queryPreviewService.createTestQueryProcessingPreview).toHaveBeenCalledWith({
       claim: "테슬라가 한국에서 철수한대",
     });
+  });
+
+  it("review preview 목록 조회를 query preview service에 위임한다", async () => {
+    const queryPreviewService = {
+      createQueryProcessingPreview: jest.fn(),
+      createTestQueryProcessingPreview: jest.fn(),
+      listQueryProcessingPreviews: jest
+        .fn()
+        .mockResolvedValue([{ reviewId: "review-1" }]),
+      getQueryProcessingPreview: jest.fn(),
+    } as unknown as ReviewsQueryPreviewService;
+    const service = new ReviewsService(queryPreviewService);
+
+    const result = await service.listQueryProcessingPreviews("user-1");
+
+    expect(result).toEqual([{ reviewId: "review-1" }]);
+    expect(queryPreviewService.listQueryProcessingPreviews).toHaveBeenCalledWith(
+      "user-1",
+    );
+  });
+
+  it("review preview 상세 조회를 query preview service에 위임한다", async () => {
+    const queryPreviewService = {
+      createQueryProcessingPreview: jest.fn(),
+      createTestQueryProcessingPreview: jest.fn(),
+      listQueryProcessingPreviews: jest.fn(),
+      getQueryProcessingPreview: jest
+        .fn()
+        .mockResolvedValue({ reviewId: "review-1" }),
+    } as unknown as ReviewsQueryPreviewService;
+    const service = new ReviewsService(queryPreviewService);
+
+    const result = await service.getQueryProcessingPreview("user-1", "review-1");
+
+    expect(result).toEqual({ reviewId: "review-1" });
+    expect(queryPreviewService.getQueryProcessingPreview).toHaveBeenCalledWith(
+      "user-1",
+      "review-1",
+    );
   });
 });
