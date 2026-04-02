@@ -176,6 +176,50 @@ sequenceDiagram
     ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
 ```
 
+### Dev Test Endpoint Sequence
+
+`POST /api/v1/reviews/query-processing-preview/test`는 세션 없는 dev 전용 진입점이지만, 실제 pipeline 실행은 인증 endpoint와 동일한 `createQueryProcessingPreview()` 경로를 공유한다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor DevClient as "Dev Client"
+    participant Controller as "ReviewsController"
+    participant ReviewsService as "ReviewsService"
+    participant QueryPreviewService as "ReviewsQueryPreviewService"
+    participant DB as "DB"
+    participant Providers as "ReviewsProvidersService"
+
+    DevClient->>Controller: POST /api/v1/reviews/query-processing-preview/test
+    Controller->>Controller: ensureDevOnly()
+
+    alt appEnv != dev
+        Controller-->>DevClient: 403 Forbidden
+    else dev 환경
+        Controller->>ReviewsService: createTestQueryProcessingPreview(payload)
+        ReviewsService->>QueryPreviewService: createTestQueryProcessingPreview(payload)
+        QueryPreviewService->>DB: preview user upsert + profile country 보정
+        DB-->>QueryPreviewService: previewUser.id
+        QueryPreviewService->>QueryPreviewService: createQueryProcessingPreview(previewUser.id, payload)
+        QueryPreviewService->>DB: claim / review job 생성
+        QueryPreviewService->>DB: preview user country 조회
+        QueryPreviewService->>Providers: query refinement
+        Providers-->>QueryPreviewService: core_claim + generated_queries + topic country
+        QueryPreviewService->>DB: search 대상 domain registry 조회
+        DB-->>QueryPreviewService: familiar / verification registry
+        QueryPreviewService->>Providers: Tavily search + relevance filtering
+        opt verification source 부족
+            QueryPreviewService->>Providers: fallback search + relevance 재판정
+        end
+        QueryPreviewService->>Providers: extraction 대상 content 추출
+        QueryPreviewService->>DB: source / evidence / handoff payload 저장
+        DB-->>QueryPreviewService: persisted artifacts
+        QueryPreviewService-->>ReviewsService: preview response
+        ReviewsService-->>Controller: preview response
+        Controller-->>DevClient: 200 OK
+    end
+```
+
 ## 단계별 입출력 아티팩트
 
 | 단계 | 입력 | 출력 |

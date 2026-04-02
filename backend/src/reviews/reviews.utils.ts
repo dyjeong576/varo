@@ -1,44 +1,10 @@
 import { createHash } from "node:crypto";
-
-export type ReviewRelevanceTier = "primary" | "reference" | "discard";
-export type TopicScope = "domestic" | "foreign" | "multi_country" | "unknown";
-export type RetrievalBucket = "familiar" | "verification" | "fallback";
-
-export interface DomainRegistryEntry {
-  id: string;
-  domain: string;
-  countryCode: string;
-  languageCode: string | null;
-  sourceKind: string;
-  usageRole: string;
-  priority: number;
-  isActive: boolean;
-}
-
-export interface QueryArtifact {
-  id: string;
-  text: string;
-  rank: number;
-}
-
-export interface SearchCandidate {
-  id: string;
-  sourceType: string;
-  publisherName: string | null;
-  publishedAt: string | null;
-  canonicalUrl: string;
-  originalUrl: string;
-  rawTitle: string;
-  rawSnippet: string | null;
-  normalizedHash: string;
-  originQueryIds: string[];
-  sourceCountryCode: string | null;
-  retrievalBucket: RetrievalBucket;
-  domainRegistryId: string | null;
-  relevanceTier?: ReviewRelevanceTier;
-  relevanceReason?: string | null;
-  contentText?: string | null;
-}
+import {
+  DomainRegistryEntry,
+  QueryArtifact,
+  RetrievalBucket,
+  SearchCandidate,
+} from "./reviews.types";
 
 export function normalizeClaimText(rawClaim: string): string {
   return rawClaim.replace(/\s+/g, " ").replace(/[!?]{2,}/g, "?").trim();
@@ -320,6 +286,78 @@ export function hasVerificationSource(candidates: SearchCandidate[]): boolean {
 
 export function countRelevantSources(candidates: SearchCandidate[]): number {
   return candidates.filter((candidate) => candidate.relevanceTier !== "discard").length;
+}
+
+export function collectSearchDomainRegistryCriteria(
+  userCountryCode: string | null,
+  topicCountryCode: string | null,
+): {
+  usageRoles: string[];
+  countryCodes: string[];
+} {
+  const familiarCriteria = buildDomainSelectionCriteria(
+    "familiar",
+    userCountryCode,
+    topicCountryCode,
+  );
+  const verificationCriteria = buildDomainSelectionCriteria(
+    "verification",
+    userCountryCode,
+    topicCountryCode,
+  );
+
+  return {
+    usageRoles: [...new Set([...familiarCriteria.usageRoles, ...verificationCriteria.usageRoles])],
+    countryCodes: [
+      ...new Set([...familiarCriteria.countryCodes, ...verificationCriteria.countryCodes]),
+    ],
+  };
+}
+
+export function selectDomainsForBucket(
+  registry: DomainRegistryEntry[],
+  bucket: "familiar" | "verification",
+  userCountryCode: string | null,
+  topicCountryCode: string | null,
+): string[] {
+  const criteria = buildDomainSelectionCriteria(
+    bucket,
+    userCountryCode,
+    topicCountryCode,
+  );
+
+  return registry
+    .filter(
+      (entry) =>
+        entry.isActive &&
+        criteria.usageRoles.includes(entry.usageRole) &&
+        criteria.countryCodes.includes(entry.countryCode),
+    )
+    .sort((left, right) => left.priority - right.priority)
+    .map((entry) => entry.domain)
+    .filter((domain, index, domains) => domains.indexOf(domain) === index);
+}
+
+function buildDomainSelectionCriteria(
+  bucket: "familiar" | "verification",
+  userCountryCode: string | null,
+  topicCountryCode: string | null,
+): {
+  usageRoles: string[];
+  countryCodes: string[];
+} {
+  return {
+    usageRoles:
+      bucket === "familiar"
+        ? ["familiar_news"]
+        : ["verification_official", "verification_news", "global_reference"],
+    countryCodes:
+      bucket === "familiar"
+        ? [userCountryCode].filter((value): value is string => Boolean(value))
+        : [topicCountryCode, "GLOBAL"].filter((value): value is string =>
+            Boolean(value),
+          ),
+  };
 }
 
 function pickPreferredBucket(

@@ -1,5 +1,7 @@
 import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
+import { ReviewsOpenAiClient } from "./providers/reviews-openai.client";
+import { ReviewsTavilyClient } from "./providers/reviews-tavily.client";
 import { ReviewsProvidersService } from "./reviews.providers.service";
 
 function createConfigServiceMock(values: Record<string, unknown>) {
@@ -31,6 +33,12 @@ function createFetchResponse({
 
 describe("ReviewsProvidersService", () => {
   const originalFetch = global.fetch;
+  const createService = (values: Record<string, unknown>) =>
+    new ReviewsProvidersService(
+      createConfigServiceMock(values) as never,
+      new ReviewsOpenAiClient(),
+      new ReviewsTavilyClient(),
+    );
 
   afterEach(() => {
     global.fetch = originalFetch;
@@ -38,12 +46,10 @@ describe("ReviewsProvidersService", () => {
   });
 
   it("real mode에서 OPENAI_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "real",
-        openAiApiKey: null,
-      }) as never,
-    );
+    const service = createService({
+      reviewProviderMode: "real",
+      openAiApiKey: null,
+    });
 
     await expect(service.refineQuery("테슬라가 한국에서 철수한대")).rejects.toMatchObject({
       code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
@@ -52,12 +58,10 @@ describe("ReviewsProvidersService", () => {
   });
 
   it("real mode에서 TAVILY_API_KEY가 없으면 검색을 실패시킨다", async () => {
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "real",
-        tavilyApiKey: null,
-      }) as never,
-    );
+    const service = createService({
+      reviewProviderMode: "real",
+      tavilyApiKey: null,
+    });
 
     await expect(
       service.searchSources({
@@ -105,12 +109,10 @@ describe("ReviewsProvidersService", () => {
       }),
     ) as typeof fetch;
 
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "real",
-        openAiApiKey: "openai-test-key",
-      }) as never,
-    );
+    const service = createService({
+      reviewProviderMode: "real",
+      openAiApiKey: "openai-test-key",
+    });
 
     const result = await service.refineQuery("트럼프가 오늘 관세 발표했대");
 
@@ -136,13 +138,11 @@ describe("ReviewsProvidersService", () => {
       }),
     ) as typeof fetch;
 
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "real",
-        tavilyApiKey: "tvly-test-key",
-        tavilySearchTimeoutMs: 40000,
-      }) as never,
-    );
+    const service = createService({
+      reviewProviderMode: "real",
+      tavilyApiKey: "tvly-test-key",
+      tavilySearchTimeoutMs: 40000,
+    });
 
     const result = await service.searchSources({
       queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
@@ -214,12 +214,10 @@ describe("ReviewsProvidersService", () => {
       }),
     ) as typeof fetch;
 
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "real",
-        openAiApiKey: "openai-test-key",
-      }) as never,
-    );
+    const service = createService({
+      reviewProviderMode: "real",
+      openAiApiKey: "openai-test-key",
+    });
 
     const result = await service.applyRelevanceFiltering({
       coreClaim: "트럼프의 관세 발표",
@@ -255,11 +253,9 @@ describe("ReviewsProvidersService", () => {
   });
 
   it("mock mode에서 foreign topic familiar 기사 primary를 reference로 낮춘다", async () => {
-    const service = new ReviewsProvidersService(
-      createConfigServiceMock({
-        reviewProviderMode: "mock",
-      }) as never,
-    );
+    const service = createService({
+      reviewProviderMode: "mock",
+    });
 
     const result = await service.applyRelevanceFiltering({
       coreClaim: "트럼프의 관세 발표",
