@@ -85,3 +85,18 @@
 - 부모 댓글 삭제 시 Prisma cascade를 따라 하위 대댓글도 함께 삭제한다.
 - 댓글 좋아요 API는 `POST/DELETE /api/v1/community/posts/:postId/comments/:commentId/likes`로 둔다.
 - 게시글 상세 응답의 댓글 구조는 flat list가 아니라 `replies[]`를 가진 트리 구조로 반환한다.
+
+## 2026-04-04
+
+### Popular Topics v1
+- 인기 주제는 `/popular` 탭 전용으로 노출하고 Home에는 노출하지 않는다.
+- 인기 주제 집계 API는 `GET /api/v1/popular/topics`로 둔다.
+- 인기 주제의 기본 집계 기준은 최근 24시간 내 `submitted + meaningful reopen` 합산 점수다.
+- 인기 topic 그룹 키는 `queryRefinement.coreClaim` 우선, 없으면 `claims.normalized_text` fallback으로 사용한다.
+- `meaningful reopen`은 `popular`, `history`, `notification`에서 기존 review preview로 재진입한 클릭만 포함한다.
+- 최근 24시간 합산 점수가 10 이상인 topic만 `/popular`에 노출한다.
+- `/popular` 정렬은 합산 점수 우선, 동률이면 submitted 수와 최신성 순으로 유지한다.
+- 인기 항목 클릭 시 새 review를 만들지 않고 해당 topic의 대표 review preview로 재진입한다.
+- 대표 review는 최근 24시간 구간에서 가장 최근에 생성되거나 재진입된 eligible review로 고정한다.
+- `user_history`는 `submitted`, `reopened` entry를 저장하고, 인기 집계는 `review_jobs + user_history`를 읽는 실시간 read API로 구현한다.
+- v1 인기 기능은 `popular_topics` 스냅샷 테이블과 worker를 도입하지 않는다.

@@ -31,6 +31,7 @@ import {
 } from "./reviews-query-preview.mapper";
 
 interface PersistQueryPreviewResultInput {
+  userId: string;
   reviewJob: Pick<ReviewJob, "id">;
   refinement: QueryRefinementResult;
   generatedQueries: QueryArtifact[];
@@ -177,13 +178,12 @@ export class ReviewsQueryPreviewPersistenceService {
   }
 
   async getQueryProcessingPreview(
-    userId: string,
+    _userId: string,
     reviewId: string,
   ): Promise<ReviewPreviewRecord> {
     const reviewJob = await this.prisma.reviewJob.findFirst({
       where: {
         id: reviewId,
-        userId,
       },
       include: {
         claim: true,
@@ -197,6 +197,43 @@ export class ReviewsQueryPreviewPersistenceService {
     });
 
     if (!reviewJob) {
+      throw new AppException(
+        APP_ERROR_CODES.NOT_FOUND,
+        "리뷰를 찾을 수 없습니다.",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return reviewJob;
+  }
+
+  async recordHistoryEntry(params: {
+    userId: string;
+    reviewJobId: string;
+    entryType: "submitted" | "reopened";
+  }): Promise<void> {
+    await this.db.userHistory.create({
+      data: {
+        userId: params.userId,
+        reviewJobId: params.reviewJobId,
+        entryType: params.entryType,
+      },
+    });
+  }
+
+  async ensureReopenableReview(reviewId: string): Promise<{
+    id: string;
+    handoffPayload: Prisma.JsonValue | null;
+  }> {
+    const reviewJob = await this.prisma.reviewJob.findUnique({
+      where: { id: reviewId },
+      select: {
+        id: true,
+        handoffPayload: true,
+      },
+    });
+
+    if (!reviewJob || !reviewJob.handoffPayload) {
       throw new AppException(
         APP_ERROR_CODES.NOT_FOUND,
         "리뷰를 찾을 수 없습니다.",
@@ -262,6 +299,11 @@ export class ReviewsQueryPreviewPersistenceService {
         evidenceSnippets.length > 0,
       ),
     );
+    await this.recordHistoryEntry({
+      userId: input.userId,
+      reviewJobId: input.reviewJob.id,
+      entryType: "submitted",
+    });
 
     return {
       createdSources,
@@ -378,5 +420,9 @@ export class ReviewsQueryPreviewPersistenceService {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  private get db(): any {
+    return this.prisma as any;
   }
 }

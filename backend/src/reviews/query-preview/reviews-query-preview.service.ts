@@ -126,6 +126,7 @@ export class ReviewsQueryPreviewService {
         : [];
       const persistedArtifacts =
         await this.persistenceService.persistQueryPreviewResult({
+          userId,
           reviewJob,
           refinement,
           generatedQueries,
@@ -183,6 +184,19 @@ export class ReviewsQueryPreviewService {
     );
 
     return mapStoredPreviewResponse(reviewJob);
+  }
+
+  async recordReviewReopen(
+    userId: string,
+    reviewId: string,
+  ): Promise<void> {
+    const reviewJob = await this.persistenceService.ensureReopenableReview(reviewId);
+
+    await this.persistenceService.recordHistoryEntry({
+      userId,
+      reviewJobId: reviewJob.id,
+      entryType: "reopened",
+    });
   }
 
   private shouldRunFallbackSearch(

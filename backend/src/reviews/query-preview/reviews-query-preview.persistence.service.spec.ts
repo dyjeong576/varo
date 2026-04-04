@@ -20,6 +20,12 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       update: jest.fn().mockResolvedValue(undefined),
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue({
+        id: "review-1",
+        handoffPayload: {
+          sourceIds: ["source-1"],
+        },
+      }),
     },
     source: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -55,6 +61,9 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       upsert: jest.fn().mockResolvedValue({
         id: "preview-user-1",
       }),
+    },
+    userHistory: {
+      create: jest.fn().mockResolvedValue(undefined),
     },
   });
 
@@ -149,6 +158,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
 
     const result = await service.persistQueryPreviewResult({
+      userId: "user-1",
       reviewJob: { id: "review-1" },
       refinement: {
         claimLanguageCode: "ko",
@@ -219,6 +229,13 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         processedSourceCount: 1,
         lastErrorCode: null,
       }),
+    });
+    expect(prisma.userHistory.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        reviewJobId: "review-1",
+        entryType: "submitted",
+      },
     });
     expect(result.handoffSourceIds).toEqual(["trump-tariff-update"]);
   });
@@ -332,21 +349,32 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     expect(result).toHaveLength(1);
   });
 
-  it("본인 소유가 아닌 review preview 상세는 404를 반환한다", async () => {
+  it("로그인 사용자가 접근 가능한 review preview 상세를 조회한다", async () => {
     const prisma = createPrismaMock();
+    prisma.reviewJob.findFirst.mockResolvedValue({
+      id: "review-404",
+      status: "partial",
+      currentStage: "handoff_ready",
+      lastErrorCode: null,
+      createdAt: new Date("2026-04-01T02:00:00.000Z"),
+      claim: {
+        id: "claim-1",
+        rawText: "트럼프가 오늘 관세 발표했대",
+        normalizedText: "트럼프가 오늘 관세 발표했대",
+      },
+      sources: [],
+      evidenceSnippets: [],
+    });
     const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
 
-    await expect(
-      service.getQueryProcessingPreview("user-2", "review-404"),
-    ).rejects.toMatchObject({
-      status: HttpStatus.NOT_FOUND,
-      code: APP_ERROR_CODES.NOT_FOUND,
-    });
+    const result = await service.getQueryProcessingPreview("user-2", "review-404");
 
+    expect(result).toMatchObject({
+      id: "review-404",
+    });
     expect(prisma.reviewJob.findFirst).toHaveBeenCalledWith({
       where: {
         id: "review-404",
-        userId: "user-2",
       },
       include: {
         claim: true,
@@ -357,6 +385,39 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           orderBy: { id: "asc" },
         },
       },
+    });
+  });
+
+  it("reopen history entry를 저장한다", async () => {
+    const prisma = createPrismaMock();
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    await service.recordHistoryEntry({
+      userId: "user-1",
+      reviewJobId: "review-1",
+      entryType: "reopened",
+    });
+
+    expect(prisma.userHistory.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        reviewJobId: "review-1",
+        entryType: "reopened",
+      },
+    });
+  });
+
+  it("handoff가 없는 review는 reopen 대상에서 제외한다", async () => {
+    const prisma = createPrismaMock();
+    prisma.reviewJob.findUnique.mockResolvedValue({
+      id: "review-404",
+      handoffPayload: null,
+    });
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    await expect(service.ensureReopenableReview("review-404")).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: APP_ERROR_CODES.NOT_FOUND,
     });
   });
 });

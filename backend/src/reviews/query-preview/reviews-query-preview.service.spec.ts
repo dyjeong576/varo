@@ -57,6 +57,13 @@ describe("ReviewsQueryPreviewService", () => {
     }),
     listRecentQueryProcessingPreviews: jest.fn().mockResolvedValue([]),
     getQueryProcessingPreview: jest.fn(),
+    ensureReopenableReview: jest.fn().mockResolvedValue({
+      id: "review-1",
+      handoffPayload: {
+        sourceIds: ["source-1"],
+      },
+    }),
+    recordHistoryEntry: jest.fn().mockResolvedValue(undefined),
   });
 
   it("빈 claim이면 입력 검증 예외를 던진다", async () => {
@@ -673,5 +680,22 @@ describe("ReviewsQueryPreviewService", () => {
 
     expect(persistence.createClaimAndReviewJob).toHaveBeenCalledTimes(1);
     expect(persistence.markReviewJobFailed).toHaveBeenCalledWith("review-1", error);
+  });
+
+  it("reopen 요청을 history entry로 기록한다", async () => {
+    const persistence = createPersistenceMock();
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      {} as never,
+    );
+
+    await service.recordReviewReopen("user-1", "review-1");
+
+    expect(persistence.ensureReopenableReview).toHaveBeenCalledWith("review-1");
+    expect(persistence.recordHistoryEntry).toHaveBeenCalledWith({
+      userId: "user-1",
+      reviewJobId: "review-1",
+      entryType: "reopened",
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { AppNotification } from "@/lib/notifications/types";
+import { buildReviewEntryHref } from "@/lib/reviews/navigation";
 import { ReviewPreviewDetail } from "@/lib/reviews/types";
 
 const STORAGE_KEY = "varo.notifications";
@@ -92,7 +93,7 @@ export function createReviewCompletionNotification(
     message: `"${review.claim}" review preview가 준비되었습니다.`,
     isRead: false,
     createdAt: new Date().toISOString(),
-    link: `/reviews/${review.reviewId}`,
+    link: buildReviewEntryHref(review.reviewId, "notification"),
   };
 
   writeNotifications([nextNotification, ...notifications].slice(0, 50));

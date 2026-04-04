@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { ReviewPreviewSummary } from "@/lib/reviews/types";
+import { buildReviewEntryHref } from "@/lib/reviews/navigation";
 
 interface ReviewHistoryListProps {
   reviews: ReviewPreviewSummary[];
@@ -73,7 +74,7 @@ export function ReviewHistoryList({
         return (
           <Link
             key={review.reviewId}
-            href={`/reviews/${review.reviewId}`}
+            href={buildReviewEntryHref(review.reviewId, "history")}
             className="block rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/50 hover:bg-blue-50/30"
             onClick={onNavigate}
           >

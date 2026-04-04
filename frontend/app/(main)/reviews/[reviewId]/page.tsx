@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
 import EvidenceGrid from "@/components/reviews/EvidenceGrid";
@@ -10,6 +10,7 @@ import EvidenceSnippetList from "@/components/reviews/EvidenceSnippetList";
 import SourceCard from "@/components/reviews/SourceCard";
 import UncertaintyCard from "@/components/reviews/UncertaintyCard";
 import VerdictHero from "@/components/reviews/VerdictHero";
+import { isReviewEntrySource } from "@/lib/reviews/navigation";
 import { ReviewPreviewDetail, ReviewSourceCategory } from "@/lib/reviews/types";
 
 const FILTERS: Array<{ label: string; value: "all" | ReviewSourceCategory }> = [
@@ -21,11 +22,14 @@ const FILTERS: Array<{ label: string; value: "all" | ReviewSourceCategory }> = [
 
 export default function ReviewResultPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const reviewId = params.reviewId as string;
   const [review, setReview] = useState<ReviewPreviewDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | ReviewSourceCategory>("all");
+  const trackedEntryRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,6 +64,31 @@ export default function ReviewResultPage() {
       isMounted = false;
     };
   }, [reviewId]);
+
+  useEffect(() => {
+    const entry = searchParams.get("entry");
+
+    if (!isReviewEntrySource(entry)) {
+      trackedEntryRef.current = null;
+      return;
+    }
+
+    const trackingKey = `${reviewId}:${entry}`;
+    if (trackedEntryRef.current === trackingKey) {
+      return;
+    }
+
+    trackedEntryRef.current = trackingKey;
+
+    api.reviews
+      .recordReopen(reviewId, entry)
+      .catch((error) => {
+        console.error("Failed to record review reopen:", error);
+      })
+      .finally(() => {
+        router.replace(`/reviews/${reviewId}`, { scroll: false });
+      });
+  }, [reviewId, router, searchParams]);
 
   if (isLoading) {
     return (

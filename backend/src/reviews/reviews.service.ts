@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { CreateReviewQueryProcessingPreviewDto } from "./dto/create-review-query-processing-preview.dto";
+import { CreateReviewReopenDto } from "./dto/create-review-reopen.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "./dto/review-query-processing-preview-response.dto";
+import { ReviewReopenResponseDto } from "./dto/review-reopen-response.dto";
 import { ReviewPreviewSummaryResponseDto } from "./dto/review-preview-summary-response.dto";
 import { ReviewsQueryPreviewService } from "./query-preview/reviews-query-preview.service";
 
@@ -32,5 +34,15 @@ export class ReviewsService {
     reviewId: string,
   ): Promise<ReviewQueryProcessingPreviewResponseDto> {
     return this.queryPreviewService.getQueryProcessingPreview(userId, reviewId);
+  }
+
+  async recordReviewReopen(
+    userId: string,
+    reviewId: string,
+    _payload: CreateReviewReopenDto,
+  ): Promise<ReviewReopenResponseDto> {
+    await this.queryPreviewService.recordReviewReopen(userId, reviewId);
+
+    return { ok: true };
   }
 }

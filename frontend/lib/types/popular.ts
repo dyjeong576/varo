@@ -1,12 +1,14 @@
 export type TrendType = 'up' | 'down' | 'steady';
 
 export interface PopularTopic {
-  id: string;
+  topicKey: string;
+  topicText: string;
   rank: number;
-  title: string;
-  requestCount: number;
+  popularityScore: number;
+  reviewCount: number;
+  reopenCount: number;
   trend: TrendType;
-  trendValue?: number;
+  trendValue: number | null;
+  representativeReviewId: string;
   updatedAt: string;
-  isHot?: boolean;
 }

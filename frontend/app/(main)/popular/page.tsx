@@ -1,7 +1,6 @@
 import React from 'react';
 import { PopularHero } from '@/components/popular/PopularHero';
-import { PopularTopicList } from '@/components/popular/PopularTopicList';
-import { mockPopularTopics } from '@/lib/mock-data';
+import { PopularTopicFeed } from '@/components/popular/PopularTopicFeed';
 
 export const metadata = {
   title: '인기 주제 | VARO',
@@ -12,7 +11,7 @@ export default function PopularPage() {
   return (
     <main className="pt-8 pb-32 px-6 max-w-3xl mx-auto min-h-screen">
       <PopularHero />
-      <PopularTopicList topics={mockPopularTopics} />
+      <PopularTopicFeed />
     </main>
   );
 }

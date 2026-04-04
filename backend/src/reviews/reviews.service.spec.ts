@@ -8,6 +8,7 @@ describe("ReviewsService", () => {
       createTestQueryProcessingPreview: jest.fn(),
       listQueryProcessingPreviews: jest.fn(),
       getQueryProcessingPreview: jest.fn(),
+      recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(queryPreviewService);
 
@@ -34,6 +35,7 @@ describe("ReviewsService", () => {
         .mockResolvedValue({ reviewId: "review-1" }),
       listQueryProcessingPreviews: jest.fn(),
       getQueryProcessingPreview: jest.fn(),
+      recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(queryPreviewService);
 
@@ -55,6 +57,7 @@ describe("ReviewsService", () => {
         .fn()
         .mockResolvedValue([{ reviewId: "review-1" }]),
       getQueryProcessingPreview: jest.fn(),
+      recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(queryPreviewService);
 
@@ -74,6 +77,7 @@ describe("ReviewsService", () => {
       getQueryProcessingPreview: jest
         .fn()
         .mockResolvedValue({ reviewId: "review-1" }),
+      recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(queryPreviewService);
 
@@ -81,6 +85,27 @@ describe("ReviewsService", () => {
 
     expect(result).toEqual({ reviewId: "review-1" });
     expect(queryPreviewService.getQueryProcessingPreview).toHaveBeenCalledWith(
+      "user-1",
+      "review-1",
+    );
+  });
+
+  it("review preview 재진입 기록을 query preview service에 위임한다", async () => {
+    const queryPreviewService = {
+      createQueryProcessingPreview: jest.fn(),
+      createTestQueryProcessingPreview: jest.fn(),
+      listQueryProcessingPreviews: jest.fn(),
+      getQueryProcessingPreview: jest.fn(),
+      recordReviewReopen: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ReviewsQueryPreviewService;
+    const service = new ReviewsService(queryPreviewService);
+
+    const result = await service.recordReviewReopen("user-1", "review-1", {
+      source: "popular",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(queryPreviewService.recordReviewReopen).toHaveBeenCalledWith(
       "user-1",
       "review-1",
     );

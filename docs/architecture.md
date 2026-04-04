@@ -58,7 +58,7 @@ VARO는 아래 도메인으로 구성한다.
 
 ### 4.4 Popular & Ranking
 - 인기 질문 집계
-- 랭킹 스냅샷
+- `submitted + meaningful reopen` 기반 랭킹
 - 결과 또는 주제 재진입
 
 ### 4.5 Notifications
@@ -96,7 +96,6 @@ VARO는 아래 도메인으로 구성한다.
            |-- review pipeline --> [NAVER Search API]
            |-- interpretation ---> [OpenAI Responses API]
            |-- notification jobs
-           |-- ranking aggregation
            +-- persist ----------> [PostgreSQL]
 ```
 
@@ -104,7 +103,7 @@ VARO는 아래 도메인으로 구성한다.
 
 - 프론트엔드는 서비스 전체 앱 셸과 사용자 인터랙션을 담당한다.
 - 백엔드는 도메인 API와 공통 비즈니스 규칙을 담당한다.
-- worker는 review 분석, 알림 생성, 인기 집계 같은 비동기 작업을 담당한다.
+- worker는 review 분석과 알림 생성 같은 비동기 작업을 담당한다.
 - PostgreSQL은 서비스 전반의 기준 데이터 저장소다.
 - Redis는 queue와 일시적 비동기 제어를 담당한다.
 
@@ -127,7 +126,6 @@ VARO는 아래 도메인으로 구성한다.
 ### 6.3 Workers
 - review 분석 파이프라인 실행
 - 알림 fan-out / 읽음 처리 보조
-- 인기 집계 스냅샷 생성
 - 외부 provider 호출과 retry
 
 ### 6.4 Data Layer
@@ -136,7 +134,7 @@ VARO는 아래 도메인으로 구성한다.
 - community
 - notifications
 - history
-- popular snapshot
+- popular read model input
 
 ## 7. 환경 구성
 지원 환경은 `dev`, `prod` 두 개다.

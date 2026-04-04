@@ -17,12 +17,19 @@ import {
   mapReviewPreviewDetail,
   mapReviewPreviewSummary,
 } from "@/lib/reviews/mappers";
+import type { ReviewEntrySource } from "@/lib/reviews/navigation";
 import type {
   ReviewPreviewDetail,
   ReviewPreviewDetailResponse,
   ReviewPreviewSummary,
   ReviewPreviewSummaryResponse,
 } from "@/lib/reviews/types";
+import type { PopularTopic } from "@/lib/types/popular";
+import type { TrendType } from "@/lib/types/popular";
+
+type PopularTopicApiResponse = Partial<PopularTopic> & {
+  requestUserCount?: number;
+};
 
 function normalizeCommunityComment(comment: CommunityComment): CommunityComment {
   return {
@@ -94,6 +101,44 @@ function normalizeCommunityPostDetail(post: CommunityPostDetail): CommunityPostD
   };
 }
 
+function normalizePopularTopic(topic: PopularTopicApiResponse): PopularTopic {
+  const reviewCount =
+    typeof topic.reviewCount === "number" && Number.isFinite(topic.reviewCount)
+      ? topic.reviewCount
+      : 0;
+  const reopenCount =
+    typeof topic.reopenCount === "number" && Number.isFinite(topic.reopenCount)
+      ? topic.reopenCount
+      : 0;
+  const popularityScore =
+    typeof topic.popularityScore === "number" && Number.isFinite(topic.popularityScore)
+      ? topic.popularityScore
+      : reviewCount + reopenCount;
+  const trend: TrendType =
+    topic.trend === "up" || topic.trend === "down" || topic.trend === "steady"
+      ? topic.trend
+      : "steady";
+
+  return {
+    topicKey: topic.topicKey ?? "",
+    topicText: topic.topicText ?? topic.topicKey ?? "",
+    rank:
+      typeof topic.rank === "number" && Number.isFinite(topic.rank)
+        ? topic.rank
+        : 0,
+    popularityScore,
+    reviewCount,
+    reopenCount,
+    trend,
+    trendValue:
+      typeof topic.trendValue === "number" && Number.isFinite(topic.trendValue)
+        ? topic.trendValue
+        : null,
+    representativeReviewId: topic.representativeReviewId ?? "",
+    updatedAt: topic.updatedAt ?? new Date(0).toISOString(),
+  };
+}
+
 export const api = {
   reviews: {
     getRecent: async (): Promise<ReviewPreviewSummary[]> => {
@@ -123,6 +168,26 @@ export const api = {
       );
 
       return mapReviewPreviewDetail(response);
+    },
+    recordReopen: async (
+      reviewId: string,
+      source: ReviewEntrySource,
+    ): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>(
+        `/api/v1/reviews/${encodeURIComponent(reviewId)}/reopen`,
+        {
+          method: "POST",
+          body: JSON.stringify({ source }),
+        },
+      ),
+  },
+  popular: {
+    getTopics: async (): Promise<PopularTopic[]> => {
+      const response = await apiRequest<PopularTopicApiResponse[]>(
+        "/api/v1/popular/topics",
+      );
+
+      return response.map(normalizePopularTopic);
     },
   },
   community: {

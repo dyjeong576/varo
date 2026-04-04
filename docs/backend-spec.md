@@ -49,7 +49,7 @@
 ### 3.5 Popular / Ranking
 
 - 인기 질문 집계
-- 랭킹 스냅샷 생성
+- `submitted + meaningful reopen` 점수 계산
 - 결과 재진입용 포인트 제공
 
 ### 3.6 Notifications
@@ -62,6 +62,7 @@
 
 - 사용자별 분석 이력 저장
 - 재진입과 상태 재확인 지원
+- `submitted`, `reopened` entry 저장
 
 ### 3.8 Shared Infra
 
@@ -119,7 +120,7 @@
 6. 결과 저장
 7. 완료 알림 생성
 8. history 반영
-9. 인기 집계 이벤트 발행
+9. 인기 집계 입력 반영
 
 ### 6.2 상태값
 
@@ -155,7 +156,7 @@
 
 - 사용자 history 반영
 - 분석 완료 알림 생성
-- 인기 질문 집계 입력 반영
+- 인기 질문 submitted 입력 반영
 
 ### 7.2 community 이벤트
 
@@ -167,8 +168,9 @@
 
 ### 7.3 ranking 집계
 
-- 주기적 snapshot 또는 이벤트 기반 카운팅
-- 홈 / 인기 화면에서 읽기 최적화된 형태로 제공
+- 최근 24시간 `submitted + meaningful reopen`을 DB에서 읽어 실시간 계산
+- v1에서는 별도 snapshot 테이블이나 worker를 두지 않음
+- `/popular`에는 합산 점수 10 이상 topic만 노출
 
 ## 8. API 구조
 
@@ -230,6 +232,7 @@
 
 - 내 분석 이력 조회
 - 기존 결과 재진입
+- `submitted`, `reopened` entry 저장
 
 ## 9. 핵심 인터페이스 / 타입
 

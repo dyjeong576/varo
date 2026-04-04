@@ -17,7 +17,9 @@ import { AppException } from "../common/exceptions/app-exception";
 import { SessionAuthGuard } from "../common/guards/session-auth.guard";
 import { ApiErrorResponseDto } from "../shared/dto/api-error-response.dto";
 import { CreateReviewQueryProcessingPreviewDto } from "./dto/create-review-query-processing-preview.dto";
+import { CreateReviewReopenDto } from "./dto/create-review-reopen.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "./dto/review-query-processing-preview-response.dto";
+import { ReviewReopenResponseDto } from "./dto/review-reopen-response.dto";
 import { ReviewPreviewSummaryResponseDto } from "./dto/review-preview-summary-response.dto";
 import { ReviewsService } from "./reviews.service";
 
@@ -87,7 +89,7 @@ export class ReviewsController {
   @UseGuards(SessionAuthGuard)
   @ApiOperation({
     summary: "review query processing preview 상세 조회",
-    description: "로그인한 사용자의 review preview 상세와 수집된 evidence/source를 반환합니다.",
+    description: "로그인한 사용자가 접근 가능한 review preview 상세와 수집된 evidence/source를 반환합니다.",
   })
   @ApiOkResponse({
     description: "review preview 상세 조회 성공",
@@ -106,6 +108,34 @@ export class ReviewsController {
     @Param("reviewId") reviewId: string,
   ): Promise<ReviewQueryProcessingPreviewResponseDto> {
     return this.reviewsService.getQueryProcessingPreview(current.user.id, reviewId);
+  }
+
+  @Post(":reviewId/reopen")
+  @ApiCookieAuth("sessionAuth")
+  @UseGuards(SessionAuthGuard)
+  @ApiOperation({
+    summary: "review preview 재진입 이벤트 기록",
+    description:
+      "popular, history, notification 재진입 액션에서 review preview reopen 이벤트를 저장합니다.",
+  })
+  @ApiOkResponse({
+    description: "재진입 이벤트 기록 성공",
+    type: ReviewReopenResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: "해당 review를 찾을 수 없음",
+    type: ApiErrorResponseDto,
+  })
+  async recordReviewReopen(
+    @CurrentUser() current: { user: { id: string } },
+    @Param("reviewId") reviewId: string,
+    @Body() payload: CreateReviewReopenDto,
+  ): Promise<ReviewReopenResponseDto> {
+    return this.reviewsService.recordReviewReopen(current.user.id, reviewId, payload);
   }
 
   @Post("query-processing-preview/test")

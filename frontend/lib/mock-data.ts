@@ -1,5 +1,4 @@
 export type NotificationType = 'analysis' | 'community' | 'system';
-import { PopularTopic } from './types/popular';
 
 export interface Notification {
   id: string;
@@ -79,51 +78,3 @@ export const mockUserProfile: UserProfile = {
   country: '대한민국',
   city: '서울특별시'
 };
-
-export const mockPopularTopics: PopularTopic[] = [
-  {
-    id: 'pop-1',
-    rank: 1,
-    title: '서울시 대중교통 요금 인상, 정말 확정된 사안인가요?',
-    requestCount: 3402,
-    trend: 'up',
-    trendValue: 12.4,
-    updatedAt: '방금 전',
-    isHot: true
-  },
-  {
-    id: 'pop-2',
-    rank: 2,
-    title: '모바일 신분증 도입 후 기존 실물 신분증 효력이 상실되나요?',
-    requestCount: 2118,
-    trend: 'up',
-    trendValue: 5.2,
-    updatedAt: '12분 전'
-  },
-  {
-    id: 'pop-3',
-    rank: 3,
-    title: '정부 지원금 청년 일자리 수당 확대 정책의 실체',
-    requestCount: 1895,
-    trend: 'steady',
-    updatedAt: '45분 전'
-  },
-  {
-    id: 'pop-4',
-    rank: 4,
-    title: '전기차 지하 주차장 출입 전면 금지 조례안 사실 여부',
-    requestCount: 1204,
-    trend: 'down',
-    trendValue: 2.8,
-    updatedAt: '1시간 전'
-  },
-  {
-    id: 'pop-5',
-    rank: 5,
-    title: '최근 발생한 은행권 해킹 이슈와 개인정보 유출 실태',
-    requestCount: 950,
-    trend: 'up',
-    trendValue: 1.5,
-    updatedAt: '2시간 전'
-  }
-];

@@ -84,8 +84,8 @@
 ### 5.5 Popular
 
 - 인기 질문 랭킹
-- 순위 / 질문 요약 / 관련 수치
-- 결과 또는 주제 상세 재진입
+- 순위 / 질문 요약 / 요청 수 / 재열람 수 / 합산 점수
+- 대표 review preview 재진입
 
 ### 5.6 Community
 
@@ -99,6 +99,7 @@
 
 - 사용자의 이전 질문 / 분석 기록
 - 일시 / 상태 / 재진입 액션
+- history 재진입은 meaningful reopen source로 기록
 
 ### 5.8 User Info / Settings
 
@@ -111,6 +112,7 @@
 - 분석 완료 알림
 - 커뮤니티 관련 알림
 - 읽음 / 미확인 상태
+- review 알림 클릭은 meaningful reopen source로 기록
 
 ## 6. 클라이언트 상태 모델
 
@@ -169,6 +171,7 @@
 
 - 보호 화면은 세션 검증 이후 렌더링
 - 결과 페이지는 deep link로 재진입 가능해야 함
+- 결과 재진입은 선택적 `entry` query를 통해 source를 전달할 수 있어야 함
 - 알림 클릭은 관련 화면으로 직접 이동해야 함
 
 ## 8. API 소비 방식
@@ -183,6 +186,7 @@
 
 - `POST /api/v1/reviews`
 - `GET /api/v1/reviews/{reviewId}`
+- `POST /api/v1/reviews/{reviewId}/reopen`
 - `GET /api/v1/reviews/{reviewId}/sources`
 - 선택 구현: `POST /api/v1/reviews/{reviewId}/retry`
 
@@ -193,6 +197,7 @@
 - 알림 목록 / 읽음 처리
 - 히스토리 조회
 - 사용자 정보 조회 / 수정
+- popular / history / notification 재진입 시 review reopen 이벤트 기록
 
 프론트는 도메인별 API client 계층을 통해 서버와 통신하고, 화면 컴포넌트가 HTTP 세부사항을 직접 다루지 않도록 유지한다.
 

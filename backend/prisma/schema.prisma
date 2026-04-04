@@ -16,6 +16,7 @@ model User {
   profile      UserProfile?
   sessions     Session[]
   reviewJobs   ReviewJob[]
+  historyEntries UserHistory[]
   communityPosts CommunityPost[]
   communityComments CommunityComment[]
   communityPostLikes CommunityPostLike[]
@@ -78,11 +79,27 @@ model ReviewJob {
   claim               Claim             @relation(fields: [claimId], references: [id], onDelete: Cascade)
   sources             Source[]
   evidenceSnippets    EvidenceSnippet[]
+  historyEntries      UserHistory[]
 
   @@index([userId])
   @@index([claimId])
   @@unique([userId, clientRequestId])
   @@map("review_jobs")
+}
+
+model UserHistory {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  reviewJobId String   @map("review_job_id")
+  entryType  String    @map("entry_type")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewJob  ReviewJob @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([reviewJobId, createdAt])
+  @@index([entryType, createdAt])
+  @@map("user_history")
 }
 
 model Source {

@@ -207,4 +207,33 @@ describe("ReviewsController (e2e)", () => {
       "review-1",
     );
   });
+
+  it("review preview 재진입 기록을 서비스에 위임한다", async () => {
+    const reviewsService = {
+      recordReviewReopen: jest.fn().mockResolvedValue({ ok: true }),
+    } as unknown as ReviewsService;
+    const configService = {} as ConfigService;
+    const controller = new ReviewsController(reviewsService, configService);
+
+    const result = await controller.recordReviewReopen(
+      {
+        user: {
+          id: "user-1",
+        },
+      },
+      "review-1",
+      {
+        source: "popular",
+      },
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(reviewsService.recordReviewReopen).toHaveBeenCalledWith(
+      "user-1",
+      "review-1",
+      {
+        source: "popular",
+      },
+    );
+  });
 });
