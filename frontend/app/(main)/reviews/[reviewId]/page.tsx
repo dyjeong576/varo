@@ -120,14 +120,15 @@ export default function ReviewResultPage() {
         : review.sources.filter((source) => source.sourceCategory === filter);
 
   return (
-    <div className="bg-[#faf8ff] min-h-full px-6 py-6">
-      <main className="mx-auto max-w-2xl space-y-8">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top,#f1f6ff_0%,#f8f9fc_32%,#f6f3fb_70%,#f5f1fb_100%)] px-4 py-5 sm:px-6 sm:py-6">
+      <main className="mx-auto max-w-3xl space-y-8">
         <VerdictHero
+          reviewId={review.reviewId}
           claim={review.claim}
+          coreClaim={review.coreClaim}
           statusLabel={review.statusLabel}
           currentStageLabel={review.currentStageLabel}
           createdAtLabel={review.createdAtLabel}
-          pendingMessage={review.pendingMessage}
           statusTone={review.statusTone}
         />
 
@@ -136,39 +137,35 @@ export default function ReviewResultPage() {
           selectedSourceCount={review.selectedSourceCount}
           discardedSourceCount={review.discardedSourceCount}
           coreClaim={review.coreClaim}
+          normalizedClaim={review.normalizedClaim}
           topicScopeLabel={review.topicScopeLabel}
           topicCountryCode={review.topicCountryCode}
+          countryDetectionReason={review.countryDetectionReason}
+          pendingMessage={review.pendingMessage}
+          createdAtLabel={review.createdAtLabel}
           generatedQueries={review.generatedQueries}
         />
-
-        <section className="rounded-xl border border-[#c2c6d8]/15 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#0050cb]">
-            Query Context
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-[#191b24]">
-            정규화 claim: {review.normalizedClaim}
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-[#424656]">
-            {review.countryDetectionReason}
-          </p>
-        </section>
 
         <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />
 
         <section className="space-y-6">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-lg font-bold text-[#191b24] tracking-tight">
-              수집된 source ({filteredSources.length})
+            <h3 className="flex items-center gap-2 text-xl font-black tracking-[-0.03em] text-[#191b24]">
+              <span className="material-symbols-outlined text-[#0050cb]">list_alt</span>
+              Cross-Reference List
+              <span className="text-base font-bold text-[#8a94a6]">
+                {filteredSources.length}
+              </span>
             </h3>
             <div className="flex flex-wrap gap-2">
               {FILTERS.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => setFilter(option.value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
                     filter === option.value
-                      ? "bg-[#0050cb] text-white"
-                      : "bg-[#e6e7f4] text-[#424656]"
+                      ? "bg-[#eef5ff] text-[#0050cb] ring-1 ring-[#c7dbff]"
+                      : "bg-white text-[#6b7280] ring-1 ring-[#e6ebf3]"
                   }`}
                 >
                   {option.label}
@@ -179,7 +176,7 @@ export default function ReviewResultPage() {
 
           <div className="space-y-4">
             {filteredSources.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#c2c6d8] bg-white px-5 py-8 text-center text-sm text-[#6b7280]">
+              <div className="rounded-[24px] border border-dashed border-[#cbd5e1] bg-white px-5 py-8 text-center text-sm text-[#6b7280] shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
                 해당 유형의 source가 없습니다.
               </div>
             ) : (

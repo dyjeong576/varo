@@ -11,12 +11,12 @@ export default function UncertaintyCard({
   insufficiencyReason,
 }: UncertaintyCardProps) {
   return (
-    <section className="bg-[#ba1a1a]/5 border border-[#ba1a1a]/10 rounded-xl p-6 mb-10">
-      <h3 className="text-sm font-bold text-[#ba1a1a] mb-2 flex items-center gap-2">
-        <span className="material-symbols-outlined text-sm">error</span> 
-        데이터 한계 및 유의사항
+    <section className="mb-10 rounded-[28px] border border-[#f2ddbc] bg-[linear-gradient(180deg,#fffaf2_0%,#fff5e7_100%)] p-6 shadow-[0_16px_32px_rgba(180,106,0,0.08)]">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-[#b46a00]">
+        <span className="material-symbols-outlined text-sm">error</span>
+        Uncertainty
       </h3>
-      <div className="space-y-2 text-xs leading-relaxed text-[#424656]">
+      <div className="space-y-3 text-sm leading-6 text-[#495466]">
         <p>{pendingMessage}</p>
         <p>
           {insufficiencyReason ??
