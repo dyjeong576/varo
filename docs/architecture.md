@@ -25,14 +25,14 @@
 - 기능 스펙과 구현 세부는 별도 문서로 분리하되, 기술 문서는 서비스 공통 구조를 기준으로 유지한다.
 
 ## 3. 기술 스택
-- Frontend: Next.js, TypeScript, App Router, Tailwind CSS
+- Frontend: Next.js 16, React 19, TypeScript, App Router, Tailwind CSS 4
 - Backend API: NestJS, TypeScript, REST API
 - Worker / Async Processing: Node.js worker + Redis queue
 - Primary Database: PostgreSQL
 - External Auth: Google login
 - External Search / AI:
-  - NAVER Search API
-  - OpenAI Responses API Structured Outputs
+  - Search / extraction provider
+  - OpenAI structured outputs
 
 ## 4. 서비스 도메인 구조
 VARO는 아래 도메인으로 구성한다.
@@ -47,6 +47,7 @@ VARO는 아래 도메인으로 구성한다.
 - claim 입력
 - source 검색 및 수집
 - evidence snippet 생성
+- preview detail 생성
 - verdict / interpretation / uncertainty 생성
 - 결과 페이지 렌더링
 
@@ -70,6 +71,7 @@ VARO는 아래 도메인으로 구성한다.
 - 이전 분석 기록
 - 결과 재진입
 - 사용자 정보 조회 / 일부 수정
+- 첫 로그인 프로필 온보딩
 
 ### 4.7 Shared Platform
 - 공통 API 계층
@@ -85,6 +87,8 @@ VARO는 아래 도메인으로 구성한다.
     |
     v
 [Next.js Frontend App]
+    |-- server-side session gate --> [/api/v1/auth/session]
+    |-- local persisted ui state --> [localStorage]
     |
     v
 [NestJS API]
@@ -93,17 +97,19 @@ VARO는 아래 도메인으로 구성한다.
     |-- enqueue events/jobs ---> [Redis]
     |
     +--> [Workers]
-           |-- review pipeline --> [NAVER Search API]
-           |-- interpretation ---> [OpenAI Responses API]
+           |-- review pipeline --> [Search / extraction providers]
+           |-- structured analysis -> [OpenAI]
            |-- notification jobs
            +-- persist ----------> [PostgreSQL]
 ```
 
 핵심 구조:
 
-- 프론트엔드는 서비스 전체 앱 셸과 사용자 인터랙션을 담당한다.
+- 프론트엔드는 서버 세션 확인 이후 보호 레이아웃을 렌더링한다.
+- 프론트엔드는 review preview, 인기, 커뮤니티, 히스토리, 알림 UI를 담당한다.
+- 프론트엔드는 일부 UI 상태를 localStorage에 유지한다.
 - 백엔드는 도메인 API와 공통 비즈니스 규칙을 담당한다.
-- worker는 review 분석과 알림 생성 같은 비동기 작업을 담당한다.
+- worker는 review 분석과 장기적 알림 생성 같은 비동기 작업을 담당한다.
 - PostgreSQL은 서비스 전반의 기준 데이터 저장소다.
 - Redis는 queue와 일시적 비동기 제어를 담당한다.
 
@@ -111,10 +117,12 @@ VARO는 아래 도메인으로 구성한다.
 
 ### 6.1 Frontend
 - 로그인 상태 확인
+- 서버 세션 기반 auth gate
 - 서비스 라우팅
-- review 생성과 결과 조회
+- review preview 생성과 결과 조회
 - 인기 / 커뮤니티 / 히스토리 / 알림 UI 렌더링
 - unread badge, loading state, optimistic interaction 처리
+- `varo.review-tasks`, `varo.notifications` localStorage 관리
 
 ### 6.2 Backend API
 - 인증 세션 검증
@@ -125,8 +133,9 @@ VARO는 아래 도메인으로 구성한다.
 
 ### 6.3 Workers
 - review 분석 파이프라인 실행
-- 알림 fan-out / 읽음 처리 보조
 - 외부 provider 호출과 retry
+- interpretation / verdict 생성
+- 장기적인 알림 fan-out
 
 ### 6.4 Data Layer
 - 사용자 / 세션 / 프로필
@@ -135,6 +144,8 @@ VARO는 아래 도메인으로 구성한다.
 - notifications
 - history
 - popular read model input
+- pending draft, reviewId 승격, preview 상태, 오류, 알림 생성 여부
+- review completion 중심 로컬 알림 목록과 읽음 상태
 
 ## 7. 환경 구성
 지원 환경은 `dev`, `prod` 두 개다.
@@ -168,7 +179,7 @@ VARO는 아래 도메인으로 구성한다.
 - queue 적체와 외부 provider 장애는 서비스 품질에 직접 연결되는 운영 지표로 본다.
 
 ## 9. 문서 역할
-- [Frontend Spec](./frontend-spec.md): 서비스 프론트엔드 구조와 클라이언트 상태
-- [Backend Spec](./backend-spec.md): 서비스 백엔드 구조, API, 비동기 처리, env
-- [Data Model](./data-model.md): 서비스 전체 저장 모델과 상태값
+- [Frontend Spec](./frontend-spec.md): 현재 프론트엔드 구조, 라우팅, 로컬 상태, API 소비 방식
+- [Backend Spec](./backend-spec.md): 백엔드 구조, 프론트가 소비하는 엔드포인트, 비동기 처리
+- [Data Model](./data-model.md): 서버 저장 모델과 현재 프론트 보조 저장 상태
 - [ERD](./erd.md): 서비스 전체 엔티티 관계와 데이터 흐름

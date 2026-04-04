@@ -45,6 +45,10 @@
 - `popular_topics`
 - `user_history`
 
+### 4.6 Client-side Persisted State
+- `review_task_records`
+- `client_notifications`
+
 ## 5. 공통 상태값 / enum
 
 ### 5.1 review 상태값
@@ -258,24 +262,26 @@
 | `target_id` | varchar(128) | 이동 대상 식별자 |
 | `created_at` | timestamptz | 생성 시각 |
 
-### 6.14 `notification_reads`
+현재 프론트는 이 서버 모델을 직접 소비하지 않고, 브라우저 localStorage의 `varo.notifications`를 사용한다.
+
+### 6.15 `notification_reads`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `notification_id` | fk | `notifications.id` 참조 |
 | `user_id` | fk | 읽은 사용자 |
 | `read_at` | timestamptz | 읽은 시각 |
 
-### 6.15 `popular_topics`
+### 6.16 `popular_topics`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
-| `id` | uuid / text id | 스냅샷 식별자 |
+| `id` | uuid / text id | planned snapshot 식별자 |
 | `claim_id` | fk nullable | 대표 claim |
 | `topic_text` | text | 인기 주제 텍스트 |
 | `ranking_score` | numeric | 집계 점수 |
 | `review_count` | integer | 관련 review 수 |
 | `snapshot_at` | timestamptz | 집계 시각 |
 
-### 6.16 `user_history`
+### 6.17 `user_history`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | history 식별자 |
@@ -283,6 +289,40 @@
 | `review_job_id` | fk | 관련 review |
 | `entry_type` | varchar(32) | `submitted`, `viewed`, `reopened` 등 |
 | `created_at` | timestamptz | 기록 시각 |
+
+### 6.18 `review_task_records` (client-side)
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `draftId` | string | pending draft 식별자 |
+| `claim` | string | 사용자가 입력한 claim |
+| `status` | string | `pending / submitting / succeeded / failed` |
+| `previewStatus` | string | preview 응답 상태 |
+| `currentStage` | string | 현재 단계 |
+| `reviewId` | string nullable | 서버 review id |
+| `reviewCreatedAt` | string nullable | 서버 review 생성 시각 |
+| `selectedSourceCount` | number | 선별 근거 수 |
+| `errorMessage` | string nullable | 사용자 노출 오류 |
+| `notificationSent` | boolean | 완료 알림 생성 여부 |
+
+저장 위치:
+
+- browser localStorage `varo.review-tasks`
+
+### 6.19 `client_notifications` (client-side)
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | string | 로컬 알림 식별자 |
+| `type` | string | `analysis / community / system` |
+| `reviewId` | string nullable | 관련 review |
+| `title` | string | 제목 |
+| `message` | string | 본문 |
+| `link` | string nullable | 이동 경로 |
+| `isRead` | boolean | 읽음 여부 |
+| `createdAt` | string | 생성 시각 |
+
+저장 위치:
+
+- browser localStorage `varo.notifications`
 
 ## 7. traceability 기준
 - 어떤 review가 어떤 claim에서 시작했는지 연결되어야 한다.
@@ -294,5 +334,6 @@
 - `users`는 서비스 전체의 계정 기준점이다.
 - `review_jobs`는 review 도메인의 중심 엔티티다.
 - `community_posts`는 review 결과와 느슨하게 연결될 수 있다.
-- `notifications`는 review와 community 도메인을 사용자 액션으로 연결한다.
+- `notifications`는 장기적으로 review와 community 도메인을 사용자 액션으로 연결한다.
+- 현재 프론트는 `review_task_records`, `client_notifications`를 보조 상태 저장으로 사용한다.
 - `popular_topics`와 `user_history`는 읽기 최적화 또는 분석 보조 모델로 운용할 수 있다.

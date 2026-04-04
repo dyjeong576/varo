@@ -2,29 +2,30 @@
 
 ## 1. 문서 목적
 
-이 문서는 VARO 서비스 전체의 프론트엔드 기술 구조를 정의한다.  
-핵심 대상은 모바일 웹 우선의 반응형 Next.js 애플리케이션이며, 인증, 분석, 인기, 커뮤니티, 알림, 히스토리를 하나의 앱 셸 안에서 연결하는 방식을 설명한다.
+이 문서는 현재 VARO 프론트엔드 구현을 기준으로 기술 구조와 사용자 경험 범위를 정리한다.  
+핵심 대상은 모바일 웹 우선의 반응형 Next.js 애플리케이션이며, 인증, review preview, 인기, 커뮤니티, 히스토리, 로컬 알림 흐름을 하나의 앱 셸 안에서 연결하는 방식을 설명한다.
 
 ## 2. 프론트엔드 기술 스택
 
-- Framework: Next.js
+- Framework: Next.js 16
+- UI Runtime: React 19
 - Language: TypeScript
 - Routing: App Router
-- Styling: Tailwind CSS
+- Styling: Tailwind CSS 4
 - Rendering strategy:
-  - 앱 셸과 인증 게이트는 서버 렌더링 우선
-  - 상호작용이 많은 영역은 클라이언트 컴포넌트 사용
+  - 인증 게이트와 보호 레이아웃은 서버 렌더링 우선
+  - 상호작용이 많은 화면은 클라이언트 컴포넌트 사용
 
 ## 3. 프론트엔드 역할
 
-- 로그인 상태 기반 진입 제어
+- 로그인 상태와 프로필 완성 여부 기반 진입 제어
 - 서비스 공통 레이아웃과 내비게이션 제공
-- review 생성, 진행 상태 polling, 결과 렌더링
-- 인기 질문, 커뮤니티, 히스토리, 알림 UI 제공
+- review preview 생성, loading 상태 표시, detail 렌더링
+- 인기 주제, 커뮤니티, 히스토리, 알림 UI 제공
 - 사용자 프로필 조회 및 일부 수정 UI 제공
 - badge, unread, loading, error, empty state를 일관된 방식으로 관리
 
-프론트엔드는 verdict 계산, source 해석, 인기 집계 계산, 알림 생성 같은 서버 책임을 직접 수행하지 않는다.
+프론트엔드는 verdict 계산, source 해석, 인기 집계 계산 같은 서버 책임을 직접 수행하지 않는다. 다만 현재 구현에서는 review task와 notification 일부 상태를 클라이언트 localStorage에 보조 저장한다.
 
 ## 4. 앱 셸 구조
 
@@ -42,15 +43,18 @@
 
 ### 4.2 auth gate
 
-- 비로그인 사용자는 로그인 화면으로 이동
-- 로그인 이후 서비스 공통 앱 셸 렌더링
+- 서버 컴포넌트에서 `/api/v1/auth/session`을 호출해 세션을 확인
+- 비로그인 사용자는 `/login`으로 이동
+- 로그인했지만 프로필 미완성 사용자는 `/onboarding/profile`로 이동
+- 인증과 프로필 조건을 만족한 뒤 서비스 공통 앱 셸을 렌더링
 - 세션 만료 시 재인증 흐름으로 전환
 
 ### 4.3 햄버거 메뉴
 
 - History
 - Settings
-- User Info 진입
+- Settings 내부에서 User Info 진입
+- 최근 review preview 요약 리스트
 
 ## 5. 주요 화면군
 
@@ -60,59 +64,78 @@
 - 서비스 소개와 신뢰감 중심 카피
 - 비로그인 사용자 진입점
 
-### 5.2 Home
+### 5.2 Onboarding Profile
+
+- 첫 로그인 후 필수 프로필 입력
+- 실명, 성별, 나이대, 국가, 도시 저장
+- 저장 완료 후 Home 이동
+
+### 5.3 Home
 
 - 중앙 입력 영역
 - 분석 시작 CTA
-- 최근 작업 또는 안내 상태를 위한 최소 보조 정보
+- active review task 감지 시 `/loading` 복귀
+- 간결한 서비스 소개 카피
 
-### 5.3 Analysis Loading
+### 5.4 Analysis Loading
 
-- 단계별 진행 상태
-- 진행 메시지
-- 장시간 처리 시 알림 기대 형성
+- 전역 review task store 기반 진행 상태
+- 안내용 단계 메시지
+- 실패 시 재시도 / 홈 이동
+- 완료 시 결과 보기
+- 완료 알림 기대 형성
 
-### 5.4 Analysis Result
+### 5.5 Analysis Result
 
 - claim
-- evidence 요약
+- preview status / current stage
+- normalized claim / country detection reason
+- generated queries
+- evidence snippet list
 - source card 목록
-- interpretation
-- uncertainty
-- verdict
+- source type filter
+- insufficiency / pending 안내
 
-### 5.5 Popular
+현재 결과 화면은 최종 interpretation / verdict가 아니라 `query-processing preview` 결과를 보여준다.
+
+### 5.6 Popular
 
 - 인기 질문 랭킹
 - 순위 / 질문 요약 / 요청 수 / 재열람 수 / 합산 점수
 - 대표 review preview 재진입
 
-### 5.6 Community
+### 5.7 Community
 
 - 게시글 목록
 - 게시글 상세
-- 댓글
-- 반응
+- 게시글 작성 / 수정 / 삭제
+- 댓글 / 대댓글 작성
+- 댓글 삭제
+- 게시글 좋아요 / 댓글 좋아요
 - 작성자 공개 정보
 
-### 5.7 History
+### 5.8 History
 
 - 사용자의 이전 질문 / 분석 기록
 - 일시 / 상태 / 재진입 액션
 - history 재진입은 meaningful reopen source로 기록
+- 서버 응답과 local pending task를 병합해 렌더링
 
-### 5.8 User Info / Settings
+### 5.9 User Info / Settings
 
 - 사용자 정보 조회
 - 일부 프로필 수정
 - 읽기 전용과 수정 가능 항목 구분
+- Settings에는 placeholder 메뉴가 함께 노출되지만 현재 `내 정보 관리`만 실제 동작
 
-### 5.9 Notifications
+### 5.10 Notifications
 
-- 분석 완료 알림
-- 커뮤니티 관련 알림
+- review preview 완료 알림
+- community / system 타입 UI
 - 읽음 / 미확인 상태
 - review 알림 클릭은 meaningful reopen source로 기록
+
+현재 알림 목록은 서버 API가 아니라 `varo.notifications` localStorage를 기준으로 렌더링된다.
 
 ## 6. 클라이언트 상태 모델
 
@@ -124,16 +147,20 @@
 - `history/list`
 - `community/feed`
 - `popular/ranking`
-- `review/current`
+- `review/tasks`
 
 ### 6.2 review 상태
 
-- `idle`
-- `submitting`
-- `loading`
-- `completed`
-- `partial`
-- `error`
+- 클라이언트 task 상태
+  - `pending`
+  - `submitting`
+  - `succeeded`
+  - `failed`
+- preview 응답 상태
+  - `searching`
+  - `partial`
+  - `completed`
+  - `failed`
 
 ### 6.3 notification 상태
 
@@ -142,6 +169,10 @@
 - `ready`
 - `empty`
 - `error`
+
+저장 위치:
+
+- `varo.notifications`: review completion 중심 로컬 알림
 
 ### 6.4 community 상태
 
@@ -152,16 +183,25 @@
 - `empty`
 - `error`
 
+추가 보조 상태:
+
+- `varo.review-tasks`: pending draft, reviewId 승격, 오류 메시지, 알림 생성 여부 저장
+- history 화면은 서버 응답과 local pending task 요약을 병합해 렌더링
+
 ## 7. 라우팅 원칙
 
 대표 route 그룹은 아래와 같다.
 
 - `/login`
+- `/onboarding/profile`
 - `/`
+- `/loading`
 - `/reviews/[reviewId]`
 - `/popular`
 - `/community`
+- `/community/write`
 - `/community/[postId]`
+- `/community/[postId]/edit`
 - `/history`
 - `/settings`
 - `/user-info`
@@ -172,34 +212,47 @@
 - 보호 화면은 세션 검증 이후 렌더링
 - 결과 페이지는 deep link로 재진입 가능해야 함
 - 결과 재진입은 선택적 `entry` query를 통해 source를 전달할 수 있어야 함
+- `entry` 값은 `popular | history | notification`만 허용
+- 해당 query가 있으면 프론트는 review reopen API를 호출한 뒤 URL에서 query를 제거
 - 알림 클릭은 관련 화면으로 직접 이동해야 함
 
 ## 8. API 소비 방식
 
 ### 8.1 인증 관련
 
-- 세션 확인
+- `GET /api/v1/auth/session`
+- `POST /api/v1/auth/logout`
 - 로그인 완료 후 사용자 상태 동기화
 - 보호 API 호출 전 인증 상태 확인
 
-### 8.2 review 관련
+### 8.2 사용자 프로필 관련
 
-- `POST /api/v1/reviews`
+- `GET /api/v1/users/me`
+- `PATCH /api/v1/users/me/profile`
+
+### 8.3 review 관련
+
+- `POST /api/v1/reviews/query-processing-preview`
+- `GET /api/v1/reviews`
 - `GET /api/v1/reviews/{reviewId}`
 - `POST /api/v1/reviews/{reviewId}/reopen`
-- `GET /api/v1/reviews/{reviewId}/sources`
-- 선택 구현: `POST /api/v1/reviews/{reviewId}/retry`
 
-### 8.3 서비스 기능 관련
+### 8.4 서비스 기능 관련
 
-- 인기 질문 목록 조회
-- 커뮤니티 목록 / 상세 / 생성 / 댓글 / 반응
-- 알림 목록 / 읽음 처리
-- 히스토리 조회
-- 사용자 정보 조회 / 수정
-- popular / history / notification 재진입 시 review reopen 이벤트 기록
+- `GET /api/v1/popular/topics`
+- `GET /api/v1/community/posts`
+- `GET /api/v1/community/posts/{postId}`
+- `POST /api/v1/community/posts`
+- `PATCH /api/v1/community/posts/{postId}`
+- `DELETE /api/v1/community/posts/{postId}`
+- `POST /api/v1/community/posts/{postId}/comments`
+- `DELETE /api/v1/community/posts/{postId}/comments/{commentId}`
+- `POST /api/v1/community/posts/{postId}/likes`
+- `DELETE /api/v1/community/posts/{postId}/likes`
+- `POST /api/v1/community/posts/{postId}/comments/{commentId}/likes`
+- `DELETE /api/v1/community/posts/{postId}/comments/{commentId}/likes`
 
-프론트는 도메인별 API client 계층을 통해 서버와 통신하고, 화면 컴포넌트가 HTTP 세부사항을 직접 다루지 않도록 유지한다.
+프론트는 도메인별 API client 계층을 통해 서버와 통신하고, 화면 컴포넌트가 HTTP 세부사항을 직접 다루지 않도록 유지한다. 단, notifications는 현재 서버 API를 소비하지 않고 로컬 저장소를 사용한다.
 
 ## 9. review 화면 정보 구조
 
@@ -208,18 +261,19 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 표시 순서:
 
 1. claim
-2. evidence 요약과 핵심 snippet
-3. source card 목록
-4. interpretation
-5. uncertainty
-6. verdict
+2. preview 상태와 stage
+3. query context와 generated query
+4. evidence snippet
+5. source card 목록
+6. insufficiency / pending 안내
 
 표시 원칙:
 
-- evidence가 verdict보다 먼저 보여야 한다.
+- 현재 화면은 최종 verdict가 아니라 preview임을 숨기지 않는다.
+- evidence가 interpretation / verdict보다 먼저 보여야 한다.
 - source card에는 출처명, 발행 시각, source type, snippet, 링크를 포함한다.
-- verdict는 단정적 진실 선언처럼 보이면 안 된다.
-- uncertainty는 별도 블록으로 분리한다.
+- interpretation과 verdict는 아직 생성 전 단계라는 점을 명시한다.
+- uncertainty 또는 insufficiency는 별도 블록으로 분리한다.
 - `partial` 결과는 경고와 함께 표시한다.
 
 ## 10. 커뮤니티와 계정 관련 표시 원칙
@@ -227,6 +281,7 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 - 커뮤니티는 익명 사용을 허용하지 않는다.
 - 작성자 정보는 실명, 성별, 나이대 기준으로 노출된다.
 - 사용자 정보 화면에서는 수정 가능 항목과 읽기 전용 항목을 명확히 구분한다.
+- Settings의 일부 메뉴는 placeholder 상태임을 숨기지 않는다.
 - 알림은 단순 표시가 아니라 관련 화면으로 이동 가능한 행동 단위여야 한다.
 
 ## 11. 공개 env
@@ -254,3 +309,4 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 - 모바일 우선 반응형
 - unread, loading, empty, error 상태를 누락하지 않음
 - review 도메인에서는 결론보다 근거를 먼저 이해하게 함
+- 현재 구현이 preview 중심이라는 사실을 UI 문구와 문서에서 일관되게 유지함

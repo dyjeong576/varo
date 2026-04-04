@@ -212,11 +212,29 @@ erDiagram
 1. 사용자가 로그인하면 `users`, `user_profiles`, `sessions`가 서비스 계정 축을 구성한다.
 2. 사용자가 질문을 제출하면 `claims`와 `review_jobs`가 생성된다.
 3. 분석 과정에서 `sources`, `evidence_snippets`, `external_request_logs`가 쌓인다.
-4. 완료되면 `review_results`가 생성되고, `user_history`와 `notifications`가 갱신된다.
-5. review 결과는 `popular_topics` 집계의 입력이 될 수 있다.
-6. 사용자는 `community_posts`, `community_comments`, `community_reactions`로 서비스 참여 활동을 남긴다.
+4. 현재 프론트는 `handoff_ready` 전후의 review preview detail을 우선 소비한다.
+5. 완료되면 `review_results`가 생성되고, `user_history`와 장기적으로는 `notifications`가 갱신된다.
+6. review 결과는 `popular_topics` 또는 `user_history` 기반 read model 집계의 입력이 될 수 있다.
+7. 사용자는 `community_posts`, `community_comments`, `community_reactions`로 서비스 참여 활동을 남긴다.
 
-## 5. 설계 포인트
+## 5. 현재 프론트 보조 저장
+
+현재 브라우저 프론트는 서버 ERD 외에 아래 local persisted state를 함께 사용한다.
+
+- `varo.review-tasks`
+  - pending draft
+  - reviewId 승격
+  - preview 상태 / stage
+  - 오류 메시지
+  - 로컬 완료 알림 생성 여부
+- `varo.notifications`
+  - review preview 완료 중심 알림
+  - 읽음 상태
+  - review detail deep link
+
+이 보조 저장은 서버 ERD를 대체하지 않고, 현재 프론트 UX를 위한 임시 클라이언트 상태 계층이다.
+
+## 6. 설계 포인트
 - `users`를 중심으로 review, history, notifications, community가 연결된다.
 - review 도메인은 여전히 VARO의 핵심 차별화 축이며, source와 evidence를 별도 엔티티로 유지한다.
 - `notifications`, `popular_topics`, `user_history`는 서비스 경험을 연결하는 보조 도메인이다.

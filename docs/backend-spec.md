@@ -15,8 +15,8 @@
 - Queue / Cache: Redis
 - External Auth: Google login
 - External Providers:
-  - NAVER Search API
-  - OpenAI Responses API Structured Outputs
+  - Tavily search / extract
+  - OpenAI structured outputs
 
 ## 3. 서비스 모듈 구조
 
@@ -36,6 +36,7 @@
 - claim 접수
 - source 검색과 수집
 - evidence snippet 생성
+- preview detail 생성
 - verdict / interpretation / uncertainty 생성
 - review 상태 조회
 
@@ -116,11 +117,12 @@
 2. source 검색
 3. 본문 추출
 4. evidence 정리
-5. interpretation 생성
-6. 결과 저장
-7. 완료 알림 생성
-8. history 반영
-9. 인기 집계 입력 반영
+5. preview detail 제공 가능 상태로 저장
+6. interpretation 생성
+7. 결과 저장
+8. 완료 알림 생성
+9. history 반영
+10. 인기 집계 입력 반영
 
 ### 6.2 상태값
 
@@ -185,15 +187,14 @@
 
 #### Auth / Session
 
-- 로그인 시작 / 콜백
-- 현재 세션 조회
-- 로그아웃
+- `GET /api/v1/auth/session`: 현재 세션 유효 여부와 로그인 사용자 정보를 조회한다.
+- `POST /api/v1/auth/logout`: 현재 세션을 종료하고 로그아웃 처리한다.
+- 로그인 시작 / 콜백: Google OAuth 인증을 시작하고 완료 후 세션을 발급한다.
 
 #### Users / Profile
 
-- 현재 사용자 조회
-- 사용자 정보 조회
-- 프로필 수정
+- `GET /api/v1/users/me`: 현재 로그인 사용자의 계정과 프로필 정보를 조회한다.
+- `PATCH /api/v1/users/me/profile`: 허용된 프로필 필드만 수정한다.
 
 ### 8.3 API 문서화 원칙
 
@@ -205,28 +206,36 @@
 
 #### Reviews
 
-- review 생성
-- review 상태 / 결과 조회
-- source 목록 조회
-- retry
+- `POST /api/v1/reviews/query-processing-preview`: claim을 받아 review preview 생성 파이프라인을 시작하고 preview detail을 반환한다.
+- `GET /api/v1/reviews`: 현재 사용자의 최근 review preview 목록을 조회한다.
+- `GET /api/v1/reviews/:reviewId`: 특정 review의 preview detail을 조회한다.
+- `POST /api/v1/reviews/:reviewId/reopen`: 기존 review 재진입 이벤트를 기록한다.
+
+프론트는 최종 verdict 결과보다 preview detail 계약을 우선 소비한다.
 
 #### Community
 
-- 게시글 목록 / 상세
-- 게시글 생성
-- 댓글 생성
-- 반응 생성
+- `GET /api/v1/community/posts`: 커뮤니티 게시글 목록을 조회한다.
+- `GET /api/v1/community/posts/:postId`: 게시글 상세와 댓글 트리를 조회한다.
+- `POST /api/v1/community/posts`: 새 게시글을 작성한다.
+- `PATCH /api/v1/community/posts/:postId`: 본인 게시글을 수정한다.
+- `DELETE /api/v1/community/posts/:postId`: 본인 게시글을 삭제한다.
+- `POST /api/v1/community/posts/:postId/comments`: 댓글 또는 대댓글을 작성한다.
+- `DELETE /api/v1/community/posts/:postId/comments/:commentId`: 본인 댓글을 삭제한다.
+- `POST /api/v1/community/posts/:postId/likes`: 게시글 좋아요를 추가한다.
+- `DELETE /api/v1/community/posts/:postId/likes`: 게시글 좋아요를 취소한다.
+- `POST /api/v1/community/posts/:postId/comments/:commentId/likes`: 댓글 좋아요를 추가한다.
+- `DELETE /api/v1/community/posts/:postId/comments/:commentId/likes`: 댓글 좋아요를 취소한다.
 
 #### Popular
 
-- 인기 질문 목록 조회
+- `GET /api/v1/popular/topics`: 최근 24시간 기준 인기 topic 랭킹을 조회한다.
 - 인기 항목 기반 결과 재진입
 
 #### Notifications
 
-- 알림 목록 조회
-- 읽음 처리
-- unread count 조회
+- 장기적으로는 알림 목록 조회 / 읽음 처리 / unread count 조회를 서버가 제공한다.
+- 현재 프론트 문맥에서는 이 영역이 아직 실제 소비 API로 연결되어 있지 않다.
 
 #### History
 
@@ -245,8 +254,9 @@
 
 ### 9.2 Review
 
-- `CreateReviewRequest`
+- `CreateReviewPreviewRequest`
 - `ReviewJob`
+- `ReviewPreviewDetail`
 - `ReviewResult`
 - `SourceCard`
 - `EvidenceSnippet`
@@ -259,6 +269,7 @@
 
 ### 9.4 Notifications
 
+- `ClientNotificationRecord`
 - `Notification`
 - `NotificationReadState`
 
@@ -284,13 +295,14 @@
 - Authorized JavaScript origins와 Authorized redirect URIs는 별개다. origin만 등록하고 redirect URI를 누락하면 `redirect_uri_mismatch`가 발생한다.
 - OAuth 콜백은 백엔드가 처리하지만, 콜백 완료 후 최종 화면 이동은 `FRONTEND_BASE_URL` 기준 절대 URL로 리다이렉트한다.
 
-### 10.2 NAVER Search API
+### 10.2 Tavily Search / Extract
 
 - review 도메인의 source 후보 수집
+- source 본문 추출
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
-### 10.3 OpenAI Responses API
+### 10.3 OpenAI Structured Outputs
 
 - review 도메인의 structured interpretation 생성
 - 입력에 없는 사실을 생성하지 않도록 제한
@@ -358,8 +370,9 @@
 - `SESSION_COOKIE_NAME`
 - `SESSION_TTL_DAYS`
 - `OPENAI_API_KEY`
-- `NAVER_SEARCH_CLIENT_ID`
-- `NAVER_SEARCH_CLIENT_SECRET`
+- `TAVILY_API_KEY`
+- `TAVILY_SEARCH_TIMEOUT_MS`
+- `TAVILY_EXTRACT_TIMEOUT_MS`
 
 ### 12.3 dev / prod 정책
 
