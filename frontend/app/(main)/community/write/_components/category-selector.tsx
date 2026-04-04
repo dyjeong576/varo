@@ -1,6 +1,6 @@
 "use client";
 
-import { CommunityCategory } from "@/lib/api/types";
+import { CommunityCategory } from "@/lib/types/community";
 
 interface CategorySelectorProps {
   selectedCategory: CommunityCategory | null;
@@ -15,14 +15,16 @@ const categories: { label: string; value: CommunityCategory }[] = [
 
 export function CategorySelector({ selectedCategory, onSelect }: CategorySelectorProps) {
   return (
-    <div className="px-4 py-6">
-      <p className="text-[13px] font-bold text-[#727687] mb-3 ml-1 uppercase tracking-wider">카테고리 선택</p>
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
+      <p className="mb-3 ml-1 text-[13px] font-bold uppercase tracking-wider text-[#727687]">
+        카테고리 선택
+      </p>
       <div className="flex flex-wrap gap-2">
         {categories.map((cat) => (
           <button
             key={cat.value}
             onClick={() => onSelect(cat.value)}
-            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+            className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition-all ${
               selectedCategory === cat.value
                 ? "bg-[#0050cb] text-white border-[#0050cb] shadow-md shadow-[#0050cb]/20"
                 : "bg-white text-[#424656] border-[#f2f3ff] hover:bg-[#f2f3ff]"

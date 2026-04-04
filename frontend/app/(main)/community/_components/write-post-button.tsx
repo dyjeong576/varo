@@ -7,9 +7,9 @@ export default function WritePostButton() {
     <div className="flex justify-end">
       <Link 
         href="/community/write"
-        className="flex items-center gap-2 bg-[#0066ff] text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:opacity-90 active:scale-95 transition-all"
+        className="inline-flex items-center gap-2 rounded-full bg-[#0066ff] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:opacity-90 active:scale-95"
       >
-        <Edit3 className="w-5 h-5" />
+        <Edit3 className="h-4.5 w-4.5" />
         <span>글쓰기</span>
       </Link>
     </div>

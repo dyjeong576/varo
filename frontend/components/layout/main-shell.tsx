@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import Image from "next/image";
 import { Bell, Home, TrendingUp, MessageSquare } from "lucide-react";
 import Link from "next/link";
@@ -15,15 +15,11 @@ import {
 export function MainShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isNotificationsPage = pathname === "/notifications";
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
-
-  useEffect(() => {
-    setUnreadNotificationCount(getUnreadNotificationCount());
-
-    return subscribeNotifications(() => {
-      setUnreadNotificationCount(getUnreadNotificationCount());
-    });
-  }, []);
+  const unreadNotificationCount = useSyncExternalStore(
+    subscribeNotifications,
+    getUnreadNotificationCount,
+    () => 0,
+  );
 
   return (
     <div className="flex flex-col min-h-[100dvh]">

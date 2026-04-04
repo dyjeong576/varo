@@ -1,22 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mockCommunityPosts } from "@/lib/mock-data";
+import { api } from "@/lib/api/client";
 import type { CommunityPost } from "@/lib/types/community";
 import { PostCard } from "./post-card";
 
 export function PostList() {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const listLayoutClass =
+    posts.length > 1 ? "grid grid-cols-1 gap-4 2xl:grid-cols-2 2xl:gap-5" : "space-y-4";
 
   useEffect(() => {
     async function loadPosts() {
       try {
-        // 실제 API 대신 Mock 데이터 시뮬레이션
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setPosts(mockCommunityPosts);
+        const nextPosts = await api.community.getPosts();
+        setPosts(nextPosts);
+        setErrorMessage(null);
       } catch (error) {
         console.error("Failed to load posts:", error);
+        setErrorMessage("커뮤니티 피드를 불러오지 못했습니다.");
       } finally {
         setIsLoading(false);
       }
@@ -28,7 +32,10 @@ export function PostList() {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white rounded-xl p-6 shadow-sm animate-pulse border border-gray-50">
+          <div
+            key={i}
+            className="rounded-2xl border border-gray-50 bg-white p-6 shadow-sm animate-pulse"
+          >
             <div className="flex justify-between items-start mb-3">
               <div className="w-3/4 h-6 bg-gray-100 rounded" />
               <div className="w-16 h-5 bg-gray-50 rounded" />
@@ -51,16 +58,28 @@ export function PostList() {
     );
   }
 
+  if (errorMessage) {
+    return (
+      <div className="rounded-2xl bg-white px-4 py-20 text-center xl:col-span-2">
+        <p className="text-sm text-[#424656]">{errorMessage}</p>
+      </div>
+    );
+  }
+
   if (posts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-white rounded-xl">
-        <p className="text-gray-400 text-sm">아직 등록된 게시글이 없습니다.<br />첫 번째 의견을 남겨보세요.</p>
+      <div className="rounded-2xl bg-white px-4 py-20 text-center xl:col-span-2">
+        <p className="text-sm text-gray-400">
+          아직 등록된 게시글이 없습니다.
+          <br />
+          첫 번째 의견을 남겨보세요.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className={listLayoutClass}>
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}

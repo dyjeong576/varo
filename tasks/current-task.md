@@ -1,7 +1,7 @@
 # Current Task
 
 ## 작업명
-Review query processing real provider 및 `/reviews` preview 연동
+Review query processing real provider 및 `/reviews`, `/community` 연동
 
 ## 목표
 - `review-query-processing.md` 기준의 pre-interpretation review pipeline 구현
@@ -18,8 +18,20 @@ Review query processing real provider 및 `/reviews` preview 연동
 - dev test endpoint와 인증 endpoint의 공통 provider 경로 유지
 - `GET /api/v1/reviews`
 - `GET /api/v1/reviews/:reviewId`
+- `GET /api/v1/community/posts`
+- `GET /api/v1/community/posts/:postId`
+- `POST /api/v1/community/posts`
+- `PATCH /api/v1/community/posts/:postId`
+- `DELETE /api/v1/community/posts/:postId`
+- `POST /api/v1/community/posts/:postId/comments`
+- `DELETE /api/v1/community/posts/:postId/comments/:commentId`
+- `POST /api/v1/community/posts/:postId/comments/:commentId/likes`
+- `DELETE /api/v1/community/posts/:postId/comments/:commentId/likes`
+- `POST /api/v1/community/posts/:postId/likes`
+- `DELETE /api/v1/community/posts/:postId/likes`
 - 프론트 home submit → review preview 생성 → `/reviews/[reviewId]` 이동
 - 프론트 history drawer / review detail 실제 API 연동
+- 프론트 community list / detail / write / edit / comment / reply / comment delete / like 실제 API 연동
 - 프론트 review task 전역 store로 loading / history / notification 상태 안정화
 - provider / service 테스트
 
@@ -27,4 +39,4 @@ Review query processing real provider 및 `/reviews` preview 연동
 - interpretation 생성
 - verdict 계산
 - Redis queue
-- 커뮤니티 / 알림 / 인기의 실제 백엔드 구현
+- 알림 / 인기의 실제 백엔드 구현

@@ -1,6 +1,5 @@
 export type NotificationType = 'analysis' | 'community' | 'system';
 import { PopularTopic } from './types/popular';
-import { CommunityPost, CommunityComment } from './types/community';
 
 export interface Notification {
   id: string;
@@ -126,80 +125,5 @@ export const mockPopularTopics: PopularTopic[] = [
     trend: 'up',
     trendValue: 1.5,
     updatedAt: '2시간 전'
-  }
-];
-
-export const mockCommunityPosts: CommunityPost[] = [
-  {
-    id: 'post-1',
-    title: '전기차 화재 관련 보도의 객관성 토론',
-    content: `최근 연이어 발생하는 전기차 화재 사고에 대한 언론 보도가 공포심을 조장하고 있다는 의견이 있습니다. 
-    팩트에 기반한 객관적인 보도가 이루어지고 있는지 데이터로 살펴봅시다. 
-    실제 화재 발생률이 내연기관 차량에 비해 높은지, 아니면 자극적인 보도로 인해 체감상 더 위험하게 느껴지는 것인지에 대한 통계적 접근이 필요합니다.`,
-    category: 'Issue',
-    author: {
-      name: '김철수',
-      gender: '남',
-      ageGroup: '30대',
-    },
-    commentCount: 12,
-    likeCount: 45,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: 'post-2',
-    title: '수도권 광역버스 증차 계획의 실효성 검증',
-    content: `정부에서 발표한 수도권 광역버스 증차 및 노선 확대 계획이 실제 출퇴근 시간 단축에 얼마나 기여할 수 있을지 전문가 의견과 실제 이동 데이터를 기반으로 토론하고자 합니다. 
-    증차만으로 해결될 문제인지, 도로 혼잡도 개선이 병행되어야 하는지에 대한 심도 있는 논의가 필요합니다.`,
-    category: 'Policy',
-    author: {
-      name: '이영희',
-      gender: '여',
-      ageGroup: '40대',
-    },
-    commentCount: 28,
-    likeCount: 82,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-  {
-    id: 'post-3',
-    title: '청년 일자리 지원금 정책 홍보물 팩트체크',
-    content: `지자체별로 시행 중인 청년 일자리 지원금 혜택에 대한 홍보 자료 중 '최대 혜택'이라는 표현이 자격 요건에 따라 크게 다를 수 있다는 제보를 확인 중입니다. 
-    누구나 받을 수 있는 것처럼 광고하지만, 실제로는 소득 기준이나 거주 기간 등 까다로운 조건이 숨겨져 있는 경우가 많습니다.`,
-    category: 'FactCheck',
-    author: {
-      name: '박지민',
-      gender: '남',
-      ageGroup: '20대',
-    },
-    commentCount: 5,
-    likeCount: 19,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  }
-];
-
-export const mockCommunityComments: CommunityComment[] = [
-  {
-    id: 'comment-1',
-    postId: 'post-1',
-    author: {
-      name: '정민수',
-      gender: '남',
-      ageGroup: '30대',
-    },
-    content: '보도 자료를 보면 배터리 제조사만 강조하고 실제 관리 부실에 대한 언급은 적은 것 같아요.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: 'comment-2',
-    postId: 'post-1',
-    author: {
-      name: '최소연',
-      gender: '여',
-      ageGroup: '20대',
-      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=So'
-    },
-    content: '소방청 통계를 찾아보니 내연기관 화재 건수가 압도적으로 많던데, 전기차만 이슈가 되는 경향이 있네요.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
   }
 ];

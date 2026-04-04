@@ -16,12 +16,45 @@ export interface CommunityPost {
   commentCount: number;
   likeCount: number;
   createdAt: string;
+  isAuthor: boolean;
+  likedByMe: boolean;
 }
 
 export interface CommunityComment {
   id: string;
   postId: string;
+  parentCommentId: string | null;
   author: CommunityAuthor;
   content: string;
   createdAt: string;
+  isAuthor: boolean;
+  likeCount: number;
+  likedByMe: boolean;
+  replies: CommunityComment[];
+}
+
+export interface CommunityPostDetail extends CommunityPost {
+  comments: CommunityComment[];
+}
+
+export interface CommunityLikeState {
+  likedByMe: boolean;
+  likeCount: number;
+}
+
+export interface CreateCommunityPostPayload {
+  category: CommunityCategory;
+  title: string;
+  content: string;
+}
+
+export interface UpdateCommunityPostPayload {
+  category?: CommunityCategory;
+  title?: string;
+  content?: string;
+}
+
+export interface CreateCommunityCommentPayload {
+  content: string;
+  parentCommentId?: string;
 }

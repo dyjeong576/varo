@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
+import { CommunityModule } from "./community/community.module";
 import { TraceIdMiddleware } from "./common/middleware/trace-id.middleware";
 import { getAppConfig } from "./config/app.config";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -18,6 +19,7 @@ import { UsersModule } from "./users/users.module";
     AuthModule,
     UsersModule,
     ReviewsModule,
+    CommunityModule,
   ],
 })
 export class AppModule implements NestModule {

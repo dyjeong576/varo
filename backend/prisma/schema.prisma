@@ -16,6 +16,10 @@ model User {
   profile      UserProfile?
   sessions     Session[]
   reviewJobs   ReviewJob[]
+  communityPosts CommunityPost[]
+  communityComments CommunityComment[]
+  communityPostLikes CommunityPostLike[]
+  communityCommentLikes CommunityCommentLike[]
 
   @@map("users")
 }
@@ -143,4 +147,65 @@ model EvidenceSnippet {
   @@index([reviewJobId])
   @@index([sourceId])
   @@map("evidence_snippets")
+}
+
+model CommunityPost {
+  id        String              @id @default(uuid())
+  userId    String              @map("user_id")
+  title     String
+  content   String
+  category  String
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments  CommunityComment[]
+  likes     CommunityPostLike[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("community_posts")
+}
+
+model CommunityComment {
+  id        String        @id @default(uuid())
+  postId    String        @map("post_id")
+  userId    String        @map("user_id")
+  parentCommentId String? @map("parent_comment_id")
+  content   String
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentComment CommunityComment? @relation("CommunityCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies   CommunityComment[] @relation("CommunityCommentReplies")
+  likes     CommunityCommentLike[]
+
+  @@index([postId, createdAt])
+  @@index([userId])
+  @@index([parentCommentId])
+  @@map("community_comments")
+}
+
+model CommunityPostLike {
+  postId    String        @map("post_id")
+  userId    String        @map("user_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+  @@map("community_post_likes")
+}
+
+model CommunityCommentLike {
+  commentId  String   @map("comment_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  comment    CommunityComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("community_comment_likes")
 }

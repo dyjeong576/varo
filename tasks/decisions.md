@@ -72,3 +72,16 @@
 - active review task가 진행 중이면 `Home` 진입 시 입력 화면 대신 기존 `/loading`으로 복귀시켜 중복 요청을 막는다.
 - history는 `claim + 시간` 휴리스틱 대신 `draftId -> reviewId` 승격 방식으로 중복 없이 병합한다.
 - review completion 알림은 `loading` 화면이 아니라 review task 성공 전이에서 1회 생성한다.
+
+### Community Feed Integration
+- 커뮤니티 1차 persisted 범위는 게시글 목록/상세/작성/수정/삭제, 댓글 작성, 게시글 공감 토글까지 포함한다.
+- 커뮤니티 API는 `GET/POST /api/v1/community/posts`, `GET/PATCH/DELETE /api/v1/community/posts/:postId`, `POST /api/v1/community/posts/:postId/comments`, `POST/DELETE /api/v1/community/posts/:postId/likes`로 둔다.
+- 커뮤니티 작성자 공개 정보는 `user_profiles.real_name / gender / age_range`를 기준으로 노출한다.
+- 실명, 성별, 나이대 프로필이 없는 사용자는 커뮤니티 게시글 작성과 댓글 작성을 할 수 없다.
+
+### Community Comment Threads
+- 댓글 생성 API는 `parentCommentId` optional payload를 받아 루트 댓글과 대댓글을 같은 endpoint에서 처리한다.
+- 댓글 삭제 API는 `DELETE /api/v1/community/posts/:postId/comments/:commentId`로 두고, 본인 댓글만 삭제할 수 있게 한다.
+- 부모 댓글 삭제 시 Prisma cascade를 따라 하위 대댓글도 함께 삭제한다.
+- 댓글 좋아요 API는 `POST/DELETE /api/v1/community/posts/:postId/comments/:commentId/likes`로 둔다.
+- 게시글 상세 응답의 댓글 구조는 flat list가 아니라 `replies[]`를 가진 트리 구조로 반환한다.
