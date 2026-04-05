@@ -375,6 +375,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     expect(prisma.reviewJob.findFirst).toHaveBeenCalledWith({
       where: {
         id: "review-404",
+        userId: "user-2",
       },
       include: {
         claim: true,
@@ -385,6 +386,19 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           orderBy: { id: "asc" },
         },
       },
+    });
+  });
+
+  it("다른 사용자의 reviewId는 404를 반환한다", async () => {
+    const prisma = createPrismaMock();
+    prisma.reviewJob.findFirst.mockResolvedValue(null);
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    await expect(
+      service.getQueryProcessingPreview("user-2", "review-404"),
+    ).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: APP_ERROR_CODES.NOT_FOUND,
     });
   });
 

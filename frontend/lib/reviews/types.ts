@@ -29,6 +29,7 @@ export interface ReviewPreviewSourceResponse {
   sourceCountryCode: string | null;
   retrievalBucket: string | null;
   domainRegistryMatched: boolean;
+  stance: "support" | "conflict" | "context" | "unknown";
 }
 
 export interface ReviewPreviewEvidenceSnippetResponse {
@@ -62,6 +63,25 @@ export interface ReviewPreviewDetailResponse {
     sourceIds: string[];
     snippetIds: string[];
     insufficiencyReason: string | null;
+  };
+  result: {
+    mode: "rule_based_preview";
+    verdict: "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False";
+    confidenceScore: number;
+    consensusLevel: "high" | "medium" | "low";
+    analysisSummary: string;
+    uncertaintySummary: string;
+    uncertaintyItems: string[];
+    agreementCount: number;
+    conflictCount: number;
+    contextCount: number;
+    sourceBreakdown: {
+      official: number;
+      press: number;
+      social: number;
+      analysis: number;
+      other: number;
+    };
   };
 }
 
@@ -111,6 +131,8 @@ export interface ReviewPreviewSource {
   retrievalBucket: string | null;
   retrievalBucketLabel: string;
   domainRegistryMatched: boolean;
+  stance: "support" | "conflict" | "context" | "unknown";
+  stanceLabel: string;
 }
 
 export interface ReviewPreviewEvidenceSnippet {
@@ -151,6 +173,25 @@ export interface ReviewPreviewDetail {
   selectedSourceCount: number;
   discardedSourceCount: number;
   insufficiencyReason: string | null;
+  verdict: "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False";
+  verdictLabel: string;
+  confidenceScore: number;
+  consensusLevel: "high" | "medium" | "low";
+  consensusLabel: string;
+  analysisSummary: string;
+  uncertaintySummary: string;
+  uncertaintyItems: string[];
+  agreementCount: number;
+  conflictCount: number;
+  contextCount: number;
+  sourceBreakdown: {
+    official: number;
+    press: number;
+    social: number;
+    analysis: number;
+    other: number;
+  };
+  resultMode: "rule_based_preview";
 }
 
 export type ReviewTaskStatus =

@@ -85,6 +85,13 @@ export class ReviewCandidateDto {
     example: true,
   })
   domainRegistryMatched!: boolean;
+
+  @ApiProperty({
+    description: "이 source가 claim에 대해 보이는 방향성",
+    example: "support",
+    enum: ["support", "conflict", "context", "unknown"],
+  })
+  stance!: string;
 }
 
 export class ReviewEvidenceSnippetDto {
@@ -125,6 +132,84 @@ export class ReviewInterpretationHandoffDto {
     nullable: true,
   })
   insufficiencyReason!: string | null;
+}
+
+export class ReviewSourceBreakdownDto {
+  @ApiProperty({ description: "공식 출처 수", example: 2 })
+  official!: number;
+
+  @ApiProperty({ description: "언론 출처 수", example: 5 })
+  press!: number;
+
+  @ApiProperty({ description: "소셜 출처 수", example: 1 })
+  social!: number;
+
+  @ApiProperty({ description: "해설 출처 수", example: 1 })
+  analysis!: number;
+
+  @ApiProperty({ description: "기타 출처 수", example: 0 })
+  other!: number;
+}
+
+export class ReviewAnalysisResultDto {
+  @ApiProperty({
+    description: "현재 결과가 규칙 기반 임시 결과인지 여부",
+    example: "rule_based_preview",
+  })
+  mode!: string;
+
+  @ApiProperty({
+    description: "수집된 출처 기준 임시 verdict",
+    example: "Likely True",
+    enum: ["Likely True", "Mixed Evidence", "Unclear", "Likely False"],
+  })
+  verdict!: string;
+
+  @ApiProperty({ description: "규칙 기반 confidence 점수", example: 84 })
+  confidenceScore!: number;
+
+  @ApiProperty({
+    description: "출처 간 합의 수준",
+    example: "high",
+    enum: ["high", "medium", "low"],
+  })
+  consensusLevel!: string;
+
+  @ApiProperty({
+    description: "결과 화면용 해석 요약",
+    example:
+      "수집된 출처 기준으로는 이 주장을 지지하는 근거가 더 우세합니다. verification 성격의 source가 포함돼 있어 현재 단계 기준 신뢰도는 비교적 높습니다.",
+  })
+  analysisSummary!: string;
+
+  @ApiProperty({
+    description: "결과 화면용 uncertainty 요약",
+    example:
+      "현재 결과는 interpretation 단계 이전에 생성된 임시 분석입니다. 추가 source 확보 여부에 따라 해석 강도가 달라질 수 있습니다.",
+  })
+  uncertaintySummary!: string;
+
+  @ApiProperty({
+    description: "세부 uncertainty 항목",
+    example: ["verification source가 충분하지 않습니다."],
+    type: [String],
+  })
+  uncertaintyItems!: string[];
+
+  @ApiProperty({ description: "지지 근거 수", example: 3 })
+  agreementCount!: number;
+
+  @ApiProperty({ description: "충돌 근거 수", example: 1 })
+  conflictCount!: number;
+
+  @ApiProperty({ description: "맥락 보완 근거 수", example: 2 })
+  contextCount!: number;
+
+  @ApiProperty({
+    description: "출처 유형 분포",
+    type: ReviewSourceBreakdownDto,
+  })
+  sourceBreakdown!: ReviewSourceBreakdownDto;
 }
 
 export class ReviewQueryProcessingPreviewResponseDto {
@@ -210,4 +295,11 @@ export class ReviewQueryProcessingPreviewResponseDto {
     type: ReviewInterpretationHandoffDto,
   })
   handoff!: ReviewInterpretationHandoffDto;
+
+  @ApiProperty({
+    description:
+      "최종 truth 판정이 아닌, 현재 수집된 출처를 기준으로 계산한 임시 결과 화면용 분석 데이터",
+    type: ReviewAnalysisResultDto,
+  })
+  result!: ReviewAnalysisResultDto;
 }

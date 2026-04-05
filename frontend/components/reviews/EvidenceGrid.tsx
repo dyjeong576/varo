@@ -2,13 +2,22 @@ interface EvidenceGridProps {
   searchedSourceCount: number;
   selectedSourceCount: number;
   discardedSourceCount: number;
+  agreementCount: number;
+  conflictCount: number;
+  contextCount: number;
   coreClaim: string;
   normalizedClaim: string;
+  consensusLabel: string;
   topicScopeLabel: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
-  pendingMessage: string;
-  createdAtLabel: string;
+  sourceBreakdown: {
+    official: number;
+    press: number;
+    social: number;
+    analysis: number;
+    other: number;
+  };
   generatedQueries: { id: string; text: string; rank: number }[];
 }
 
@@ -19,79 +28,84 @@ export default function EvidenceGrid({
   searchedSourceCount,
   selectedSourceCount,
   discardedSourceCount,
+  agreementCount,
+  conflictCount,
+  contextCount,
   coreClaim,
   normalizedClaim,
+  consensusLabel,
   topicScopeLabel,
   topicCountryCode,
   countryDetectionReason,
-  pendingMessage,
-  createdAtLabel,
+  sourceBreakdown,
   generatedQueries,
 }: EvidenceGridProps) {
   const coverage =
     searchedSourceCount > 0
       ? Math.max(6, Math.round((selectedSourceCount / searchedSourceCount) * 100))
       : 0;
+  const sourceEntries = [
+    { label: "공식", value: sourceBreakdown.official, tone: "bg-[#0050cb]" },
+    { label: "언론", value: sourceBreakdown.press, tone: "bg-[#d6e3fb]" },
+    { label: "소셜", value: sourceBreakdown.social, tone: "bg-[#c2c6d8]" },
+  ];
+  const maxSourceValue = Math.max(...sourceEntries.map((entry) => entry.value), 1);
 
   return (
     <section className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
-        <div className="rounded-[28px] border border-white/70 bg-white/75 p-6 shadow-[0_22px_45px_rgba(12,23,43,0.08)] ring-1 ring-[#dbe2ee]/70 backdrop-blur-md">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8f0ff] text-[#0050cb]">
-              <span className="material-symbols-outlined">fact_check</span>
-            </div>
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#0050cb]">
-              Preview Status
-            </span>
+      <div className="rounded-xl bg-[#eef3ff] p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#556070]">
+          <span className="material-symbols-outlined text-sm">analytics</span>
+          교차 검증 일치도
+        </h3>
+        <div className="mb-2 h-3 w-full rounded-full bg-[linear-gradient(90deg,#cc4204_0%,#0066ff_100%)]">
+          <div
+            className="relative h-full"
+            style={{ width: `${coverage}%` }}
+          >
+            <div className="absolute right-0 top-1/2 h-5 w-3 -translate-y-1/2 rounded-full border-2 border-[#0050cb] bg-white shadow-sm" />
           </div>
+        </div>
+        <div className="flex justify-between text-[10px] font-bold uppercase tracking-tight text-[#6b7280]">
+          <span>거짓</span>
+          <span>불분명</span>
+          <span>사실</span>
+        </div>
+      </div>
 
-          <p className="text-sm leading-6 text-[#2b3240] sm:text-[15px]">
-            {pendingMessage}
-          </p>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-[#8a94a6]">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="material-symbols-outlined !text-[16px]">update</span>
-              {createdAtLabel}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="material-symbols-outlined !text-[16px]">language</span>
-              {topicScopeLabel}
-              {topicCountryCode ? ` · ${topicCountryCode}` : ""}
-            </span>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex h-40 flex-col justify-between rounded-xl border border-[#dfe4f0] bg-white p-5">
+          <p className="text-xs font-bold text-[#6b7280]">출처 분포</p>
+          <div className="flex h-16 items-end gap-2">
+            {sourceEntries.map((entry) => (
+              <div
+                key={entry.label}
+                className={`flex-1 rounded-t-sm ${entry.tone}`}
+                style={{
+                  height: `${entry.value > 0 ? Math.max(18, (entry.value / maxSourceValue) * 100) : 12}%`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between text-[10px] font-medium text-[#6b7280]">
+            {sourceEntries.map((entry) => (
+              <span key={entry.label}>{entry.label}</span>
+            ))}
           </div>
         </div>
 
-        <div className="flex flex-col justify-between rounded-[28px] bg-[linear-gradient(160deg,#0e63ff_0%,#0050cb_62%,#0d3d94_100%)] p-6 text-white shadow-[0_22px_45px_rgba(0,80,203,0.28)]">
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-[0.24em] text-white/78">
-              Evidence Coverage
-            </h3>
-            <div className="mt-5 text-5xl font-black tracking-[-0.05em]">
-              {selectedSourceCount}
-            </div>
-            <p className="mt-2 text-xs leading-5 text-white/76">
-              검색 후보 {searchedSourceCount}건 중 선별된 근거 수입니다. 제외 후보는 {discardedSourceCount}건입니다.
-            </p>
-          </div>
-
-          <div className="mt-6 space-y-2">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-white/76">
-              <span>Selected / Searched</span>
-              <span>{searchedSourceCount > 0 ? `${coverage}%` : "0%"}</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
-              <div
-                className="h-full rounded-full bg-white"
-                style={{ width: `${coverage}%` }}
-              />
-            </div>
+        <div className="flex h-40 flex-col justify-between rounded-xl border border-[#dfe4f0] bg-white p-5">
+          <p className="text-xs font-bold text-[#6b7280]">정보 합의성</p>
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <span className="text-3xl font-black text-[#0050cb]">{consensusLabel}</span>
+            <span className="mt-1 text-center text-[10px] text-[#6b7280]">
+              지지 {agreementCount} · 충돌 {conflictCount} · 맥락 {contextCount}
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-[#e8ecf4] bg-white p-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)]">
+      <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#0050cb]">
@@ -123,6 +137,10 @@ export default function EvidenceGrid({
           </span>
           <span className="rounded-full bg-[#f6f7fb] px-3 py-1.5 text-xs font-semibold text-[#556070]">
             제외 후보 {discardedSourceCount}건
+          </span>
+          <span className="rounded-full bg-[#f6f7fb] px-3 py-1.5 text-xs font-semibold text-[#556070]">
+            범위 {topicScopeLabel}
+            {topicCountryCode ? ` · ${topicCountryCode}` : ""}
           </span>
         </div>
 

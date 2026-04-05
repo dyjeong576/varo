@@ -119,6 +119,19 @@ function getRelevanceLabel(relevanceTier: string): string {
   }
 }
 
+function getStanceLabel(stance: ReviewPreviewSourceResponse["stance"]): string {
+  switch (stance) {
+    case "support":
+      return "지지 근거";
+    case "conflict":
+      return "충돌 근거";
+    case "context":
+      return "맥락 근거";
+    default:
+      return "판정 보류";
+  }
+}
+
 function getRetrievalBucketLabel(retrievalBucket: string | null): string {
   switch (retrievalBucket) {
     case "familiar":
@@ -145,6 +158,34 @@ function getTopicScopeLabel(topicScope: string): string {
   }
 }
 
+function getVerdictLabel(verdict: ReviewPreviewDetailResponse["result"]["verdict"]): string {
+  switch (verdict) {
+    case "Likely True":
+      return "대체로 사실";
+    case "Likely False":
+      return "대체로 사실 아님";
+    case "Mixed Evidence":
+      return "근거 혼재";
+    case "Unclear":
+    default:
+      return "불분명";
+  }
+}
+
+function getConsensusLabel(
+  consensusLevel: ReviewPreviewDetailResponse["result"]["consensusLevel"],
+): string {
+  switch (consensusLevel) {
+    case "high":
+      return "높음";
+    case "medium":
+      return "중간";
+    case "low":
+    default:
+      return "낮음";
+  }
+}
+
 function mapSource(source: ReviewPreviewSourceResponse): ReviewPreviewSource {
   return {
     id: source.id,
@@ -167,6 +208,8 @@ function mapSource(source: ReviewPreviewSourceResponse): ReviewPreviewSource {
     retrievalBucket: source.retrievalBucket,
     retrievalBucketLabel: getRetrievalBucketLabel(source.retrievalBucket),
     domainRegistryMatched: source.domainRegistryMatched,
+    stance: source.stance,
+    stanceLabel: getStanceLabel(source.stance),
   };
 }
 
@@ -220,8 +263,8 @@ export function mapReviewPreviewDetail(
   const evidenceSnippets = mapEvidenceSnippets(detail, sources);
   const pendingMessage =
     detail.status === "failed"
-      ? "preview 생성이 중단되어 interpretation과 verdict를 아직 만들지 못했습니다."
-      : "이번 화면은 interpretation과 verdict 생성 전 단계의 근거 수집 결과입니다.";
+      ? "임시 결과 생성이 중단되어 저장된 근거만 표시하고 있습니다."
+      : "이 결과는 현재 수집된 출처 기준으로 계산된 임시 분석입니다.";
 
   return {
     reviewId: detail.reviewId,
@@ -259,5 +302,18 @@ export function mapReviewPreviewDetail(
     selectedSourceCount: detail.selectedSourceCount,
     discardedSourceCount: detail.discardedSourceCount,
     insufficiencyReason: detail.handoff.insufficiencyReason,
+    verdict: detail.result.verdict,
+    verdictLabel: getVerdictLabel(detail.result.verdict),
+    confidenceScore: detail.result.confidenceScore,
+    consensusLevel: detail.result.consensusLevel,
+    consensusLabel: getConsensusLabel(detail.result.consensusLevel),
+    analysisSummary: detail.result.analysisSummary,
+    uncertaintySummary: detail.result.uncertaintySummary,
+    uncertaintyItems: detail.result.uncertaintyItems,
+    agreementCount: detail.result.agreementCount,
+    conflictCount: detail.result.conflictCount,
+    contextCount: detail.result.contextCount,
+    sourceBreakdown: detail.result.sourceBreakdown,
+    resultMode: detail.result.mode,
   };
 }

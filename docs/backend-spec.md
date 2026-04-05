@@ -208,10 +208,10 @@
 
 - `POST /api/v1/reviews/query-processing-preview`: claim을 받아 review preview 생성 파이프라인을 시작하고 preview detail을 반환한다.
 - `GET /api/v1/reviews`: 현재 사용자의 최근 review preview 목록을 조회한다.
-- `GET /api/v1/reviews/:reviewId`: 특정 review의 preview detail을 조회한다.
+- `GET /api/v1/reviews/:reviewId`: 특정 review의 detail과 preview artifact 기반 임시 result를 조회한다.
 - `POST /api/v1/reviews/:reviewId/reopen`: 기존 review 재진입 이벤트를 기록한다.
 
-프론트는 최종 verdict 결과보다 preview detail 계약을 우선 소비한다.
+프론트는 현재 단계에서 DB 저장 final result보다 preview artifact 기반 detail 계약을 우선 소비한다.
 
 #### Community
 

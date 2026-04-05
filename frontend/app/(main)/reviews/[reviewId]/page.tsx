@@ -10,6 +10,7 @@ import EvidenceSnippetList from "@/components/reviews/EvidenceSnippetList";
 import SourceCard from "@/components/reviews/SourceCard";
 import UncertaintyCard from "@/components/reviews/UncertaintyCard";
 import VerdictHero from "@/components/reviews/VerdictHero";
+import AnalysisSummary from "@/components/reviews/AnalysisSummary";
 import { isReviewEntrySource } from "@/lib/reviews/navigation";
 import { ReviewPreviewDetail, ReviewSourceCategory } from "@/lib/reviews/types";
 
@@ -123,30 +124,37 @@ export default function ReviewResultPage() {
     <div className="min-h-full bg-[radial-gradient(circle_at_top,#f1f6ff_0%,#f8f9fc_32%,#f6f3fb_70%,#f5f1fb_100%)] px-4 py-5 sm:px-6 sm:py-6">
       <main className="mx-auto max-w-3xl space-y-8">
         <VerdictHero
-          reviewId={review.reviewId}
           claim={review.claim}
-          coreClaim={review.coreClaim}
-          statusLabel={review.statusLabel}
-          currentStageLabel={review.currentStageLabel}
+          verdictLabel={review.verdictLabel}
+          confidenceScore={review.confidenceScore}
           createdAtLabel={review.createdAtLabel}
-          statusTone={review.statusTone}
+          currentStageLabel={review.currentStageLabel}
+          pendingMessage={review.pendingMessage}
         />
 
         <EvidenceGrid
           searchedSourceCount={review.searchedSourceCount}
           selectedSourceCount={review.selectedSourceCount}
           discardedSourceCount={review.discardedSourceCount}
+          agreementCount={review.agreementCount}
+          conflictCount={review.conflictCount}
+          contextCount={review.contextCount}
           coreClaim={review.coreClaim}
           normalizedClaim={review.normalizedClaim}
+          consensusLabel={review.consensusLabel}
           topicScopeLabel={review.topicScopeLabel}
           topicCountryCode={review.topicCountryCode}
           countryDetectionReason={review.countryDetectionReason}
-          pendingMessage={review.pendingMessage}
-          createdAtLabel={review.createdAtLabel}
+          sourceBreakdown={review.sourceBreakdown}
           generatedQueries={review.generatedQueries}
         />
 
         <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />
+
+        <AnalysisSummary
+          interpretation={review.analysisSummary}
+          mode={review.resultMode}
+        />
 
         <section className="space-y-6">
           <div className="flex items-center justify-between gap-3">
@@ -190,6 +198,8 @@ export default function ReviewResultPage() {
         <UncertaintyCard
           pendingMessage={review.pendingMessage}
           insufficiencyReason={review.insufficiencyReason}
+          uncertaintySummary={review.uncertaintySummary}
+          uncertaintyItems={review.uncertaintyItems}
         />
       </main>
     </div>

@@ -37,7 +37,7 @@ export class ReviewsController {
   @ApiOperation({
     summary: "review query processing 미리보기 실행",
     description:
-      "claim intake부터 evidence preparation 직전 handoff payload 생성까지의 review query pipeline을 실행합니다.",
+      "claim intake부터 evidence preparation 직전 handoff payload 생성까지의 review query pipeline을 실행하고, 수집된 출처 기준 임시 결과 화면 계약을 함께 반환합니다.",
   })
   @ApiOkResponse({
     description: "질의 처리 미리보기 성공",
@@ -89,7 +89,8 @@ export class ReviewsController {
   @UseGuards(SessionAuthGuard)
   @ApiOperation({
     summary: "review query processing preview 상세 조회",
-    description: "로그인한 사용자가 접근 가능한 review preview 상세와 수집된 evidence/source를 반환합니다.",
+    description:
+      "로그인한 사용자가 접근 가능한 review 상세와 수집된 evidence/source, 그리고 현재 저장된 근거 기준 임시 결과 화면 데이터를 반환합니다.",
   })
   @ApiOkResponse({
     description: "review preview 상세 조회 성공",

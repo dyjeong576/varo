@@ -478,7 +478,10 @@ describe("ReviewsQueryPreviewService", () => {
       "https://www.reuters.com/world/us/trump-tariff-update",
     );
     expect(result.sources[0]?.publishedAt).toBe("2026-04-01T01:00:00.000Z");
+    expect(result.sources[0]?.stance).toBe("support");
     expect(result.handoff.sourceIds).toEqual(["source-2"]);
+    expect(result.result.mode).toBe("rule_based_preview");
+    expect(result.result.verdict).toBe("Unclear");
   });
 
   it("verification source가 부족하면 fallback search를 수행한다", async () => {

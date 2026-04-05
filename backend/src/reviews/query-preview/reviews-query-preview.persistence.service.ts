@@ -178,12 +178,13 @@ export class ReviewsQueryPreviewPersistenceService {
   }
 
   async getQueryProcessingPreview(
-    _userId: string,
+    userId: string,
     reviewId: string,
   ): Promise<ReviewPreviewRecord> {
     const reviewJob = await this.prisma.reviewJob.findFirst({
       where: {
         id: reviewId,
+        userId,
       },
       include: {
         claim: true,
@@ -212,7 +213,7 @@ export class ReviewsQueryPreviewPersistenceService {
     reviewJobId: string;
     entryType: "submitted" | "reopened";
   }): Promise<void> {
-    await this.db.userHistory.create({
+    await this.prisma.userHistory.create({
       data: {
         userId: params.userId,
         reviewJobId: params.reviewJobId,

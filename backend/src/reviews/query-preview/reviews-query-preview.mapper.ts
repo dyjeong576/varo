@@ -9,6 +9,7 @@ import {
 import { hasVerificationSource } from "../reviews.utils";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
 import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
+import { assembleReviewResult } from "./review-result-assembler";
 
 interface ReviewClaimRecord {
   id: string;
@@ -232,6 +233,14 @@ export function mapPreviewResponse(params: {
   handoffSourceIds: string[];
   insufficiencyReason: string | null;
 }): ReviewQueryProcessingPreviewResponseDto {
+  const assembledResult = assembleReviewResult({
+    coreClaim: params.refinement.coreClaim,
+    rawClaim: params.claim.rawText,
+    sources: params.sources,
+    evidenceSnippets: params.evidenceSnippets,
+    insufficiencyReason: params.insufficiencyReason,
+  });
+
   return {
     reviewId: params.reviewJob.id,
     claimId: params.claim.id,
@@ -262,6 +271,7 @@ export function mapPreviewResponse(params: {
       sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
       domainRegistryMatched: Boolean(source.domainRegistryId),
+      stance: assembledResult.sourceStances[source.id] ?? "unknown",
     })),
     evidenceSnippets: params.evidenceSnippets.map((snippet) => ({
       id: snippet.id,
@@ -277,6 +287,7 @@ export function mapPreviewResponse(params: {
       snippetIds: params.evidenceSnippets.map((snippet) => snippet.id),
       insufficiencyReason: params.insufficiencyReason,
     },
+    result: assembledResult.result,
   };
 }
 
@@ -412,6 +423,13 @@ export function mapStoredPreviewResponse(
     refinement.coreClaim,
     reviewJob.evidenceSnippets,
   );
+  const assembledResult = assembleReviewResult({
+    coreClaim: refinement.coreClaim,
+    rawClaim: reviewJob.claim.rawText,
+    sources: reviewJob.sources,
+    evidenceSnippets: reviewJob.evidenceSnippets,
+    insufficiencyReason: handoff.insufficiencyReason,
+  });
 
   return {
     reviewId: reviewJob.id,
@@ -443,6 +461,7 @@ export function mapStoredPreviewResponse(
       sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
       domainRegistryMatched: Boolean(source.domainRegistryId),
+      stance: assembledResult.sourceStances[source.id] ?? "unknown",
     })),
     evidenceSnippets: reviewJob.evidenceSnippets.map((snippet) => ({
       id: snippet.id,
@@ -460,5 +479,6 @@ export function mapStoredPreviewResponse(
       (source) => source.relevanceTier === "discard",
     ).length,
     handoff,
+    result: assembledResult.result,
   };
 }

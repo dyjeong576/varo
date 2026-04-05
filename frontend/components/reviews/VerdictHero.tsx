@@ -1,65 +1,54 @@
 interface VerdictHeroProps {
-  reviewId: string;
   claim: string;
-  coreClaim: string;
-  statusLabel: string;
-  currentStageLabel: string;
+  verdictLabel: string;
+  confidenceScore: number;
   createdAtLabel: string;
-  statusTone: "blue" | "slate" | "red";
+  currentStageLabel: string;
+  pendingMessage: string;
 }
 
 /**
  * review preview 헤더 컴포넌트
  */
 export default function VerdictHero({
-  reviewId,
   claim,
-  coreClaim,
-  statusLabel,
-  currentStageLabel,
+  verdictLabel,
+  confidenceScore,
   createdAtLabel,
-  statusTone,
+  currentStageLabel,
+  pendingMessage,
 }: VerdictHeroProps) {
-  const toneClassName = {
-    blue: "bg-[#fff4d6] text-[#b46a00]",
-    slate: "bg-[#edf1f7] text-[#556070]",
-    red: "bg-[#fde8e8] text-[#ba1a1a]",
-  };
-  const previewCaseLabel = `Preview #${reviewId.slice(0, 8).toUpperCase()}`;
-
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold tracking-[0.18em] ${toneClassName[statusTone]}`}
-        >
-          <span className="material-symbols-outlined !text-[14px]">error</span>
-          {statusLabel}
-        </span>
-        <span className="text-sm font-medium text-[#98a1b2]">{previewCaseLabel}</span>
-      </div>
+    <section className="space-y-4">
+      <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#0050cb]">
+            임시 분석 결과
+          </span>
+          <span className="rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-bold text-[#0050cb]">
+            {currentStageLabel}
+          </span>
+        </div>
 
-      <div className="space-y-2">
-        <h1 className="text-[2rem] font-black tracking-[-0.04em] text-[#151821] sm:text-[2.35rem]">
+        <h1 className="text-[1.9rem] font-extrabold leading-tight tracking-[-0.04em] text-[#191b24] sm:text-[2.2rem]">
           {claim}
         </h1>
-        <p className="text-base text-[#6b7280] sm:text-lg">
-          Core Claim:{" "}
-          <span className="font-semibold text-[#191b24]">{coreClaim}</span>
-        </p>
+
+        <div className="mt-6 flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0050cb_0%,#0066ff_100%)] text-white">
+            <span className="material-symbols-outlined">verified</span>
+          </div>
+          <div>
+            <p className="text-xl font-bold text-[#0050cb]">{verdictLabel}</p>
+            <p className="text-sm text-[#6b7280]">VARO 임시 신뢰도 {confidenceScore}%</p>
+          </div>
+        </div>
       </div>
 
+      <p className="text-sm leading-6 text-[#6b7280]">{pendingMessage}</p>
       <div className="flex flex-wrap items-center gap-3 text-sm text-[#6b7280]">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-[#d8deeb] backdrop-blur-sm">
-          <span className="material-symbols-outlined !text-[18px] text-[#0050cb]">
-            auto_awesome
-          </span>
-          {currentStageLabel}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="material-symbols-outlined !text-[18px] text-[#9aa3b2]">
-            schedule
-          </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 ring-1 ring-[#d8deeb]">
+          <span className="material-symbols-outlined !text-[18px] text-[#0050cb]">schedule</span>
           {createdAtLabel}
         </span>
       </div>

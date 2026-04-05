@@ -88,15 +88,16 @@
 ### 5.5 Analysis Result
 
 - claim
-- preview status / current stage
-- normalized claim / country detection reason
-- generated queries
+- provisional verdict / confidence / consensus
+- source distribution / agreement / conflict summary
+- normalized claim / country detection reason / generated queries
 - evidence snippet list
 - source card 목록
 - source type filter
-- insufficiency / pending 안내
+- rule-based analysis summary
+- uncertainty / insufficiency 안내
 
-현재 결과 화면은 최종 interpretation / verdict가 아니라 `query-processing preview` 결과를 보여준다.
+현재 결과 화면은 최종 interpretation 저장 결과가 아니라, 저장된 preview artifact를 바탕으로 서버가 계산한 `rule_based_preview` 상세 결과를 보여준다.
 
 ### 5.6 Popular
 
@@ -261,18 +262,19 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 표시 순서:
 
 1. claim
-2. preview 상태와 stage
+2. provisional verdict / confidence / consensus
 3. query context와 generated query
 4. evidence snippet
 5. source card 목록
-6. insufficiency / pending 안내
+6. rule-based analysis summary
+7. uncertainty / insufficiency 안내
 
 표시 원칙:
 
-- 현재 화면은 최종 verdict가 아니라 preview임을 숨기지 않는다.
+- 현재 화면은 최종 저장 verdict가 아니라 `rule_based_preview` 임시 결과임을 숨기지 않는다.
 - evidence가 interpretation / verdict보다 먼저 보여야 한다.
 - source card에는 출처명, 발행 시각, source type, snippet, 링크를 포함한다.
-- interpretation과 verdict는 아직 생성 전 단계라는 점을 명시한다.
+- interpretation과 최종 verdict는 아직 생성 전 단계이며, 현재 결과는 저장된 preview artifact 기준 파생 결과임을 명시한다.
 - uncertainty 또는 insufficiency는 별도 블록으로 분리한다.
 - `partial` 결과는 경고와 함께 표시한다.
 
@@ -309,4 +311,4 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 - 모바일 우선 반응형
 - unread, loading, empty, error 상태를 누락하지 않음
 - review 도메인에서는 결론보다 근거를 먼저 이해하게 함
-- 현재 구현이 preview 중심이라는 사실을 UI 문구와 문서에서 일관되게 유지함
+- 현재 구현이 preview artifact 기반 임시 result 중심이라는 사실을 UI 문구와 문서에서 일관되게 유지함

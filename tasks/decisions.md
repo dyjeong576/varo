@@ -100,3 +100,11 @@
 - 대표 review는 최근 24시간 구간에서 가장 최근에 생성되거나 재진입된 eligible review로 고정한다.
 - `user_history`는 `submitted`, `reopened` entry를 저장하고, 인기 집계는 `review_jobs + user_history`를 읽는 실시간 read API로 구현한다.
 - v1 인기 기능은 `popular_topics` 스냅샷 테이블과 worker를 도입하지 않는다.
+
+## 2026-04-05
+
+### Review Result Screen Contract
+- `GET /api/v1/reviews/:reviewId`와 `POST /api/v1/reviews/query-processing-preview`는 preview artifact와 함께 result screen용 확장 detail 계약을 반환한다.
+- result screen용 `verdict`, `confidenceScore`, `consensusLevel`, `analysisSummary`, `uncertainty`는 DB 저장 없이 조회 시점 규칙 기반 파생 값으로 생성한다.
+- 위 임시 result는 `rule_based_preview` 모드로 명시하고, 이후 interpretation 단계의 LLM 결과로 교체 가능하게 둔다.
+- review detail 조회는 반드시 `userId + reviewId` owner scope를 함께 검증한다.

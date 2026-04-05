@@ -24,15 +24,15 @@ function getSourceTone(source: ReviewPreviewSource): {
   icon: string;
   badge: string;
 } {
-  if (source.relevanceTier === "discard") {
+  if (source.stance === "conflict") {
     return {
-      container: "border-[#f2ddbc] bg-[#fffaf2]",
-      icon: "bg-[#fff2dd] text-[#dd8a00]",
-      badge: "bg-[#fff2dd] text-[#dd8a00]",
+      container: "border-[#fde3df] bg-[#fff8f7]",
+      icon: "bg-[#ffe8e4] text-[#ba1a1a]",
+      badge: "bg-[#ffe8e4] text-[#ba1a1a]",
     };
   }
 
-  if (source.relevanceTier === "primary") {
+  if (source.stance === "support") {
     return {
       container: "border-[#dbe8ff] bg-white",
       icon: "bg-[#eef5ff] text-[#0050cb]",
@@ -74,7 +74,7 @@ export default function SourceCard({ source }: SourceCardProps) {
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.1em] ${tone.badge}`}
                 >
-                  {source.relevanceLabel}
+                  {source.stanceLabel}
                 </span>
               </div>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a94a6]">
@@ -103,6 +103,9 @@ export default function SourceCard({ source }: SourceCardProps) {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-[#6b7280]">
+            <span className="rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1">
+              {source.relevanceLabel}
+            </span>
             <span className="rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1">
               {source.retrievalBucketLabel}
             </span>
