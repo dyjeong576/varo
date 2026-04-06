@@ -112,6 +112,7 @@
 ### Deployment Architecture
 - production 배포는 단일 레포를 유지하되 `frontend`와 `backend`를 별도 Docker image로 분리한다.
 - production 초기 인프라는 `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions self-hosted runner` 조합으로 고정한다.
+- production EC2 인스턴스 OS는 `Amazon Linux 2023`, 아키텍처는 `ARM64 / aarch64`로 고정한다.
 - production 도메인은 `www.varocheck.com`과 `api.varocheck.com`을 분리한다.
 - Nginx는 `www`를 frontend 컨테이너, `api`를 backend 컨테이너로 reverse proxy 한다.
 - backend production health endpoint는 `GET /api/v1/health`로 제공한다.
