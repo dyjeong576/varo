@@ -78,11 +78,8 @@ jobs:
           test -f "$WWW_CONF" || { echo "Missing nginx config: $WWW_CONF" >&2; exit 1; }
           test -f "$API_CONF" || { echo "Missing nginx config: $API_CONF" >&2; exit 1; }
 
-          sudo cp "$WWW_CONF" /etc/nginx/sites-available/www.varocheck.com.conf
-          sudo cp "$API_CONF" /etc/nginx/sites-available/api.varocheck.com.conf
-
-          sudo ln -sfn /etc/nginx/sites-available/www.varocheck.com.conf /etc/nginx/sites-enabled/www.varocheck.com.conf
-          sudo ln -sfn /etc/nginx/sites-available/api.varocheck.com.conf /etc/nginx/sites-enabled/api.varocheck.com.conf
+          sudo cp "$WWW_CONF" /etc/nginx/conf.d/www.varocheck.com.conf
+          sudo cp "$API_CONF" /etc/nginx/conf.d/api.varocheck.com.conf
 
           sudo nginx -t
           sudo systemctl reload nginx
