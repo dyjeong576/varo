@@ -61,18 +61,6 @@ run_as_deploy_user() {
   "$@"
 }
 
-preflight() {
-  if ! run_as_deploy_user command -v docker >/dev/null 2>&1; then
-    echo "Missing docker command for deploy user '$DEPLOY_USER'." >&2
-    exit 1
-  fi
-
-  if ! run_as_deploy_user docker compose version >/dev/null 2>&1; then
-    echo "Amazon Linux 2023 requires the Docker Compose plugin. Install it before running deploy.sh." >&2
-    exit 1
-  fi
-}
-
 compose() {
   run_as_deploy_user env \
     FRONTEND_IMAGE="$FRONTEND_IMAGE" \
@@ -80,8 +68,6 @@ compose() {
     IMAGE_TAG="$IMAGE_TAG" \
     docker compose -f "$COMPOSE_FILE" "$@"
 }
-
-preflight
 
 echo "Using deploy user: $DEPLOY_USER"
 echo "Using compose command: docker compose"
