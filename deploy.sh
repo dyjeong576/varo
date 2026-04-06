@@ -9,6 +9,7 @@ RELEASE_ENV_FILE="$COMPOSE_DIR/.release.env"
 FRONTEND_ENV_FILE=${FRONTEND_ENV_FILE:-$ROOT_DIR/env/frontend.env}
 BACKEND_ENV_FILE=${BACKEND_ENV_FILE:-$ROOT_DIR/env/backend.env}
 POSTGRES_ENV_FILE=${POSTGRES_ENV_FILE:-$ROOT_DIR/env/postgres.env}
+DEPLOY_USER=${SUDO_USER:-$(id -un)}
 
 require_env() {
   local name="$1"
@@ -47,15 +48,48 @@ EOF
 
 chmod 600 "$RELEASE_ENV_FILE"
 
-echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
 set -a
 . "$RELEASE_ENV_FILE"
 set +a
 
+run_as_deploy_user() {
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    sudo -H -u "$DEPLOY_USER" "$@"
+    return
+  fi
+
+  "$@"
+}
+
+preflight() {
+  if ! run_as_deploy_user command -v docker >/dev/null 2>&1; then
+    echo "Missing docker command for deploy user '$DEPLOY_USER'." >&2
+    exit 1
+  fi
+
+  if ! run_as_deploy_user docker compose version >/dev/null 2>&1; then
+    echo "Amazon Linux 2023 requires the Docker Compose plugin. Install it before running deploy.sh." >&2
+    exit 1
+  fi
+}
+
+compose() {
+  run_as_deploy_user env \
+    FRONTEND_IMAGE="$FRONTEND_IMAGE" \
+    BACKEND_IMAGE="$BACKEND_IMAGE" \
+    IMAGE_TAG="$IMAGE_TAG" \
+    docker compose -f "$COMPOSE_FILE" "$@"
+}
+
+preflight
+
+echo "Using deploy user: $DEPLOY_USER"
+echo "Using compose command: docker compose"
+printf '%s\n' "$GHCR_TOKEN" | run_as_deploy_user docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
 wait_for_postgres() {
   for attempt in {1..20}; do
-    if docker compose -f "$COMPOSE_FILE" exec -T postgres sh -lc \
+    if compose exec -T postgres sh -lc \
       'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null; then
       return 0
     fi
@@ -67,15 +101,15 @@ wait_for_postgres() {
   return 1
 }
 
-docker compose -f "$COMPOSE_FILE" up -d postgres
+compose up -d postgres
 wait_for_postgres
 
-docker compose -f "$COMPOSE_FILE" pull frontend backend
-docker compose -f "$COMPOSE_FILE" run --rm backend npm run prisma:deploy
-docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+compose pull frontend backend
+compose run --rm backend npm run prisma:deploy
+compose up -d --remove-orphans
 
 for attempt in {1..20}; do
-  if docker compose -f "$COMPOSE_FILE" exec -T postgres sh -lc \
+  if compose exec -T postgres sh -lc \
     'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null \
     && curl --fail --silent http://127.0.0.1:4000/api/v1/health >/dev/null \
     && curl --fail --silent http://127.0.0.1:3000/healthz >/dev/null; then
@@ -87,5 +121,5 @@ for attempt in {1..20}; do
 done
 
 echo "Deployment health checks failed." >&2
-docker compose -f "$COMPOSE_FILE" ps >&2
+compose ps >&2
 exit 1
