@@ -1,50 +1,31 @@
 # Current Task
 
 ## 작업명
-Review query processing real provider 및 `/reviews`, `/community`, `/popular` 연동
+EC2 단일 서버 기준 production 배포 인프라 구축
 
 ## 목표
-- `review-query-processing.md` 기준의 pre-interpretation review pipeline 구현
-- claim 정규화, query refinement, source search, relevance filtering, extraction, handoff payload 생성 구현
-- OpenAI query refinement / relevance filtering 실연동
-- Tavily search / extract 실연동
-- real mode 오류 정책과 테스트 보강
-- `/reviews/[reviewId]`를 실제 review detail API와 연결
-- 수집된 출처 기준 임시 analysis result 계약을 `GET /api/v1/reviews/:reviewId`와 `POST /api/v1/reviews/query-processing-preview`에 반영
+- 단일 레포 구조를 유지한 채 `frontend`와 `backend`를 개별 Docker image로 배포한다.
+- `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions` production 경로를 구축한다.
+- `www.varocheck.com`과 `api.varocheck.com` 분리 도메인 기준으로 배포 자동화를 준비한다.
+- 같은 EC2에서 PostgreSQL을 함께 운영하고, 로컬 PC에서는 SSH tunnel로만 접근한다.
+- backend health endpoint와 frontend health route를 추가해 배포 검증 기준을 만든다.
 
 ## 이번 작업 범위
-- review query backend
-- NestJS reviews provider real integration
-- OpenAI / Tavily direct `fetch` 연동
-- dev test endpoint와 인증 endpoint의 공통 provider 경로 유지
-- `GET /api/v1/reviews`
-- `GET /api/v1/reviews/:reviewId`
-- `POST /api/v1/reviews/:reviewId/reopen`
-- rule-based 임시 result assembler
-- review detail owner scope 보강
-- `GET /api/v1/popular/topics`
-- `GET /api/v1/community/posts`
-- `GET /api/v1/community/posts/:postId`
-- `POST /api/v1/community/posts`
-- `PATCH /api/v1/community/posts/:postId`
-- `DELETE /api/v1/community/posts/:postId`
-- `POST /api/v1/community/posts/:postId/comments`
-- `DELETE /api/v1/community/posts/:postId/comments/:commentId`
-- `POST /api/v1/community/posts/:postId/comments/:commentId/likes`
-- `DELETE /api/v1/community/posts/:postId/comments/:commentId/likes`
-- `POST /api/v1/community/posts/:postId/likes`
-- `DELETE /api/v1/community/posts/:postId/likes`
-- 프론트 home submit → review preview 생성 → `/reviews/[reviewId]` 이동
-- 프론트 history drawer / review detail 실제 API 연동
-- 프론트 popular list 실제 API 연동
-- 프론트 popular / history / notification 재진입 이벤트 기록
-- 프론트 community list / detail / write / edit / comment / reply / comment delete / like 실제 API 연동
-- 프론트 review task 전역 store로 loading / history / notification 상태 안정화
-- `user_history` 기반 submitted / reopened 이벤트 저장 및 popular 점수 집계
-- provider / service 테스트
+- `frontend/Dockerfile`
+- `backend/Dockerfile`
+- 루트 `docker-compose.prod.yml`
+- `.github/workflows/ci.yml`
+- `.github/workflows/cd.yml`
+- `deploy/nginx/*.conf`
+- 루트 `deploy.sh`
+- `deploy/env/*.example`
+- same-host PostgreSQL 배포 구조 정리
+- backend `GET /api/v1/health`
+- frontend `/healthz`
+- production 배포 문서 정리
 
 ## 제외 범위
-- interpretation 생성
-- OpenAI 기반 최종 verdict / interpretation 생성
-- Redis queue
-- 알림의 실제 백엔드 구현
+- ECS, Kubernetes 같은 오케스트레이션 도입
+- blue-green / canary 배포
+- Terraform 등 IaC 도입
+- 멀티 서버 분리 배포

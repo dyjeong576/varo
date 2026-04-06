@@ -108,3 +108,13 @@
 - result screen용 `verdict`, `confidenceScore`, `consensusLevel`, `analysisSummary`, `uncertainty`는 DB 저장 없이 조회 시점 규칙 기반 파생 값으로 생성한다.
 - 위 임시 result는 `rule_based_preview` 모드로 명시하고, 이후 interpretation 단계의 LLM 결과로 교체 가능하게 둔다.
 - review detail 조회는 반드시 `userId + reviewId` owner scope를 함께 검증한다.
+
+### Deployment Architecture
+- production 배포는 단일 레포를 유지하되 `frontend`와 `backend`를 별도 Docker image로 분리한다.
+- production 초기 인프라는 `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions` 조합으로 고정한다.
+- production 도메인은 `www.varocheck.com`과 `api.varocheck.com`을 분리한다.
+- Nginx는 `www`를 frontend 컨테이너, `api`를 backend 컨테이너로 reverse proxy 한다.
+- backend production health endpoint는 `GET /api/v1/health`로 제공한다.
+- production DB는 비용 절감을 위해 같은 EC2에서 Docker Compose 기반 PostgreSQL로 운영한다.
+- backend `DATABASE_URL`은 같은 compose 네트워크의 `postgres` 서비스를 가리키게 한다.
+- 로컬 PC에서 Postgres 접속이 필요할 때는 `5432` 공개 대신 SSH tunnel 방식을 사용한다.

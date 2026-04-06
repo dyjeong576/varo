@@ -232,6 +232,10 @@
 - `GET /api/v1/popular/topics`: 최근 24시간 기준 인기 topic 랭킹을 조회한다.
 - 인기 항목 기반 결과 재진입
 
+#### Operations
+
+- `GET /api/v1/health`: 애플리케이션과 DB 연결 상태를 확인하는 production 헬스체크 엔드포인트
+
 #### Notifications
 
 - 장기적으로는 알림 목록 조회 / 읽음 처리 / unread count 조회를 서버가 제공한다.
