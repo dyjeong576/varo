@@ -49,9 +49,13 @@ chmod 600 "$RELEASE_ENV_FILE"
 
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
+set -a
+. "$RELEASE_ENV_FILE"
+set +a
+
 wait_for_postgres() {
   for attempt in {1..20}; do
-    if docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres sh -lc \
+    if docker compose -f "$COMPOSE_FILE" exec -T postgres sh -lc \
       'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null; then
       return 0
     fi
@@ -63,15 +67,15 @@ wait_for_postgres() {
   return 1
 }
 
-docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" up -d postgres
+docker compose -f "$COMPOSE_FILE" up -d postgres
 wait_for_postgres
 
-docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" pull frontend backend
-docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npm run prisma:deploy
-docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans
+docker compose -f "$COMPOSE_FILE" pull frontend backend
+docker compose -f "$COMPOSE_FILE" run --rm backend npm run prisma:deploy
+docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
 for attempt in {1..20}; do
-  if docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres sh -lc \
+  if docker compose -f "$COMPOSE_FILE" exec -T postgres sh -lc \
     'pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null \
     && curl --fail --silent http://127.0.0.1:4000/api/v1/health >/dev/null \
     && curl --fail --silent http://127.0.0.1:3000/healthz >/dev/null; then
@@ -83,5 +87,5 @@ for attempt in {1..20}; do
 done
 
 echo "Deployment health checks failed." >&2
-docker compose --env-file "$RELEASE_ENV_FILE" -f "$COMPOSE_FILE" ps >&2
+docker compose -f "$COMPOSE_FILE" ps >&2
 exit 1
