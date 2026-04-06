@@ -17,9 +17,9 @@ EC2 단일 서버 기준 production 배포 인프라 구축
 - `.github/workflows/ci.yml`
 - `.github/workflows/cd.yml`
 - self-hosted runner 기반 CD 구조 정리
-- `deploy/nginx/*.conf`
 - 루트 `deploy.sh`
-- `deploy/env/*.example`
+- 서버-side Nginx 설정 원본 경로 규약 (`/srv/varo/nginx/*.conf`)
+- 서버-side env 파일 경로 규약 (`/srv/varo/env/*.env`)
 - same-host PostgreSQL 배포 구조 정리
 - backend `GET /api/v1/health`
 - frontend `/healthz`
