@@ -51,63 +51,55 @@ jobs:
           tags: ghcr.io/${{ needs.prepare.outputs.owner_lc }}/varo-${{ matrix.service }}:${{ github.sha }}
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - varo-prod
     needs:
       - prepare
       - build-and-push
     steps:
       - uses: actions/checkout@v4
 
-      - name: Upload deployment assets to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy.sh,deploy"
-          target: "/tmp/varo-release-${{ github.sha }}"
+      - name: Sync deployment assets on EC2 self-hosted runner
+        run: |
+          set -euo pipefail
+          ROOT_DIR="/srv/varo"
 
-      - name: Deploy release
-        uses: appleboy/ssh-action@v1.2.0
+          sudo mkdir -p "$ROOT_DIR/compose" "$ROOT_DIR/nginx" "$ROOT_DIR/env" /var/www/certbot
+
+          sudo cp docker-compose.prod.yml "$ROOT_DIR/compose/docker-compose.prod.yml"
+          sudo cp deploy.sh "$ROOT_DIR/compose/deploy.sh"
+          sudo chmod +x "$ROOT_DIR/compose/deploy.sh"
+
+          sudo cp deploy/nginx/www.varocheck.com.conf /etc/nginx/sites-available/www.varocheck.com.conf
+          sudo cp deploy/nginx/api.varocheck.com.conf /etc/nginx/sites-available/api.varocheck.com.conf
+
+          sudo ln -sfn /etc/nginx/sites-available/www.varocheck.com.conf /etc/nginx/sites-enabled/www.varocheck.com.conf
+          sudo ln -sfn /etc/nginx/sites-available/api.varocheck.com.conf /etc/nginx/sites-enabled/api.varocheck.com.conf
+
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+      - name: Deploy release on EC2 self-hosted runner
         env:
           GITHUB_SHA: ${{ github.sha }}
           OWNER_LC: ${{ needs.prepare.outputs.owner_lc }}
           GHCR_PULL_USERNAME: ${{ secrets.GHCR_PULL_USERNAME }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GITHUB_SHA,OWNER_LC,GHCR_PULL_USERNAME,GHCR_PULL_TOKEN
-          script_stop: true
-          script: |
-            set -euo pipefail
-            STAGING_DIR="/tmp/varo-release-${GITHUB_SHA}"
-            ROOT_DIR="/srv/varo"
+        run: |
+          set -euo pipefail
+          ROOT_DIR="/srv/varo"
 
-            sudo mkdir -p "$ROOT_DIR/compose" "$ROOT_DIR/nginx" "$ROOT_DIR/env" /var/www/certbot
-
-            sudo cp "$STAGING_DIR/docker-compose.prod.yml" "$ROOT_DIR/compose/docker-compose.prod.yml"
-            sudo cp "$STAGING_DIR/deploy.sh" "$ROOT_DIR/compose/deploy.sh"
-            sudo chmod +x "$ROOT_DIR/compose/deploy.sh"
-
-            sudo cp "$STAGING_DIR/deploy/nginx/www.varocheck.com.conf" /etc/nginx/sites-available/www.varocheck.com.conf
-            sudo cp "$STAGING_DIR/deploy/nginx/api.varocheck.com.conf" /etc/nginx/sites-available/api.varocheck.com.conf
-
-            sudo ln -sfn /etc/nginx/sites-available/www.varocheck.com.conf /etc/nginx/sites-enabled/www.varocheck.com.conf
-            sudo ln -sfn /etc/nginx/sites-available/api.varocheck.com.conf /etc/nginx/sites-enabled/api.varocheck.com.conf
-
-            sudo nginx -t
-            sudo systemctl reload nginx
-
-            sudo env \
-              FRONTEND_IMAGE="ghcr.io/${OWNER_LC}/varo-frontend" \
-              BACKEND_IMAGE="ghcr.io/${OWNER_LC}/varo-backend" \
-              IMAGE_TAG="${GITHUB_SHA}" \
-              GHCR_USERNAME="${GHCR_PULL_USERNAME}" \
-              GHCR_TOKEN="${GHCR_PULL_TOKEN}" \
-              ROOT_DIR="$ROOT_DIR" \
-              "$ROOT_DIR/compose/deploy.sh"
+          sudo env \
+            FRONTEND_IMAGE="ghcr.io/${OWNER_LC}/varo-frontend" \
+            BACKEND_IMAGE="ghcr.io/${OWNER_LC}/varo-backend" \
+            IMAGE_TAG="${GITHUB_SHA}" \
+            GHCR_USERNAME="${GHCR_PULL_USERNAME}" \
+            GHCR_TOKEN="${GHCR_PULL_TOKEN}" \
+            ROOT_DIR="$ROOT_DIR" \
+            "$ROOT_DIR/compose/deploy.sh"
 
       - name: Verify public backend health
         run: curl --fail --retry 10 --retry-delay 5 --retry-connrefused https://api.varocheck.com/api/v1/health

@@ -111,10 +111,11 @@
 
 ### Deployment Architecture
 - production 배포는 단일 레포를 유지하되 `frontend`와 `backend`를 별도 Docker image로 분리한다.
-- production 초기 인프라는 `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions` 조합으로 고정한다.
+- production 초기 인프라는 `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions self-hosted runner` 조합으로 고정한다.
 - production 도메인은 `www.varocheck.com`과 `api.varocheck.com`을 분리한다.
 - Nginx는 `www`를 frontend 컨테이너, `api`를 backend 컨테이너로 reverse proxy 한다.
 - backend production health endpoint는 `GET /api/v1/health`로 제공한다.
 - production DB는 비용 절감을 위해 같은 EC2에서 Docker Compose 기반 PostgreSQL로 운영한다.
 - backend `DATABASE_URL`은 같은 compose 네트워크의 `postgres` 서비스를 가리키게 한다.
 - 로컬 PC에서 Postgres 접속이 필요할 때는 `5432` 공개 대신 SSH tunnel 방식을 사용한다.
+- 자동배포는 GitHub-hosted runner의 SSH 접속 대신 EC2 내부 self-hosted runner가 로컬 배포 스크립트를 실행하는 방식으로 둔다.
