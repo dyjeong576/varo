@@ -44,6 +44,7 @@ describe("app.config", () => {
       GOOGLE_CLIENT_SECRET: "google-client-secret",
       SESSION_SECRET: "session-secret",
       SESSION_COOKIE_NAME: "varo_session",
+      SESSION_COOKIE_DOMAIN: "varocheck.com",
       SESSION_TTL_DAYS: "30",
     };
 
@@ -56,10 +57,32 @@ describe("app.config", () => {
     expect(config.appCanonicalHostStatus).toBe("pending");
     expect(config.googleCallbackUrl).toBe("http://localhost:4000/api/v1/auth/google/callback");
     expect(config.frontendBaseUrl).toBe("http://localhost:3000");
+    expect(config.sessionCookieDomain).toBe("varocheck.com");
     expect(config.reviewProviderMode).toBe("mock");
     expect(config.openAiApiKey).toBeNull();
     expect(config.tavilyApiKey).toBeNull();
     expect(config.tavilySearchTimeoutMs).toBe(40000);
     expect(config.tavilyExtractTimeoutMs).toBe(80000);
+  });
+
+  it("prod에서 www/api 표준 호스트를 쓰면 세션 쿠키 domain을 자동 추론한다", () => {
+    process.env = {
+      ...originalEnv,
+      PORT: "4000",
+      NODE_ENV: "production",
+      APP_ENV: "prod",
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/varo",
+      API_BASE_URL: "https://api.varocheck.com",
+      FRONTEND_BASE_URL: "https://www.varocheck.com",
+      GOOGLE_CLIENT_ID: "google-client-id",
+      GOOGLE_CLIENT_SECRET: "google-client-secret",
+      SESSION_SECRET: "session-secret",
+      SESSION_COOKIE_NAME: "varo_session",
+      SESSION_TTL_DAYS: "30",
+    };
+
+    const config = getAppConfig();
+
+    expect(config.sessionCookieDomain).toBe("varocheck.com");
   });
 });

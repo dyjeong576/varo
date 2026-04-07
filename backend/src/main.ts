@@ -13,6 +13,7 @@ async function bootstrap(): Promise<void> {
   const appName = configService.get<string>("appName", "VARO");
   const appTagline = configService.get<string>("appTagline", "Verified Analysis, Reasoned Opinion");
 
+  app.set("trust proxy", 1);
   app.setGlobalPrefix("api/v1");
   app.use(cookieParser());
   app.useGlobalPipes(
