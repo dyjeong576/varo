@@ -127,3 +127,10 @@
 - production에서 `www.varocheck.com`과 `api.varocheck.com`을 함께 사용할 때 세션 쿠키는 공유 domain 기반으로 발급한다.
 - 세션 쿠키 domain은 backend env `SESSION_COOKIE_DOMAIN`으로 제어하고, 값이 없더라도 표준 `www`/`api` 호스트 조합이면 `varocheck.com`을 자동 추론한다.
 - OAuth state cookie는 callback 검증 범위를 줄이기 위해 기존대로 host-only cookie를 유지한다.
+
+### Production CD Cost Reduction
+- production CD의 Docker image build는 GitHub-hosted runner가 아니라 EC2 self-hosted runner에서 수행한다.
+- `main` push 시 CD는 변경 파일을 기준으로 `frontend` / `backend` 중 필요한 서비스만 build, push, deploy 한다.
+- GHCR production 태그 정책은 immutable 7자리 `short SHA` + 최신 배포 별칭 `prod` 조합으로 유지한다.
+- production deploy는 항상 `prod`가 아니라 immutable `short SHA` 태그를 사용한다.
+- GHCR cleanup은 서비스별 최신 `short SHA` 10개와 `prod`가 붙은 버전만 남기고 나머지를 정리한다.

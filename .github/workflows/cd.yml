@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*.*.*"
 
 permissions:
   contents: read
@@ -16,66 +14,112 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      owner_lc: ${{ steps.vars.outputs.owner_lc }}
-    steps:
-      - id: vars
-        run: echo "owner_lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        service: [frontend, backend]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_PULL_USERNAME }}
-          password: ${{ secrets.GHCR_PULL_TOKEN }}
-
-      - name: Build and push ${{ matrix.service }}
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./${{ matrix.service }}/Dockerfile
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ needs.prepare.outputs.owner_lc }}/varo-${{ matrix.service }}:${{ github.sha }}
-
-      - name: Verify ARM64 manifest for ${{ matrix.service }}
-        run: |
-          set -euo pipefail
-          docker buildx imagetools inspect \
-            "ghcr.io/${{ needs.prepare.outputs.owner_lc }}/varo-${{ matrix.service }}:${{ github.sha }}" \
-            | grep -F "linux/arm64"
-
   deploy:
     runs-on:
       - self-hosted
       - Linux
       - ARM64
       - varo-prod
-    needs:
-      - prepare
-      - build-and-push
+    env:
+      ROOT_DIR: /srv/varo
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Sync deployment assets on EC2 self-hosted runner
+      - name: Resolve deployment metadata
+        id: vars
+        shell: bash
         run: |
           set -euo pipefail
-          ROOT_DIR="/srv/varo"
+
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          SHORT_SHA="$(git rev-parse --short=7 "$GITHUB_SHA")"
+          BEFORE_SHA="${{ github.event.before }}"
+          ZERO_SHA="0000000000000000000000000000000000000000"
+          FRONTEND_CHANGED=false
+          BACKEND_CHANGED=false
+          RELEVANT_CHANGED=false
+
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" == "$ZERO_SHA" ]] || ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            FRONTEND_CHANGED=true
+            BACKEND_CHANGED=true
+            RELEVANT_CHANGED=true
+          else
+            while IFS= read -r file; do
+              [[ -z "$file" ]] && continue
+
+              case "$file" in
+                frontend/*)
+                  FRONTEND_CHANGED=true
+                  RELEVANT_CHANGED=true
+                  ;;
+                backend/*)
+                  BACKEND_CHANGED=true
+                  RELEVANT_CHANGED=true
+                  ;;
+                docker-compose.prod.yml|deploy.sh|.dockerignore|.github/workflows/cd.yml)
+                  FRONTEND_CHANGED=true
+                  BACKEND_CHANGED=true
+                  RELEVANT_CHANGED=true
+                  ;;
+              esac
+            done < <(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")
+          fi
+
+          echo "owner_lc=$OWNER_LC" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "frontend_changed=$FRONTEND_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "backend_changed=$BACKEND_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "relevant_changed=$RELEVANT_CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Print deployment metadata
+        shell: bash
+        run: |
+          echo "owner=${{ steps.vars.outputs.owner_lc }}"
+          echo "short_sha=${{ steps.vars.outputs.short_sha }}"
+          echo "frontend_changed=${{ steps.vars.outputs.frontend_changed }}"
+          echo "backend_changed=${{ steps.vars.outputs.backend_changed }}"
+          echo "relevant_changed=${{ steps.vars.outputs.relevant_changed }}"
+
+      - name: Skip deploy for non-runtime changes
+        if: steps.vars.outputs.relevant_changed != 'true'
+        run: echo "No deploy-relevant changes detected."
+
+      - name: Login to GHCR
+        if: steps.vars.outputs.relevant_changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_PULL_USERNAME }}
+          password: ${{ secrets.GHCR_PULL_TOKEN }}
+
+      - name: Build and push frontend image
+        if: steps.vars.outputs.frontend_changed == 'true'
+        env:
+          IMAGE_REPO: ghcr.io/${{ steps.vars.outputs.owner_lc }}/varo-frontend
+          IMAGE_TAG: ${{ steps.vars.outputs.short_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --file frontend/Dockerfile --tag "$IMAGE_REPO:$IMAGE_TAG" .
+          docker push "$IMAGE_REPO:$IMAGE_TAG"
+
+      - name: Build and push backend image
+        if: steps.vars.outputs.backend_changed == 'true'
+        env:
+          IMAGE_REPO: ghcr.io/${{ steps.vars.outputs.owner_lc }}/varo-backend
+          IMAGE_TAG: ${{ steps.vars.outputs.short_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --file backend/Dockerfile --tag "$IMAGE_REPO:$IMAGE_TAG" .
+          docker push "$IMAGE_REPO:$IMAGE_TAG"
+
+      - name: Sync deployment assets on EC2 self-hosted runner
+        if: steps.vars.outputs.relevant_changed == 'true'
+        run: |
+          set -euo pipefail
           WWW_CONF="$ROOT_DIR/nginx/www.varocheck.com.conf"
           API_CONF="$ROOT_DIR/nginx/api.varocheck.com.conf"
 
@@ -95,23 +139,59 @@ jobs:
           sudo systemctl reload nginx
 
       - name: Deploy release on EC2 self-hosted runner
+        if: steps.vars.outputs.relevant_changed == 'true'
         env:
-          GITHUB_SHA: ${{ github.sha }}
-          OWNER_LC: ${{ needs.prepare.outputs.owner_lc }}
+          IMAGE_TAG: ${{ steps.vars.outputs.short_sha }}
+          OWNER_LC: ${{ steps.vars.outputs.owner_lc }}
+          DEPLOY_FRONTEND: ${{ steps.vars.outputs.frontend_changed }}
+          DEPLOY_BACKEND: ${{ steps.vars.outputs.backend_changed }}
           GHCR_PULL_USERNAME: ${{ secrets.GHCR_PULL_USERNAME }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
         run: |
           set -euo pipefail
-          ROOT_DIR="/srv/varo"
 
           sudo env \
             FRONTEND_IMAGE="ghcr.io/${OWNER_LC}/varo-frontend" \
             BACKEND_IMAGE="ghcr.io/${OWNER_LC}/varo-backend" \
-            IMAGE_TAG="${GITHUB_SHA}" \
+            IMAGE_TAG="${IMAGE_TAG}" \
+            DEPLOY_FRONTEND="${DEPLOY_FRONTEND}" \
+            DEPLOY_BACKEND="${DEPLOY_BACKEND}" \
             GHCR_USERNAME="${GHCR_PULL_USERNAME}" \
             GHCR_TOKEN="${GHCR_PULL_TOKEN}" \
             ROOT_DIR="$ROOT_DIR" \
             "$ROOT_DIR/compose/deploy.sh"
 
       - name: Verify public backend health
+        if: steps.vars.outputs.relevant_changed == 'true'
         run: curl --fail --retry 10 --retry-delay 5 --retry-connrefused https://api.varocheck.com/api/v1/health
+
+      - name: Update prod image aliases
+        if: steps.vars.outputs.relevant_changed == 'true'
+        env:
+          OWNER_LC: ${{ steps.vars.outputs.owner_lc }}
+          IMAGE_TAG: ${{ steps.vars.outputs.short_sha }}
+          DEPLOY_FRONTEND: ${{ steps.vars.outputs.frontend_changed }}
+          DEPLOY_BACKEND: ${{ steps.vars.outputs.backend_changed }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          update_prod_tag() {
+            local service="$1"
+            local image="ghcr.io/${OWNER_LC}/varo-${service}"
+
+            if ! docker image inspect "${image}:${IMAGE_TAG}" >/dev/null 2>&1; then
+              docker pull "${image}:${IMAGE_TAG}"
+            fi
+
+            docker image tag "${image}:${IMAGE_TAG}" "${image}:prod"
+            docker push "${image}:prod"
+          }
+
+          if [[ "$DEPLOY_FRONTEND" == "true" ]]; then
+            update_prod_tag frontend
+          fi
+
+          if [[ "$DEPLOY_BACKEND" == "true" ]]; then
+            update_prod_tag backend
+          fi

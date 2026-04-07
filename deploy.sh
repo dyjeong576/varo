@@ -10,6 +10,8 @@ FRONTEND_ENV_FILE=${FRONTEND_ENV_FILE:-$ROOT_DIR/env/frontend.env}
 BACKEND_ENV_FILE=${BACKEND_ENV_FILE:-$ROOT_DIR/env/backend.env}
 POSTGRES_ENV_FILE=${POSTGRES_ENV_FILE:-$ROOT_DIR/env/postgres.env}
 DEPLOY_USER=${SUDO_USER:-$(id -un)}
+DEPLOY_FRONTEND=${DEPLOY_FRONTEND:-true}
+DEPLOY_BACKEND=${DEPLOY_BACKEND:-true}
 
 require_env() {
   local name="$1"
@@ -61,6 +63,19 @@ run_as_deploy_user() {
   "$@"
 }
 
+normalize_bool() {
+  local value="${1,,}"
+
+  case "$value" in
+    true|1|yes|y|on) echo "true" ;;
+    false|0|no|n|off) echo "false" ;;
+    *)
+      echo "Invalid boolean value: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
 compose() {
   run_as_deploy_user env \
     FRONTEND_IMAGE="$FRONTEND_IMAGE" \
@@ -72,6 +87,14 @@ compose() {
 echo "Using deploy user: $DEPLOY_USER"
 echo "Using compose command: docker compose"
 printf '%s\n' "$GHCR_TOKEN" | run_as_deploy_user docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+DEPLOY_FRONTEND=$(normalize_bool "$DEPLOY_FRONTEND")
+DEPLOY_BACKEND=$(normalize_bool "$DEPLOY_BACKEND")
+
+if [[ "$DEPLOY_FRONTEND" != "true" && "$DEPLOY_BACKEND" != "true" ]]; then
+  echo "Nothing to deploy."
+  exit 0
+fi
 
 wait_for_postgres() {
   for attempt in {1..20}; do
@@ -90,9 +113,26 @@ wait_for_postgres() {
 compose up -d postgres
 wait_for_postgres
 
-compose pull frontend backend
-compose run --rm backend npm run prisma:deploy
-compose up -d --remove-orphans
+services_to_pull=()
+
+if [[ "$DEPLOY_FRONTEND" == "true" ]]; then
+  services_to_pull+=(frontend)
+fi
+
+if [[ "$DEPLOY_BACKEND" == "true" ]]; then
+  services_to_pull+=(backend)
+fi
+
+compose pull "${services_to_pull[@]}"
+
+if [[ "$DEPLOY_BACKEND" == "true" ]]; then
+  compose run --rm backend npm run prisma:deploy
+  compose up -d backend
+fi
+
+if [[ "$DEPLOY_FRONTEND" == "true" ]]; then
+  compose up -d frontend
+fi
 
 for attempt in {1..20}; do
   if compose exec -T postgres sh -lc \
