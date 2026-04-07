@@ -58,6 +58,27 @@ describe("SessionService", () => {
     );
   });
 
+  it("추론된 sessionCookieDomain 설정도 세션 쿠키에 반영한다", () => {
+    const service = createService({
+      APP_ENV: "prod",
+      SESSION_COOKIE_NAME: "varo_session",
+      sessionCookieDomain: "varocheck.com",
+    });
+    const response = {
+      cookie: jest.fn(),
+    };
+
+    service.writeSessionCookie(response as never, "session-id", new Date("2026-04-08T00:00:00.000Z"));
+
+    expect(response.cookie).toHaveBeenCalledWith(
+      "varo_session",
+      "session-id",
+      expect.objectContaining({
+        domain: "varocheck.com",
+      }),
+    );
+  });
+
   it("SESSION_COOKIE_DOMAIN이 없으면 host-only 세션 쿠키를 유지한다", () => {
     const service = createService({
       APP_ENV: "prod",

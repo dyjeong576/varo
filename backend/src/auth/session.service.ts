@@ -143,7 +143,9 @@ export class SessionService {
   }
 
   private getSessionCookieOptions(): CookieOptions {
-    const domain = this.configService.get<string>("SESSION_COOKIE_DOMAIN");
+    const domain =
+      this.configService.get<string>("sessionCookieDomain") ??
+      this.configService.get<string>("SESSION_COOKIE_DOMAIN");
 
     return {
       httpOnly: true,
