@@ -81,7 +81,6 @@ extract_host_from_url() {
 CERTBOT_PRIMARY_DOMAIN=${CERTBOT_PRIMARY_DOMAIN:-${APP_INTENDED_PRODUCTION_HOST:-www.varocheck.com}}
 CERTBOT_API_DOMAIN=${CERTBOT_API_DOMAIN:-$(extract_host_from_url "$API_BASE_URL")}
 
-require_env CERTBOT_EMAIL
 require_env CERTBOT_PRIMARY_DOMAIN
 require_env CERTBOT_API_DOMAIN
 require_env API_BASE_URL
@@ -208,6 +207,8 @@ has_certificate() {
 }
 
 issue_initial_certificate() {
+  require_env CERTBOT_EMAIL
+
   compose run --rm certbot certonly \
     --webroot \
     --webroot-path /var/www/certbot \
@@ -286,10 +287,10 @@ if service_running frontend; then
     'node -e "fetch(\"http://127.0.0.1:3000/healthz\").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"'
 fi
 
-wait_for_container_check nginx "http://127.0.0.1/" 'wget -q --spider http://127.0.0.1/ || exit 1'
+wait_for_container_check nginx "http://127.0.0.1/_healthz" 'wget -q --spider http://127.0.0.1/_healthz || exit 1'
 
 if service_running backend; then
-  wait_for_public_url "${API_BASE_URL%/}/health"
+  wait_for_public_url "${API_BASE_URL%/}/api/v1/health"
 fi
 
 if service_running frontend; then
