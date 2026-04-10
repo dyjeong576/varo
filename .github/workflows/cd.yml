@@ -58,7 +58,7 @@ jobs:
                   BACKEND_CHANGED=true
                   RELEVANT_CHANGED=true
                   ;;
-                docker-compose.prod.yml|deploy.sh|.dockerignore|.github/workflows/cd.yml)
+                ops/nginx/*|docker-compose.prod.yml|deploy.sh|.dockerignore|.github/workflows/cd.yml)
                   FRONTEND_CHANGED=true
                   BACKEND_CHANGED=true
                   RELEVANT_CHANGED=true
@@ -120,23 +120,21 @@ jobs:
         if: steps.vars.outputs.relevant_changed == 'true'
         run: |
           set -euo pipefail
-          WWW_CONF="$ROOT_DIR/nginx/www.varocheck.com.conf"
-          API_CONF="$ROOT_DIR/nginx/api.varocheck.com.conf"
 
-          sudo mkdir -p "$ROOT_DIR/compose" "$ROOT_DIR/nginx" "$ROOT_DIR/env" /var/www/certbot
+          sudo mkdir -p \
+            "$ROOT_DIR/compose" \
+            "$ROOT_DIR/env" \
+            "$ROOT_DIR/nginx/conf.d" \
+            "$ROOT_DIR/nginx/includes" \
+            "$ROOT_DIR/nginx/templates/http-only" \
+            "$ROOT_DIR/nginx/templates/tls" \
+            "$ROOT_DIR/certbot/www" \
+            "$ROOT_DIR/certbot/conf"
 
           sudo cp docker-compose.prod.yml "$ROOT_DIR/compose/docker-compose.prod.yml"
           sudo cp deploy.sh "$ROOT_DIR/compose/deploy.sh"
           sudo chmod +x "$ROOT_DIR/compose/deploy.sh"
-
-          test -f "$WWW_CONF" || { echo "Missing nginx config: $WWW_CONF" >&2; exit 1; }
-          test -f "$API_CONF" || { echo "Missing nginx config: $API_CONF" >&2; exit 1; }
-
-          sudo cp "$WWW_CONF" /etc/nginx/conf.d/www.varocheck.com.conf
-          sudo cp "$API_CONF" /etc/nginx/conf.d/api.varocheck.com.conf
-
-          sudo nginx -t
-          sudo systemctl reload nginx
+          sudo cp -R ops/nginx/. "$ROOT_DIR/nginx/"
 
       - name: Deploy release on EC2 self-hosted runner
         if: steps.vars.outputs.relevant_changed == 'true'
