@@ -83,8 +83,6 @@ services:
   certbot:
     image: certbot/certbot:latest
     restart: unless-stopped
-    env_file:
-      - ${ROOT_DIR:-/srv/varo}/env/certbot.env
     command:
       - /bin/sh
       - -c

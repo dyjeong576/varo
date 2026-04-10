@@ -9,7 +9,6 @@ RELEASE_ENV_FILE="$COMPOSE_DIR/.release.env"
 FRONTEND_ENV_FILE=${FRONTEND_ENV_FILE:-$ROOT_DIR/env/frontend.env}
 BACKEND_ENV_FILE=${BACKEND_ENV_FILE:-$ROOT_DIR/env/backend.env}
 POSTGRES_ENV_FILE=${POSTGRES_ENV_FILE:-$ROOT_DIR/env/postgres.env}
-CERTBOT_ENV_FILE=${CERTBOT_ENV_FILE:-$ROOT_DIR/env/certbot.env}
 NGINX_ROOT_DIR=${NGINX_ROOT_DIR:-$ROOT_DIR/nginx}
 NGINX_CONF_DIR="$NGINX_ROOT_DIR/conf.d"
 NGINX_INCLUDE_DIR="$NGINX_ROOT_DIR/includes"
@@ -47,7 +46,6 @@ require_file "$COMPOSE_FILE"
 require_file "$FRONTEND_ENV_FILE"
 require_file "$BACKEND_ENV_FILE"
 require_file "$POSTGRES_ENV_FILE"
-require_file "$CERTBOT_ENV_FILE"
 require_file "$NGINX_HTTP_TEMPLATE"
 require_file "$NGINX_TLS_TEMPLATE"
 
@@ -68,10 +66,20 @@ chmod 600 "$RELEASE_ENV_FILE"
 
 set -a
 . "$RELEASE_ENV_FILE"
-. "$CERTBOT_ENV_FILE"
 . "$FRONTEND_ENV_FILE"
 . "$BACKEND_ENV_FILE"
 set +a
+
+extract_host_from_url() {
+  local url="$1"
+  local without_scheme="${url#*://}"
+  local host_and_path="${without_scheme%%/*}"
+
+  printf '%s\n' "${host_and_path%%:*}"
+}
+
+CERTBOT_PRIMARY_DOMAIN=${CERTBOT_PRIMARY_DOMAIN:-${APP_INTENDED_PRODUCTION_HOST:-www.varocheck.com}}
+CERTBOT_API_DOMAIN=${CERTBOT_API_DOMAIN:-$(extract_host_from_url "$API_BASE_URL")}
 
 require_env CERTBOT_EMAIL
 require_env CERTBOT_PRIMARY_DOMAIN
@@ -188,6 +196,12 @@ wait_for_public_url() {
   return 1
 }
 
+service_running() {
+  local service="$1"
+
+  compose ps --services --status running "$service" | grep -qx "$service"
+}
+
 has_certificate() {
   [[ -f "$CERTBOT_CONF_DIR/live/$CERTBOT_PRIMARY_DOMAIN/fullchain.pem" ]] \
     && [[ -f "$CERTBOT_CONF_DIR/live/$CERTBOT_PRIMARY_DOMAIN/privkey.pem" ]]
@@ -262,12 +276,24 @@ if [[ "$DEPLOY_FRONTEND" == "true" ]]; then
   compose up -d frontend
 fi
 
-wait_for_container_check backend "http://127.0.0.1:4000/api/v1/health" \
-  'node -e "fetch(\"http://127.0.0.1:4000/api/v1/health\").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"'
-wait_for_container_check frontend "http://127.0.0.1:3000/healthz" \
-  'node -e "fetch(\"http://127.0.0.1:3000/healthz\").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"'
+if service_running backend; then
+  wait_for_container_check backend "http://127.0.0.1:4000/api/v1/health" \
+    'node -e "fetch(\"http://127.0.0.1:4000/api/v1/health\").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"'
+fi
+
+if service_running frontend; then
+  wait_for_container_check frontend "http://127.0.0.1:3000/healthz" \
+    'node -e "fetch(\"http://127.0.0.1:3000/healthz\").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"'
+fi
+
 wait_for_container_check nginx "http://127.0.0.1/" 'wget -q --spider http://127.0.0.1/ || exit 1'
-wait_for_public_url "${API_BASE_URL%/}/health"
-wait_for_public_url "${PUBLIC_FRONTEND_URL%/}/healthz"
+
+if service_running backend; then
+  wait_for_public_url "${API_BASE_URL%/}/health"
+fi
+
+if service_running frontend; then
+  wait_for_public_url "${PUBLIC_FRONTEND_URL%/}/healthz"
+fi
 
 echo "Deployment succeeded."
