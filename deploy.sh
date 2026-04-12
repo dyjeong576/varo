@@ -78,14 +78,16 @@ extract_host_from_url() {
   printf '%s\n' "${host_and_path%%:*}"
 }
 
-CERTBOT_PRIMARY_DOMAIN=${CERTBOT_PRIMARY_DOMAIN:-${APP_INTENDED_PRODUCTION_HOST:-www.varocheck.com}}
+CERTBOT_PRIMARY_DOMAIN=${CERTBOT_PRIMARY_DOMAIN:-varocheck.com}
+CERTBOT_WWW_DOMAIN=${CERTBOT_WWW_DOMAIN:-${APP_INTENDED_PRODUCTION_HOST:-www.varocheck.com}}
 CERTBOT_API_DOMAIN=${CERTBOT_API_DOMAIN:-$(extract_host_from_url "$API_BASE_URL")}
 
 require_env CERTBOT_PRIMARY_DOMAIN
+require_env CERTBOT_WWW_DOMAIN
 require_env CERTBOT_API_DOMAIN
 require_env API_BASE_URL
 
-if [[ -z "${NEXT_PUBLIC_APP_PUBLIC_URL:-}" && -z "${APP_PUBLIC_URL:-}" ]]; then
+if [[ -z "${NEXT_PUBLIC_APP_PUBLIC_URL:-}" && -z "${APP_PUBLIC_URM:-}" ]]; then
   echo "Missing public frontend URL in frontend.env or backend.env." >&2
   exit 1
 fi
@@ -217,6 +219,7 @@ issue_initial_certificate() {
     --no-eff-email \
     --non-interactive \
     -d "$CERTBOT_PRIMARY_DOMAIN" \
+    -d "$CERTBOT_WWW_DOMAIN" \
     -d "$CERTBOT_API_DOMAIN"
 }
 
