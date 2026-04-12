@@ -55,7 +55,7 @@ jobs:
                   RELEVANT_CHANGED=true
                   ;;
                 backend/*)
-                  BACKEND_CHANGED=true
+                  BACKEND_CHANGD=true
                   RELEVANT_CHANGED=true
                   ;;
                 ops/nginx/*|docker-compose.prod.yml|deploy.sh|.dockerignore|.github/workflows/cd.yml)
@@ -99,10 +99,25 @@ jobs:
         env:
           IMAGE_REPO: ghcr.io/${{ steps.vars.outputs.owner_lc }}/varo-frontend
           IMAGE_TAG: ${{ steps.vars.outputs.short_sha }}
+          FRONTEND_ENV_FILE: ${{ env.ROOT_DIR }}/env/frontend.env
         shell: bash
         run: |
           set -euo pipefail
-          docker build --file frontend/Dockerfile --tag "$IMAGE_REPO:$IMAGE_TAG" .
+          set -a
+          . "$FRONTEND_ENV_FILE"
+          set +a
+
+          docker build \
+            --file frontend/Dockerfile \
+            --build-arg NEXT_PUBLIC_APP_NAME="${NEXT_PUBLIC_APP_NAME:-}" \
+            --build-arg NEXT_PUBLIC_APP_TAGLINE="${NEXT_PUBLIC_APP_TAGLINE:-}" \
+            --build-arg NEXT_PUBLIC_APP_PUBLIC_URL="${NEXT_PUBLIC_APP_PUBLIC_URL:-}" \
+            --build-arg NEXT_PUBLIC_APP_INTENDED_PRODUCTION_HOST="${NEXT_PUBLIC_APP_INTENDED_PRODUCTION_HOST:-}" \
+            --build-arg NEXT_PUBLIC_APP_CANONICAL_HOST_STATUS="${NEXT_PUBLIC_APP_CANONICAL_HOST_STATUS:-}" \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:-}" \
+            --build-arg NEXT_PUBLIC_APP_ENV="${NEXT_PUBLIC_APP_ENV:-}" \
+            --tag "$IMAGE_REPO:$IMAGE_TAG" \
+            .
           docker push "$IMAGE_REPO:$IMAGE_TAG"
 
       - name: Build and push backend image
