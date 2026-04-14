@@ -12,9 +12,10 @@ const GUEST_SESSION: SessionResponse = {
 
 export async function getServerSession(): Promise<SessionResponse> {
   const cookieStore = await cookies();
+  const serverApiBaseUrl = process.env.INTERNAL_API_BASE_URL?.trim() || API_BASE_URL;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/session`, {
+    const response = await fetch(`${serverApiBaseUrl}/api/v1/auth/session`, {
       headers: {
         cookie: cookieStore.toString(),
       },

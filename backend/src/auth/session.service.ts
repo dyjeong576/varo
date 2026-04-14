@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Response } from "express";
+import type { CookieOptions } from "express";
 import type { UserProfile } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -103,11 +104,8 @@ export class SessionService {
 
   writeSessionCookie(response: Response, sessionId: string, expiresAt: Date): void {
     response.cookie(this.getCookieName(), sessionId, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: this.configService.get<string>("APP_ENV") === "prod",
+      ...this.getSessionCookieOptions(),
       expires: expiresAt,
-      path: "/",
     });
   }
 
@@ -123,10 +121,7 @@ export class SessionService {
 
   clearSessionCookie(response: Response): void {
     response.clearCookie(this.getCookieName(), {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: this.configService.get<string>("APP_ENV") === "prod",
-      path: "/",
+      ...this.getSessionCookieOptions(),
     });
   }
 
@@ -145,5 +140,19 @@ export class SessionService {
 
   getOauthStateCookieName(): string {
     return `${this.getCookieName()}_oauth_state`;
+  }
+
+  private getSessionCookieOptions(): CookieOptions {
+    const domain =
+      this.configService.get<string>("sessionCookieDomain") ??
+      this.configService.get<string>("SESSION_COOKIE_DOMAIN");
+
+    return {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: this.configService.get<string>("APP_ENV") === "prod",
+      path: "/",
+      ...(domain ? { domain } : {}),
+    };
   }
 }

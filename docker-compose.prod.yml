@@ -5,16 +5,14 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file:
-      - /srv/varo/env/postgres.env
-    ports:
-      - "127.0.0.1:5432:5432"
+      - ${ROOT_DIR:-/srv/varo}/env/postgres.env
     volumes:
-      - /srv/varo/postgres-data:/var/lib/postgresql/data
+      - ${ROOT_DIR:-/srv/varo}/postgres-data:/var/lib/postgresql/data
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -h 127.0.0.1 -p 5432 -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
+          "pg_isready -h 127.0.0.1 -p 5432 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"",
         ]
       interval: 10s
       timeout: 5s
@@ -25,9 +23,7 @@ services:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     env_file:
-      - /srv/varo/env/frontend.env
-    ports:
-      - "127.0.0.1:3000:3000"
+      - ${ROOT_DIR:-/srv/varo}/env/frontend.env
     healthcheck:
       test:
         [
@@ -45,12 +41,10 @@ services:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     env_file:
-      - /srv/varo/env/backend.env
+      - ${ROOT_DIR:-/srv/varo}/env/backend.env
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:4000:4000"
     healthcheck:
       test:
         [
@@ -63,3 +57,36 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${ROOT_DIR:-/srv/varo}/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ${ROOT_DIR:-/srv/varo}/nginx/includes:/etc/nginx/includes:ro
+      - ${ROOT_DIR:-/srv/varo}/certbot/www:/var/www/certbot:ro
+      - ${ROOT_DIR:-/srv/varo}/certbot/conf:/etc/letsencrypt:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider --no-check-certificate http://127.0.0.1/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - trap exit TERM; while :; do sleep 12h & wait $$!; done
+    volumes:
+      - ${ROOT_DIR:-/srv/varo}/certbot/www:/var/www/certbot
+      - ${ROOT_DIR:-/srv/varo}/certbot/conf:/etc/letsencrypt

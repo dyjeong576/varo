@@ -18,6 +18,7 @@ export interface AppConfig {
   googleCallbackUrl: string;
   sessionSecret: string;
   sessionCookieName: string;
+  sessionCookieDomain: string | null;
   sessionTtlDays: number;
   reviewProviderMode: "mock" | "real";
   openAiApiKey: string | null;
@@ -100,6 +101,36 @@ function readPositiveInteger(name: string, fallback: number): number {
   return parsed;
 }
 
+function inferSessionCookieDomain(
+  frontendBaseUrl: string,
+  apiBaseUrl: string,
+  appEnv: AppEnv,
+): string | null {
+  if (appEnv !== "prod") {
+    return null;
+  }
+
+  const frontendHostname = new URL(frontendBaseUrl).hostname;
+  const apiHostname = new URL(apiBaseUrl).hostname;
+
+  if (frontendHostname === apiHostname) {
+    return null;
+  }
+
+  if (!frontendHostname.startsWith("www.") || !apiHostname.startsWith("api.")) {
+    return null;
+  }
+
+  const frontendRootDomain = frontendHostname.slice("www.".length);
+  const apiRootDomain = apiHostname.slice("api.".length);
+
+  if (!frontendRootDomain || frontendRootDomain !== apiRootDomain) {
+    return null;
+  }
+
+  return frontendRootDomain;
+}
+
 export function buildGoogleCallbackUrl(apiBaseUrl: string): string {
   const normalizedBaseUrl = normalizeBaseUrl("API_BASE_URL", apiBaseUrl);
 
@@ -134,6 +165,9 @@ export function getAppConfig(): AppConfig {
   const appPublicUrl = normalizeOptionalBaseUrl("APP_PUBLIC_URL", getOptional("APP_PUBLIC_URL"));
   const apiBaseUrl = normalizeBaseUrl("API_BASE_URL", getRequired("API_BASE_URL"));
   const frontendBaseUrl = normalizeBaseUrl("FRONTEND_BASE_URL", getRequired("FRONTEND_BASE_URL"));
+  const sessionCookieDomain =
+    getOptional("SESSION_COOKIE_DOMAIN") ??
+    inferSessionCookieDomain(frontendBaseUrl, apiBaseUrl, appEnv);
 
   return {
     appName,
@@ -152,6 +186,7 @@ export function getAppConfig(): AppConfig {
     googleCallbackUrl: buildGoogleCallbackUrl(apiBaseUrl),
     sessionSecret: getRequired("SESSION_SECRET"),
     sessionCookieName: getRequired("SESSION_COOKIE_NAME"),
+    sessionCookieDomain,
     sessionTtlDays: ttl,
     reviewProviderMode: readReviewProviderMode(getOptional("REVIEW_PROVIDER_MODE"), appEnv),
     openAiApiKey: getOptional("OPENAI_API_KEY") ?? null,

@@ -29,6 +29,7 @@
 - Backend API: NestJS, TypeScript, REST API
 - Worker / Async Processing: Node.js worker + Redis queue
 - Primary Database: PostgreSQL
+- Infra / Runtime: Amazon Linux EC2, Docker Compose, nginx container, certbot container, GHCR, GitHub Actions self-hosted runner
 - External Auth: Google login
 - External Search / AI:
   - Search / extraction provider
@@ -112,6 +113,47 @@ VARO는 아래 도메인으로 구성한다.
 - worker는 review 분석과 장기적 알림 생성 같은 비동기 작업을 담당한다.
 - PostgreSQL은 서비스 전반의 기준 데이터 저장소다.
 - Redis는 queue와 일시적 비동기 제어를 담당한다.
+
+### 5.1 현재 production 배포 토폴로지
+
+현재 production 인프라는 비용과 운영 단순성을 우선한 단일 서버 구성을 사용한다.
+
+```text
+[User Browser]
+    |
+    v
+[Route 53]
+    |
+    v
+[Amazon Linux EC2]
+    |
+    +--> [nginx container :80/:443]
+    |       |-- www.varocheck.com --> [frontend container :3000]
+    |       |-- api.varocheck.com --> [backend container :4000]
+    |
+    +--> [certbot container]
+    |       |-- ACME webroot --> [/srv/varo/certbot/www]
+    |       +-- cert storage --> [/srv/varo/certbot/conf]
+    |
+    +--> [postgres container]
+    |
+    +--> [self-hosted GitHub Actions runner]
+            |
+            +--> build and push images to [GHCR]
+            +--> pull release images from [GHCR]
+            +--> run [/srv/varo/compose/deploy.sh]
+```
+
+운영 기준:
+
+- `nginx`, `certbot`, `frontend`, `backend`, `postgres`는 같은 EC2의 Docker Compose로 기동한다.
+- 외부 공개 포트는 `80`, `443`, `22`만 사용한다.
+- `3000`, `4000`, `5432`는 host에 bind 하지 않고 compose 내부 네트워크로만 사용한다.
+- 로컬 PC에서 Postgres 접속이 필요할 때는 `5432` 공개 대신 SSH tunnel을 사용한다.
+- 활성 Nginx 설정은 `/srv/varo/nginx/conf.d/*.conf`, 공통 include는 `/srv/varo/nginx/includes/*.conf`, 템플릿은 `/srv/varo/nginx/templates/*`에 둔다.
+- certbot webroot와 인증서 저장소는 각각 `/srv/varo/certbot/www`, `/srv/varo/certbot/conf`를 사용한다.
+- deploy bootstrap은 `postgres up -> http-only nginx -> cert issuance/renew -> tls reload -> app deploy` 순서를 따른다.
+- host `nginx`는 컨테이너 구조로 전환하기 전에 수동으로 중지/비활성화한다.
 
 ## 6. 프론트 / 백엔드 / 데이터 경계
 

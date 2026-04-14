@@ -111,10 +111,37 @@
 
 ### Deployment Architecture
 - production 배포는 단일 레포를 유지하되 `frontend`와 `backend`를 별도 Docker image로 분리한다.
-- production 초기 인프라는 `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions` 조합으로 고정한다.
+- production 초기 인프라는 `EC2 1대 + host Nginx + Docker Compose + GHCR + GitHub Actions self-hosted runner` 조합으로 시작했지만, 이 결정은 2026-04-11의 containerized nginx/certbot 결정으로 대체한다.
+- production EC2 인스턴스 OS는 `Amazon Linux 2023`, 아키텍처는 `ARM64 / aarch64`로 고정한다.
 - production 도메인은 `www.varocheck.com`과 `api.varocheck.com`을 분리한다.
 - Nginx는 `www`를 frontend 컨테이너, `api`를 backend 컨테이너로 reverse proxy 한다.
 - backend production health endpoint는 `GET /api/v1/health`로 제공한다.
 - production DB는 비용 절감을 위해 같은 EC2에서 Docker Compose 기반 PostgreSQL로 운영한다.
 - backend `DATABASE_URL`은 같은 compose 네트워크의 `postgres` 서비스를 가리키게 한다.
 - 로컬 PC에서 Postgres 접속이 필요할 때는 `5432` 공개 대신 SSH tunnel 방식을 사용한다.
+- 자동배포는 GitHub-hosted runner의 SSH 접속 대신 EC2 내부 self-hosted runner가 로컬 배포 스크립트를 실행하는 방식으로 둔다.
+
+## 2026-04-07
+
+### Cross-Subdomain Session Cookie
+- production에서 `www.varocheck.com`과 `api.varocheck.com`을 함께 사용할 때 세션 쿠키는 공유 domain 기반으로 발급한다.
+- 세션 쿠키 domain은 backend env `SESSION_COOKIE_DOMAIN`으로 제어하고, 값이 없더라도 표준 `www`/`api` 호스트 조합이면 `varocheck.com`을 자동 추론한다.
+- OAuth state cookie는 callback 검증 범위를 줄이기 위해 기존대로 host-only cookie를 유지한다.
+
+### Production CD Cost Reduction
+- production CD의 Docker image build는 GitHub-hosted runner가 아니라 EC2 self-hosted runner에서 수행한다.
+- `main` push 시 CD는 변경 파일을 기준으로 `frontend` / `backend` 중 필요한 서비스만 build, push, deploy 한다.
+- GHCR production 태그 정책은 immutable 7자리 `short SHA` + 최신 배포 별칭 `prod` 조합으로 유지한다.
+- production deploy는 항상 `prod`가 아니라 immutable `short SHA` 태그를 사용한다.
+- GHCR cleanup은 서비스별 최신 `short SHA` 10개와 `prod`가 붙은 버전만 남기고 나머지를 정리한다.
+
+## 2026-04-11
+
+### Production Reverse Proxy Runtime
+- production reverse proxy와 TLS termination은 host Nginx가 아니라 Docker Compose 기반 `nginx` 컨테이너로 운영한다.
+- TLS 인증서 발급과 갱신은 Docker Compose 기반 `certbot` 컨테이너를 사용하고, challenge 방식은 `webroot`로 고정한다.
+- production 초기 인프라는 `EC2 1대 + nginx container + certbot container + Docker Compose + GHCR + GitHub Actions self-hosted runner` 조합으로 갱신한다.
+- 외부 공개 포트 `80`, `443`은 `nginx` 컨테이너만 bind 하고 `frontend`, `backend`, `postgres`는 compose 내부 네트워크로만 연결한다.
+- 컨테이너용 Nginx 활성 설정은 `/srv/varo/nginx/conf.d/*.conf`, 공통 include는 `/srv/varo/nginx/includes/*.conf`, 템플릿은 `/srv/varo/nginx/templates/*`에 둔다.
+- certbot webroot와 인증서 저장소는 각각 `/srv/varo/certbot/www`, `/srv/varo/certbot/conf`를 사용한다.
+- 배포 스크립트는 `http-only nginx 기동 -> certbot 발급/갱신 -> TLS nginx reload -> app deploy` 순서를 따른다.
