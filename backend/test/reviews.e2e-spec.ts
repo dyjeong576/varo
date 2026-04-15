@@ -7,6 +7,7 @@ describe("ReviewsController (e2e)", () => {
     const reviewsService = {
       createQueryProcessingPreview: jest.fn().mockResolvedValue({
         reviewId: "review-1",
+        clientRequestId: "pending:review-1",
         claimId: "claim-1",
         rawClaim: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
         createdAt: "2026-04-01T02:00:00.000Z",
@@ -53,6 +54,7 @@ describe("ReviewsController (e2e)", () => {
     );
 
     expect(result.reviewId).toBe("review-1");
+    expect(result.clientRequestId).toBe("pending:review-1");
     expect(reviewsService.createQueryProcessingPreview).toHaveBeenCalledWith("user-1", {
       claim: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
       clientRequestId: "pending:review-1",
@@ -63,6 +65,7 @@ describe("ReviewsController (e2e)", () => {
     const reviewsService = {
       createTestQueryProcessingPreview: jest.fn().mockResolvedValue({
         reviewId: "review-1",
+        clientRequestId: null,
         claimId: "claim-1",
         rawClaim: "테슬라가 한국에서 완전 철수한대",
         createdAt: "2026-04-01T02:00:00.000Z",
@@ -137,6 +140,7 @@ describe("ReviewsController (e2e)", () => {
       listQueryProcessingPreviews: jest.fn().mockResolvedValue([
         {
           reviewId: "review-1",
+          clientRequestId: "pending:review-1",
           rawClaim: "트럼프가 오늘 관세 발표했대",
           status: "partial",
           currentStage: "handoff_ready",
@@ -156,6 +160,7 @@ describe("ReviewsController (e2e)", () => {
     });
 
     expect(result).toHaveLength(1);
+    expect(result[0]?.clientRequestId).toBe("pending:review-1");
     expect(reviewsService.listQueryProcessingPreviews).toHaveBeenCalledWith("user-1");
   });
 
@@ -163,6 +168,7 @@ describe("ReviewsController (e2e)", () => {
     const reviewsService = {
       getQueryProcessingPreview: jest.fn().mockResolvedValue({
         reviewId: "review-1",
+        clientRequestId: "pending:review-1",
         claimId: "claim-1",
         rawClaim: "트럼프가 오늘 관세 발표했대",
         createdAt: "2026-04-01T02:00:00.000Z",
@@ -202,6 +208,7 @@ describe("ReviewsController (e2e)", () => {
     );
 
     expect(result.reviewId).toBe("review-1");
+    expect(result.clientRequestId).toBe("pending:review-1");
     expect(reviewsService.getQueryProcessingPreview).toHaveBeenCalledWith(
       "user-1",
       "review-1",

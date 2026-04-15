@@ -30,7 +30,6 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  if (configService.get<string>("APP_ENV") === "dev") {
     const document = SwaggerModule.createDocument(
       app,
       new DocumentBuilder()
@@ -47,14 +46,12 @@ async function bootstrap(): Promise<void> {
         })
         .build(),
     );
-
     SwaggerModule.setup("api/docs", app, document, {
       swaggerOptions: {
         persistAuthorization: true,
       },
       customSiteTitle: `${appName} API 문서`,
     });
-  }
 
   const port = configService.get<number>("PORT", 4000);
   await app.listen(port);

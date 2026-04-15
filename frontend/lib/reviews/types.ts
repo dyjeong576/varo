@@ -1,5 +1,6 @@
 export interface ReviewPreviewSummaryResponse {
   reviewId: string;
+  clientRequestId: string | null;
   rawClaim: string;
   status: string;
   currentStage: string;
@@ -40,6 +41,7 @@ export interface ReviewPreviewEvidenceSnippetResponse {
 
 export interface ReviewPreviewDetailResponse {
   reviewId: string;
+  clientRequestId: string | null;
   claimId: string;
   rawClaim: string;
   createdAt: string;
@@ -94,6 +96,7 @@ export type ReviewSourceCategory =
 
 export interface ReviewPreviewSummary {
   reviewId: string;
+  clientRequestId: string | null;
   claim: string;
   createdAt: string;
   createdAtLabel: string;
@@ -148,6 +151,7 @@ export interface ReviewPreviewEvidenceSnippet {
 
 export interface ReviewPreviewDetail {
   reviewId: string;
+  clientRequestId: string | null;
   claimId: string;
   claim: string;
   normalizedClaim: string;
@@ -202,6 +206,7 @@ export type ReviewTaskStatus =
 
 export interface ReviewTaskRecord {
   draftId: string;
+  clientRequestId: string | null;
   claim: string;
   status: ReviewTaskStatus;
   previewStatus: string;

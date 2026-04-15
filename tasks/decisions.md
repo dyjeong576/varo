@@ -145,3 +145,12 @@
 - 컨테이너용 Nginx 활성 설정은 `/srv/varo/nginx/conf.d/*.conf`, 공통 include는 `/srv/varo/nginx/includes/*.conf`, 템플릿은 `/srv/varo/nginx/templates/*`에 둔다.
 - certbot webroot와 인증서 저장소는 각각 `/srv/varo/certbot/www`, `/srv/varo/certbot/conf`를 사용한다.
 - 배포 스크립트는 `http-only nginx 기동 -> certbot 발급/갱신 -> TLS nginx reload -> app deploy` 순서를 따른다.
+
+## 2026-04-15
+
+### Review Task History Deduplication
+- review task history는 `claim + 시간` 휴리스틱이 아니라 `clientRequestId`를 우선 병합 키로 사용한다.
+- `GET /api/v1/reviews` summary와 review detail 응답은 local pending draft와 server review job을 연결할 수 있도록 `clientRequestId`를 노출한다.
+- frontend의 local `draftId`는 review 생성 요청의 `clientRequestId`로 유지하고, 같은 값이 서버 응답에 있으면 하나의 history item으로 병합한다.
+- `/loading`의 성공 여부는 HTTP 요청 성공이 아니라 review payload의 `status/currentStage`를 기준으로 판정한다.
+- 서버가 `failed` 상태의 review detail을 반환하면 frontend는 성공 CTA와 completion notification을 만들지 않고 실패 상태를 유지한다.

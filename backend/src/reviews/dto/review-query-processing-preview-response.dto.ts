@@ -216,6 +216,13 @@ export class ReviewQueryProcessingPreviewResponseDto {
   @ApiProperty({ description: "review job 식별자", example: "review-1" })
   reviewId!: string;
 
+  @ApiProperty({
+    description: "client에서 생성한 요청 식별자. local pending draft와 server review job 병합에 사용합니다.",
+    example: "pending:review-1",
+    nullable: true,
+  })
+  clientRequestId!: string | null;
+
   @ApiProperty({ description: "claim 식별자", example: "claim-1" })
   claimId!: string;
 

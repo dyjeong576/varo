@@ -5,6 +5,13 @@ export class ReviewPreviewSummaryResponseDto {
   reviewId!: string;
 
   @ApiProperty({
+    description: "client에서 생성한 요청 식별자. local pending draft와 server review job 병합에 사용합니다.",
+    example: "pending:review-1",
+    nullable: true,
+  })
+  clientRequestId!: string | null;
+
+  @ApiProperty({
     description: "사용자가 입력한 claim 원문",
     example: "트럼프가 오늘 관세 발표했대",
   })

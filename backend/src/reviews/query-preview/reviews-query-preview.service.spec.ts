@@ -1,4 +1,4 @@
-import { HttpStatus } from "@nestjs/common";
+import { HttpStatus, Logger } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
 import { ReviewsProvidersService } from "../reviews.providers.service";
@@ -16,16 +16,20 @@ describe("ReviewsQueryPreviewService", () => {
       }
     }),
     findQueryProcessingPreviewByClientRequestId: jest.fn().mockResolvedValue(null),
-    createClaimAndReviewJob: jest.fn().mockResolvedValue({
-      claim: {
-        id: "claim-1",
-        rawText: "트럼프가 오늘 관세 발표했대",
-      },
-      reviewJob: {
-        id: "review-1",
-        createdAt: new Date("2026-04-01T02:00:00.000Z"),
-      },
-    }),
+    createClaimAndReviewJob: jest.fn().mockImplementation(
+      ({ clientRequestId }: { clientRequestId?: string }) =>
+        Promise.resolve({
+          claim: {
+            id: "claim-1",
+            rawText: "트럼프가 오늘 관세 발표했대",
+          },
+          reviewJob: {
+            id: "review-1",
+            createdAt: new Date("2026-04-01T02:00:00.000Z"),
+            clientRequestId: clientRequestId ?? null,
+          },
+        }),
+    ),
     resolveUserCountryCode: jest.fn().mockResolvedValue("KR"),
     loadSearchDomainRegistry: jest.fn().mockResolvedValue([
       {
@@ -241,6 +245,7 @@ describe("ReviewsQueryPreviewService", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
         id: "review-1",
+        clientRequestId: "pending:review-1",
         status: "partial",
         currentStage: "handoff_ready",
         searchedSourceCount: 1,
@@ -306,6 +311,8 @@ describe("ReviewsQueryPreviewService", () => {
 
     expect(firstResult.reviewId).toBe("review-1");
     expect(secondResult.reviewId).toBe("review-1");
+    expect(firstResult.clientRequestId).toBe("pending:review-1");
+    expect(secondResult.clientRequestId).toBe("pending:review-1");
     expect(persistence.createClaimAndReviewJob).toHaveBeenCalledTimes(1);
     expect(persistence.resetQueryProcessingPreview).not.toHaveBeenCalled();
   });
@@ -314,6 +321,7 @@ describe("ReviewsQueryPreviewService", () => {
     const persistence = createPersistenceMock();
     persistence.findQueryProcessingPreviewByClientRequestId.mockResolvedValue({
       id: "review-1",
+      clientRequestId: "pending:review-1",
       status: "searching",
       currentStage: "query_refinement",
       searchedSourceCount: 0,
@@ -361,8 +369,67 @@ describe("ReviewsQueryPreviewService", () => {
     });
 
     expect(result.reviewId).toBe("review-1");
+    expect(result.clientRequestId).toBe("pending:review-1");
     expect(persistence.createClaimAndReviewJob).not.toHaveBeenCalled();
     expect(persistence.resetQueryProcessingPreview).toHaveBeenCalledWith("review-1");
+  });
+
+  it("같은 clientRequestId의 failed review는 초기화 후 같은 reviewId로 재실행한다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.findQueryProcessingPreviewByClientRequestId.mockResolvedValue({
+      id: "review-1",
+      clientRequestId: "pending:review-1",
+      status: "failed",
+      currentStage: "failed",
+      searchedSourceCount: 0,
+      lastErrorCode: APP_ERROR_CODES.SOURCE_SEARCH_FAILED,
+      createdAt: new Date("2026-04-01T02:00:00.000Z"),
+      claim: {
+        id: "claim-1",
+        rawText: "트럼프가 오늘 관세 발표했대",
+        normalizedText: "트럼프가 오늘 관세 발표했대",
+      },
+      queryRefinement: null,
+      handoffPayload: null,
+      sources: [],
+      evidenceSnippets: [],
+    });
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: [],
+      insufficiencyReason: "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
+    });
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+      }),
+      searchSources: jest.fn().mockResolvedValue([]),
+      searchFallbackSources: jest.fn().mockResolvedValue([]),
+      applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
+      extractContent: jest.fn().mockResolvedValue([]),
+    } as unknown as ReviewsProvidersService;
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const result = await service.createQueryProcessingPreview("user-1", {
+      claim: "트럼프가 오늘 관세 발표했대",
+      clientRequestId: "pending:review-1",
+    });
+
+    expect(result.reviewId).toBe("review-1");
+    expect(result.clientRequestId).toBe("pending:review-1");
+    expect(persistence.createClaimAndReviewJob).not.toHaveBeenCalled();
+    expect(persistence.resetQueryProcessingPreview).toHaveBeenCalledWith("review-1");
+    expect(providers.refineQuery).toHaveBeenCalledTimes(1);
   });
 
   it("저장된 review preview 목록을 summary 응답으로 매핑한다", async () => {
@@ -370,6 +437,7 @@ describe("ReviewsQueryPreviewService", () => {
     persistence.listRecentQueryProcessingPreviews.mockResolvedValue([
       {
         id: "review-1",
+        clientRequestId: "pending:review-1",
         status: "partial",
         currentStage: "handoff_ready",
         lastErrorCode: null,
@@ -390,6 +458,7 @@ describe("ReviewsQueryPreviewService", () => {
     expect(result).toEqual([
       {
         reviewId: "review-1",
+        clientRequestId: "pending:review-1",
         rawClaim: "트럼프가 오늘 관세 발표했대",
         status: "partial",
         currentStage: "handoff_ready",
@@ -404,6 +473,7 @@ describe("ReviewsQueryPreviewService", () => {
     const persistence = createPersistenceMock();
     persistence.getQueryProcessingPreview.mockResolvedValue({
       id: "review-1",
+      clientRequestId: "pending:review-1",
       status: "partial",
       currentStage: "handoff_ready",
       searchedSourceCount: 2,
@@ -473,6 +543,7 @@ describe("ReviewsQueryPreviewService", () => {
     const result = await service.getQueryProcessingPreview("user-1", "review-1");
 
     expect(result.reviewId).toBe("review-1");
+    expect(result.clientRequestId).toBe("pending:review-1");
     expect(result.rawClaim).toBe("트럼프가 오늘 관세 발표했대");
     expect(result.sources[0]?.originalUrl).toBe(
       "https://www.reuters.com/world/us/trump-tariff-update",
@@ -659,6 +730,9 @@ describe("ReviewsQueryPreviewService", () => {
 
   it("refinement가 실패해도 claim은 남기고 review job을 failed로 기록한다", async () => {
     const persistence = createPersistenceMock();
+    const loggerSpy = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
     const error = new AppException(
       APP_ERROR_CODES.LLM_SCHEMA_ERROR,
       "질의 정제 결과가 요구 형식을 충족하지 않습니다.",
@@ -675,6 +749,7 @@ describe("ReviewsQueryPreviewService", () => {
     await expect(
       service.createQueryProcessingPreview("user-1", {
         claim: "테슬라가 한국에서 완전 철수한대",
+        clientRequestId: "pending:review-1",
       }),
     ).rejects.toMatchObject({
       code: APP_ERROR_CODES.LLM_SCHEMA_ERROR,
@@ -683,6 +758,14 @@ describe("ReviewsQueryPreviewService", () => {
 
     expect(persistence.createClaimAndReviewJob).toHaveBeenCalledTimes(1);
     expect(persistence.markReviewJobFailed).toHaveBeenCalledWith("review-1", error);
+    expect(loggerSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "review query processing preview failed userId=user-1 reviewJobId=review-1 claimId=claim-1 clientRequestId=pending:review-1 errorCode=LLM_SCHEMA_ERROR",
+      ),
+      expect.any(String),
+    );
+    expect(loggerSpy.mock.calls[0]?.[0]).not.toContain("테슬라가 한국에서 완전 철수한대");
+    loggerSpy.mockRestore();
   });
 
   it("reopen 요청을 history entry로 기록한다", async () => {

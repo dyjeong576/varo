@@ -19,6 +19,7 @@ interface ReviewClaimRecord {
 
 interface StoredReviewPreviewRecord {
   id: string;
+  clientRequestId: string | null;
   status: string;
   currentStage: string;
   searchedSourceCount: number;
@@ -33,6 +34,7 @@ interface StoredReviewPreviewRecord {
 
 interface StoredReviewPreviewSummaryRecord {
   id: string;
+  clientRequestId: string | null;
   status: string;
   currentStage: string;
   lastErrorCode: string | null;
@@ -220,7 +222,7 @@ export function parseOriginQueryIds(value: unknown): string[] {
 }
 
 export function mapPreviewResponse(params: {
-  reviewJob: Pick<ReviewJob, "id">;
+  reviewJob: Pick<ReviewJob, "id" | "clientRequestId">;
   claim: Pick<ReviewClaimRecord, "id" | "rawText">;
   createdAt: Date;
   normalizedClaim: string;
@@ -243,6 +245,7 @@ export function mapPreviewResponse(params: {
 
   return {
     reviewId: params.reviewJob.id,
+    clientRequestId: params.reviewJob.clientRequestId,
     claimId: params.claim.id,
     rawClaim: params.claim.rawText,
     createdAt: params.createdAt.toISOString(),
@@ -400,6 +403,7 @@ export function mapStoredPreviewSummary(
 ): ReviewPreviewSummaryResponseDto {
   return {
     reviewId: reviewJob.id,
+    clientRequestId: reviewJob.clientRequestId,
     rawClaim: reviewJob.claim.rawText,
     status: reviewJob.status,
     currentStage: reviewJob.currentStage,
@@ -433,6 +437,7 @@ export function mapStoredPreviewResponse(
 
   return {
     reviewId: reviewJob.id,
+    clientRequestId: reviewJob.clientRequestId,
     claimId: reviewJob.claim.id,
     rawClaim: reviewJob.claim.rawText,
     createdAt: reviewJob.createdAt.toISOString(),

@@ -101,7 +101,7 @@ export class ReviewsQueryPreviewPersistenceService {
     clientRequestId?: string;
   }): Promise<{
     claim: Pick<Claim, "id" | "rawText">;
-    reviewJob: Pick<ReviewJob, "id" | "createdAt">;
+    reviewJob: Pick<ReviewJob, "id" | "createdAt" | "clientRequestId">;
   }> {
     const claim = await this.prisma.claim.create({
       data: {
@@ -125,6 +125,7 @@ export class ReviewsQueryPreviewPersistenceService {
       select: {
         id: true,
         createdAt: true,
+        clientRequestId: true,
       },
     });
 

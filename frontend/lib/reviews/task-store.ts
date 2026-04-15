@@ -30,6 +30,10 @@ function emitChange(): void {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
+function normalizeComparableClaim(claim: string): string {
+  return claim.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function isReviewTaskRecord(value: unknown): value is ReviewTaskRecord {
   return Boolean(
     value &&
@@ -42,6 +46,21 @@ function isReviewTaskRecord(value: unknown): value is ReviewTaskRecord {
       typeof (value as ReviewTaskRecord).startedAt === "string" &&
       typeof (value as ReviewTaskRecord).notificationSent === "boolean",
   );
+}
+
+function normalizeReviewTaskRecord(record: ReviewTaskRecord): ReviewTaskRecord {
+  const storedClientRequestId = (record as { clientRequestId?: unknown })
+    .clientRequestId;
+
+  return {
+    ...record,
+    clientRequestId:
+      typeof storedClientRequestId === "string"
+        ? storedClientRequestId
+        : record.draftId.startsWith("pending:")
+          ? record.draftId
+          : null,
+  };
 }
 
 function readTaskRecords(): ReviewTaskRecord[] {
@@ -69,7 +88,9 @@ function readTaskRecords(): ReviewTaskRecord[] {
       return taskRecordsCache;
     }
 
-    taskRecordsCache = parsed.filter(isReviewTaskRecord);
+    taskRecordsCache = parsed
+      .filter(isReviewTaskRecord)
+      .map(normalizeReviewTaskRecord);
     return taskRecordsCache;
   } catch {
     taskRecordsCache = [];
@@ -131,6 +152,7 @@ function toTaskSummary(record: ReviewTaskRecord): ReviewPreviewSummary {
 
   return {
     reviewId: record.reviewId ?? record.draftId,
+    clientRequestId: record.clientRequestId ?? record.draftId,
     claim: record.claim,
     createdAt,
     createdAtLabel: formatCreatedAtLabel(createdAt),
@@ -149,11 +171,42 @@ function toTaskSummary(record: ReviewTaskRecord): ReviewPreviewSummary {
   };
 }
 
+function isActiveLocalTask(record: ReviewTaskRecord): boolean {
+  return (
+    !record.reviewId &&
+    (record.status === "pending" || record.status === "submitting")
+  );
+}
+
+function dedupeActiveLocalTasks(records: ReviewTaskRecord[]): ReviewTaskRecord[] {
+  const seenActiveClaims = new Set<string>();
+
+  return records.filter((record) => {
+    if (!isActiveLocalTask(record)) {
+      return true;
+    }
+
+    const normalizedClaim = normalizeComparableClaim(record.claim);
+
+    if (!normalizedClaim) {
+      return true;
+    }
+
+    if (seenActiveClaims.has(normalizedClaim)) {
+      return false;
+    }
+
+    seenActiveClaims.add(normalizedClaim);
+    return true;
+  });
+}
+
 function toStartedTask(record: ReviewTaskRecord): ReviewTaskRecord {
   const now = new Date().toISOString();
 
   return {
     ...record,
+    clientRequestId: record.clientRequestId ?? record.draftId,
     status: "submitting",
     previewStatus: "searching",
     currentStage: "query_refinement",
@@ -174,6 +227,7 @@ function toSucceededTask(
 ): ReviewTaskRecord {
   return {
     ...record,
+    clientRequestId: review.clientRequestId ?? record.clientRequestId ?? record.draftId,
     status: "succeeded",
     previewStatus: review.status,
     currentStage: review.currentStage,
@@ -186,12 +240,33 @@ function toSucceededTask(
   };
 }
 
+function toStoredFailedTask(
+  record: ReviewTaskRecord,
+  review: ReviewPreviewDetail,
+): ReviewTaskRecord {
+  return {
+    ...record,
+    clientRequestId: review.clientRequestId ?? record.clientRequestId ?? record.draftId,
+    status: "failed",
+    previewStatus: review.status,
+    currentStage: review.currentStage,
+    completedAt: new Date().toISOString(),
+    reviewId: review.reviewId,
+    reviewCreatedAt: review.createdAt,
+    selectedSourceCount: review.selectedSourceCount,
+    lastErrorCode: null,
+    errorMessage: "근거 수집에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    notificationSent: false,
+  };
+}
+
 function toFailedTask(
   record: ReviewTaskRecord,
   errorMessage: string,
 ): ReviewTaskRecord {
   return {
     ...record,
+    clientRequestId: record.clientRequestId ?? record.draftId,
     status: "failed",
     previewStatus: "failed",
     currentStage: "failed",
@@ -222,16 +297,28 @@ function maybeCreateCompletionNotification(
 }
 
 export function createReviewTask(claim: string): string {
+  const normalizedClaim = normalizeComparableClaim(claim);
+  const records = readTaskRecords();
+  const existingActiveTask = getReviewTasks().find(
+    (record) =>
+      isActiveLocalTask(record) &&
+      normalizeComparableClaim(record.claim) === normalizedClaim,
+  );
+
+  if (existingActiveTask) {
+    return existingActiveTask.draftId;
+  }
+
   const draftId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? `pending:${crypto.randomUUID()}`
       : `pending:${Date.now()}`;
   const now = new Date().toISOString();
-  const records = readTaskRecords();
 
   writeTaskRecords([
     {
       draftId,
+      clientRequestId: draftId,
       claim,
       status: "pending",
       previewStatus: "searching",
@@ -263,15 +350,11 @@ export function getReviewTasks(): ReviewTaskRecord[] {
 }
 
 export function getReviewTaskSummaries(): ReviewPreviewSummary[] {
-  return getReviewTasks().map(toTaskSummary);
+  return dedupeActiveLocalTasks(getReviewTasks()).map(toTaskSummary);
 }
 
 export function getActiveReviewTask(): ReviewTaskRecord | null {
-  const activeRecords = getReviewTasks().filter(
-    (record) =>
-      !record.reviewId &&
-      (record.status === "pending" || record.status === "submitting"),
-  );
+  const activeRecords = getReviewTasks().filter(isActiveLocalTask);
 
   return activeRecords[0] ?? null;
 }
@@ -337,6 +420,14 @@ export function startReviewTask(draftId: string): Promise<void> {
   const request = (async () => {
     try {
       const review = await api.reviews.create(task.claim, draftId);
+      if (review.status === "failed") {
+        updateTaskRecord(draftId, (currentRecord) =>
+          toStoredFailedTask(currentRecord, review),
+        );
+
+        return;
+      }
+
       const succeededTask = updateTaskRecord(draftId, (currentRecord) =>
         toSucceededTask(currentRecord, review),
       );

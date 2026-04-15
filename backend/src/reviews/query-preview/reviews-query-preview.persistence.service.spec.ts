@@ -16,6 +16,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       create: jest.fn().mockResolvedValue({
         id: "review-1",
         createdAt: new Date("2026-04-01T02:00:00.000Z"),
+        clientRequestId: "pending:review-1",
       }),
       update: jest.fn().mockResolvedValue(undefined),
       findMany: jest.fn().mockResolvedValue([]),
@@ -89,9 +90,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       select: {
         id: true,
         createdAt: true,
+        clientRequestId: true,
       },
     });
     expect(result.reviewJob.id).toBe("review-1");
+    expect(result.reviewJob.clientRequestId).toBe("pending:review-1");
   });
 
   it("clientRequestId로 기존 review preview를 조회한다", async () => {
@@ -319,6 +322,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     prisma.reviewJob.findMany.mockResolvedValue([
       {
         id: "review-1",
+        clientRequestId: "pending:review-1",
         status: "partial",
         currentStage: "handoff_ready",
         lastErrorCode: null,
@@ -347,12 +351,14 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       },
     });
     expect(result).toHaveLength(1);
+    expect(result[0]?.clientRequestId).toBe("pending:review-1");
   });
 
   it("로그인 사용자가 접근 가능한 review preview 상세를 조회한다", async () => {
     const prisma = createPrismaMock();
     prisma.reviewJob.findFirst.mockResolvedValue({
       id: "review-404",
+      clientRequestId: "pending:review-404",
       status: "partial",
       currentStage: "handoff_ready",
       lastErrorCode: null,
@@ -371,6 +377,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
     expect(result).toMatchObject({
       id: "review-404",
+      clientRequestId: "pending:review-404",
     });
     expect(prisma.reviewJob.findFirst).toHaveBeenCalledWith({
       where: {

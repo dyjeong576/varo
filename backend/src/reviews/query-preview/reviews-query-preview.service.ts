@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { CreateReviewQueryProcessingPreviewDto } from "../dto/create-review-query-processing-preview.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
 import { ReviewsProvidersService } from "../reviews.providers.service";
@@ -17,6 +17,7 @@ import {
 } from "./reviews-query-preview.mapper";
 import { ReviewsQueryPreviewPersistenceService } from "./reviews-query-preview.persistence.service";
 import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
+import { AppException } from "../../common/exceptions/app-exception";
 
 const QUERY_COUNT_LIMIT = 1;
 const RELEVANCE_LIMIT = 15;
@@ -25,6 +26,8 @@ const REFERENCE_PROMOTION_LIMIT = 3;
 
 @Injectable()
 export class ReviewsQueryPreviewService {
+  private readonly logger = new Logger(ReviewsQueryPreviewService.name);
+
   constructor(
     private readonly persistenceService: ReviewsQueryPreviewPersistenceService,
     private readonly providersService: ReviewsProvidersService,
@@ -44,7 +47,11 @@ export class ReviewsQueryPreviewService {
         payload.clientRequestId,
       ));
 
-    if (existingReview && existingReview.status !== "searching") {
+    if (
+      existingReview &&
+      existingReview.status !== "searching" &&
+      existingReview.status !== "failed"
+    ) {
       return mapStoredPreviewResponse(existingReview);
     }
 
@@ -57,6 +64,7 @@ export class ReviewsQueryPreviewService {
           reviewJob: {
             id: existingReview.id,
             createdAt: existingReview.createdAt,
+            clientRequestId: existingReview.clientRequestId,
           },
         }
       : await this.persistenceService.createClaimAndReviewJob({
@@ -152,6 +160,16 @@ export class ReviewsQueryPreviewService {
         insufficiencyReason: persistedArtifacts.insufficiencyReason,
       });
     } catch (error) {
+      this.logger.error(
+        this.buildPreviewFailureLogMessage({
+          userId,
+          reviewJobId: reviewJob.id,
+          claimId: claim.id,
+          clientRequestId: reviewJob.clientRequestId ?? payload.clientRequestId ?? null,
+          error,
+        }),
+        error instanceof Error ? error.stack : undefined,
+      );
       await this.persistenceService.markReviewJobFailed(reviewJob.id, error);
       throw error;
     }
@@ -218,5 +236,32 @@ export class ReviewsQueryPreviewService {
       topicCountryCode,
       topicScope,
     });
+  }
+
+  private buildPreviewFailureLogMessage(params: {
+    userId: string;
+    reviewJobId: string;
+    claimId: string;
+    clientRequestId: string | null;
+    error: unknown;
+  }): string {
+    const errorCode = params.error instanceof AppException
+      ? params.error.code
+      : params.error instanceof Error
+        ? params.error.name
+        : "UNKNOWN_ERROR";
+    const errorMessage = params.error instanceof Error
+      ? params.error.message
+      : "Unknown non-error failure";
+
+    return [
+      "review query processing preview failed",
+      `userId=${params.userId}`,
+      `reviewJobId=${params.reviewJobId}`,
+      `claimId=${params.claimId}`,
+      `clientRequestId=${params.clientRequestId ?? "none"}`,
+      `errorCode=${errorCode}`,
+      `errorMessage=${errorMessage}`,
+    ].join(" ");
   }
 }

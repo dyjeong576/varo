@@ -240,6 +240,7 @@ export function mapReviewPreviewSummary(
 
   return {
     reviewId: summary.reviewId,
+    clientRequestId: summary.clientRequestId,
     claim: summary.rawClaim,
     createdAt: summary.createdAt,
     createdAtLabel: formatDateTime(summary.createdAt),
@@ -268,6 +269,7 @@ export function mapReviewPreviewDetail(
 
   return {
     reviewId: detail.reviewId,
+    clientRequestId: detail.clientRequestId,
     claimId: detail.claimId,
     claim: detail.rawClaim,
     normalizedClaim: detail.normalizedClaim,
