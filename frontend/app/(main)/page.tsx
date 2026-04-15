@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, MapPin } from "lucide-react";
 import {
   createReviewTask,
   getActiveReviewTask,
@@ -68,6 +68,12 @@ export default function HomePage() {
         <p className="text-[13px] text-gray-500 break-keep leading-relaxed max-w-[90%]">
           VARO는 수집된 출처와 구조화된 요약을 바탕으로 판단에 필요한 맥락을 정리합니다.
         </p>
+        <div className="mt-5 inline-flex max-w-[92%] items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-3.5 py-2 text-[12px] font-bold leading-snug text-blue-700 shadow-[0_6px_20px_rgba(37,99,235,0.08)]">
+          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="break-keep">
+            현재는 한국 관련 뉴스와 주장만 검토합니다.
+          </span>
+        </div>
       </div>
 
       {/* 입력 영역 */}

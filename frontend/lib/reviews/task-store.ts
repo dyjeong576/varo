@@ -163,7 +163,9 @@ function toTaskSummary(record: ReviewTaskRecord): ReviewPreviewSummary {
     selectedSourceCount: record.selectedSourceCount,
     lastErrorCode: record.lastErrorCode,
     subtitle:
-      summaryStatus === "failed"
+      summaryStatus === "out_of_scope"
+        ? "지원 범위 밖"
+        : summaryStatus === "failed"
         ? "요청 실패"
         : record.selectedSourceCount > 0
           ? `선별 근거 ${record.selectedSourceCount}건`
@@ -420,19 +422,19 @@ export function startReviewTask(draftId: string): Promise<void> {
   const request = (async () => {
     try {
       const review = await api.reviews.create(task.claim, draftId);
-      if (review.status === "failed") {
-        updateTaskRecord(draftId, (currentRecord) =>
-          toStoredFailedTask(currentRecord, review),
-        );
+  if (review.status === "failed") {
+    updateTaskRecord(draftId, (currentRecord) =>
+      toStoredFailedTask(currentRecord, review),
+    );
 
-        return;
-      }
+    return;
+  }
 
       const succeededTask = updateTaskRecord(draftId, (currentRecord) =>
         toSucceededTask(currentRecord, review),
       );
 
-      if (succeededTask) {
+      if (succeededTask && review.status !== "out_of_scope") {
         maybeCreateCompletionNotification(succeededTask, review);
       }
     } catch (error) {

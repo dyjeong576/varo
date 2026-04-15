@@ -6,7 +6,6 @@ import { ReviewsOpenAiClient } from "./providers/reviews-openai.client";
 import { ReviewsTavilyClient } from "./providers/reviews-tavily.client";
 import {
   ExtractedSource,
-  QueryArtifact,
   QueryRefinementResult,
   RelevanceFilteringInput,
   SearchCandidate,
@@ -30,44 +29,37 @@ export class ReviewsProvidersService {
   async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
     const apiKey = this.getRequiredTavilyApiKey();
     const timeoutMs = this.getTavilySearchTimeoutMs();
+    const familiarDomains = selectDomainsForBucket(
+      input.domainRegistry,
+      "familiar",
+    );
     const verificationDomains = selectDomainsForBucket(
       input.domainRegistry,
       "verification",
-      input.userCountryCode,
-      input.topicCountryCode,
-      input.topicScope,
     );
 
-    return this.tavilyClient.searchSources({
-      apiKey,
-      timeoutMs,
-      input,
-      bucket: "verification",
-      includeDomains: verificationDomains,
-    });
-  }
+    const [familiarCandidates, verificationCandidates] = await Promise.all([
+      familiarDomains.length > 0
+        ? this.tavilyClient.searchSources({
+            apiKey,
+            timeoutMs,
+            input,
+            bucket: "familiar",
+            includeDomains: familiarDomains,
+          })
+        : Promise.resolve([]),
+      verificationDomains.length > 0
+        ? this.tavilyClient.searchSources({
+            apiKey,
+            timeoutMs,
+            input,
+            bucket: "verification",
+            includeDomains: verificationDomains,
+          })
+        : Promise.resolve([]),
+    ]);
 
-  async searchFallbackSources(
-    queries: QueryArtifact[],
-    domainRegistry: SearchSourcesInput["domainRegistry"],
-  ): Promise<SearchCandidate[]> {
-    const apiKey = this.getRequiredTavilyApiKey();
-    const timeoutMs = this.getTavilySearchTimeoutMs();
-
-    return this.tavilyClient.searchSources({
-      apiKey,
-      timeoutMs,
-      input: {
-        queries,
-        coreClaim: "",
-        claimLanguageCode: "",
-        userCountryCode: null,
-        topicCountryCode: null,
-        topicScope: "unknown",
-        domainRegistry,
-      },
-      bucket: "fallback",
-    });
+    return [...familiarCandidates, ...verificationCandidates];
   }
 
   async applyRelevanceFiltering(

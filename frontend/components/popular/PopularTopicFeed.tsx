@@ -1,31 +1,55 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
+import { ApiClientError } from '@/lib/api/http';
 import { PopularTopic } from '@/lib/types/popular';
 import { PopularTopicList } from './PopularTopicList';
 
 export const PopularTopicFeed = () => {
+  const router = useRouter();
   const [topics, setTopics] = useState<PopularTopic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadTopics() {
       try {
         const nextTopics = await api.popular.getTopics();
+
+        if (!isMounted) {
+          return;
+        }
+
         setTopics(nextTopics);
         setErrorMessage(null);
       } catch (error) {
-        console.error('Failed to load popular topics:', error);
+        if (!isMounted) {
+          return;
+        }
+
+        if (error instanceof ApiClientError && error.status === 401) {
+          router.replace('/login');
+          return;
+        }
+
         setErrorMessage('인기 주제를 불러오지 못했습니다.');
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     void loadTopics();
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   if (isLoading) {
     return (

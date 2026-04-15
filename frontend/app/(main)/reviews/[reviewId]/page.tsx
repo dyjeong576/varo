@@ -12,6 +12,7 @@ import UncertaintyCard from "@/components/reviews/UncertaintyCard";
 import VerdictHero from "@/components/reviews/VerdictHero";
 import AnalysisSummary from "@/components/reviews/AnalysisSummary";
 import { isReviewEntrySource } from "@/lib/reviews/navigation";
+import { getReviewTask } from "@/lib/reviews/task-store";
 import { ReviewPreviewDetail, ReviewSourceCategory } from "@/lib/reviews/types";
 
 const FILTERS: Array<{ label: string; value: "all" | ReviewSourceCategory }> = [
@@ -26,6 +27,16 @@ export default function ReviewResultPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reviewId = params.reviewId as string;
+  const isPendingReviewRoute = reviewId.startsWith("pending:");
+  const pendingReviewTask = isPendingReviewRoute ? getReviewTask(reviewId) : null;
+  const pendingRouteErrorMessage =
+    isPendingReviewRoute &&
+    pendingReviewTask?.status !== "pending" &&
+    pendingReviewTask?.status !== "submitting" &&
+    !pendingReviewTask?.reviewId
+      ? pendingReviewTask?.errorMessage ??
+        "아직 서버에 저장되지 않은 임시 review라 상세 화면을 열 수 없습니다."
+      : null;
   const [review, setReview] = useState<ReviewPreviewDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,6 +45,29 @@ export default function ReviewResultPage() {
 
   useEffect(() => {
     let isMounted = true;
+
+    if (isPendingReviewRoute) {
+      if (pendingReviewTask?.reviewId && pendingReviewTask.reviewId !== reviewId) {
+        router.replace(`/reviews/${encodeURIComponent(pendingReviewTask.reviewId)}`);
+        return () => {
+          isMounted = false;
+        };
+      }
+
+      if (
+        pendingReviewTask?.status === "pending" ||
+        pendingReviewTask?.status === "submitting"
+      ) {
+        router.replace(`/loading?draft=${encodeURIComponent(reviewId)}`);
+        return () => {
+          isMounted = false;
+        };
+      }
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     api.reviews
       .getDetail(reviewId)
@@ -64,9 +98,13 @@ export default function ReviewResultPage() {
     return () => {
       isMounted = false;
     };
-  }, [reviewId]);
+  }, [isPendingReviewRoute, pendingReviewTask, reviewId, router]);
 
   useEffect(() => {
+    if (isPendingReviewRoute || !review) {
+      return;
+    }
+
     const entry = searchParams.get("entry");
 
     if (!isReviewEntrySource(entry)) {
@@ -83,13 +121,29 @@ export default function ReviewResultPage() {
 
     api.reviews
       .recordReopen(reviewId, entry)
-      .catch((error) => {
-        console.error("Failed to record review reopen:", error);
-      })
+      .catch(() => undefined)
       .finally(() => {
         router.replace(`/reviews/${reviewId}`, { scroll: false });
       });
-  }, [reviewId, router, searchParams]);
+  }, [isPendingReviewRoute, review, reviewId, router, searchParams]);
+
+  if (isPendingReviewRoute) {
+    if (pendingRouteErrorMessage) {
+      return (
+        <div className="px-6 py-10">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-red-100 bg-red-50 p-6 text-sm text-red-700">
+            {pendingRouteErrorMessage}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex min-h-[calc(100dvh-7rem)] items-center justify-center px-6">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -119,18 +173,54 @@ export default function ReviewResultPage() {
               source.sourceCategory !== "press",
           )
         : review.sources.filter((source) => source.sourceCategory === filter);
+  const hasReviewResult =
+    !review.isOutOfScope &&
+    review.verdictLabel !== null &&
+    review.confidenceScore !== null &&
+    review.analysisSummary !== null &&
+    review.uncertaintySummary !== null &&
+    review.resultMode !== null;
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top,#f1f6ff_0%,#f8f9fc_32%,#f6f3fb_70%,#f5f1fb_100%)] px-4 py-5 sm:px-6 sm:py-6">
       <main className="mx-auto max-w-3xl space-y-8">
-        <VerdictHero
-          claim={review.claim}
-          verdictLabel={review.verdictLabel}
-          confidenceScore={review.confidenceScore}
-          createdAtLabel={review.createdAtLabel}
-          currentStageLabel={review.currentStageLabel}
-          pendingMessage={review.pendingMessage}
-        />
+        {hasReviewResult ? (
+          <VerdictHero
+            claim={review.claim}
+            verdictLabel={review.verdictLabel!}
+            confidenceScore={review.confidenceScore!}
+            createdAtLabel={review.createdAtLabel}
+            currentStageLabel={review.currentStageLabel}
+            pendingMessage={review.pendingMessage}
+          />
+        ) : (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#64748b]">
+                  지원 범위 확인
+                </span>
+                <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-bold text-[#475569]">
+                  {review.currentStageLabel}
+                </span>
+              </div>
+
+              <h1 className="text-[1.9rem] font-extrabold leading-tight tracking-[-0.04em] text-[#191b24] sm:text-[2.2rem]">
+                {review.claim}
+              </h1>
+
+              <div className="mt-6 rounded-xl bg-[#f8fafc] px-4 py-4 text-sm leading-6 text-[#475569]">
+                현재 MVP는 한국 관련 claim만 검토합니다. 이 claim은 판단 없이
+                지원 범위 밖으로 기록되었습니다.
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#dfe4f0] bg-white p-5 text-sm leading-6 text-[#475569]">
+              <p className="font-bold text-[#191b24]">한국 관련성 판단 이유</p>
+              <p className="mt-2">{review.koreaRelevanceReason}</p>
+            </div>
+          </section>
+        )}
 
         <EvidenceGrid
           searchedSourceCount={review.searchedSourceCount}
@@ -149,12 +239,16 @@ export default function ReviewResultPage() {
           generatedQueries={review.generatedQueries}
         />
 
-        <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />
+        {review.evidenceSnippets.length > 0 ? (
+          <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />
+        ) : null}
 
-        <AnalysisSummary
-          interpretation={review.analysisSummary}
-          mode={review.resultMode}
-        />
+        {hasReviewResult ? (
+          <AnalysisSummary
+            interpretation={review.analysisSummary!}
+            mode={review.resultMode!}
+          />
+        ) : null}
 
         <section className="space-y-6">
           <div className="flex items-center justify-between gap-3">
@@ -195,12 +289,14 @@ export default function ReviewResultPage() {
           </div>
         </section>
 
-        <UncertaintyCard
-          pendingMessage={review.pendingMessage}
-          insufficiencyReason={review.insufficiencyReason}
-          uncertaintySummary={review.uncertaintySummary}
-          uncertaintyItems={review.uncertaintyItems}
-        />
+        {hasReviewResult ? (
+          <UncertaintyCard
+            pendingMessage={review.pendingMessage}
+            insufficiencyReason={review.insufficiencyReason}
+            uncertaintySummary={review.uncertaintySummary!}
+            uncertaintyItems={review.uncertaintyItems}
+          />
+        ) : null}
       </main>
     </div>
   );

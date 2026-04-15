@@ -1,3 +1,4 @@
+import { ApiClientError } from "@/lib/api/http";
 import { ReviewPreviewSummary } from "@/lib/reviews/types";
 import { getReviewTaskSummaries } from "@/lib/reviews/task-store";
 
@@ -109,7 +110,21 @@ export function mergeReviewSummaries(
 export async function getMergedReviewSummaries(
   fetchServerReviews: () => Promise<ReviewPreviewSummary[]>,
 ): Promise<ReviewPreviewSummary[]> {
-  const serverReviews = await fetchServerReviews();
+  const taskReviews = getReviewTaskSummaries();
 
-  return mergeReviewSummaries(serverReviews, getReviewTaskSummaries());
+  try {
+    const serverReviews = await fetchServerReviews();
+
+    return mergeReviewSummaries(serverReviews, taskReviews);
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 401) {
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      }
+
+      return mergeReviewSummaries([], taskReviews);
+    }
+
+    throw error;
+  }
 }

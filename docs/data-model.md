@@ -213,8 +213,8 @@
 | `domain` | text | 도메인 또는 wildcard 패턴 |
 | `country_code` | varchar(16) | 국가 코드 |
 | `language_code` | varchar(16) nullable | 주요 언어 코드 |
-| `source_kind` | varchar(64) | `government`, `news_agency` 등 |
-| `usage_role` | varchar(64) | `familiar_news`, `verification_official`, `verification_news`, `global_reference` |
+| `source_kind` | varchar(64) | `government`, `news_agency`, `social_platform` 등 |
+| `usage_role` | varchar(64) | `familiar_news`, `familiar_social`, `verification_official`, `verification_news`, `global_reference` |
 | `priority` | integer | 검색 우선순위 |
 | `is_active` | boolean | 활성 여부 |
 | `created_at` | timestamptz | 생성 시각 |

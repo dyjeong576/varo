@@ -57,6 +57,17 @@
 - retrieval bucket은 `familiar / verification / fallback` 3단계로 고정한다.
 - 국가별 domain registry는 MVP에서 소수 핵심 도메인만 큐레이션한다.
 
+### Korea-Related Only MVP Scope
+- 2026-04-01의 Country-Aware Domain Routing 결정은 MVP 범위에서 대체한다.
+- MVP는 claim 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 포함된 한국 관련 claim만 검토한다.
+- 한국어 기사에 단순 보도된 순수 해외 이슈는 검토하지 않고 `out_of_scope` review job으로 기록한다.
+- `out_of_scope`는 시스템 실패가 아니므로 `lastErrorCode`를 남기지 않고 verdict/result를 생성하지 않는다.
+- source search는 KR `source_domain_registry`만 사용하며, 국가별 해외 verification routing과 domainless fallback search는 MVP 범위에서 제거한다.
+- `userCountryCode`는 사용자 프로필/audit 목적으로 조회하고 query refinement artifact에 보존하지만, domain routing에는 사용하지 않는다.
+- `topicCountryCode`는 사용자 국가가 아니라 claim/context 기준의 주제 국가로 유지하며, domain routing에는 사용하지 않는다.
+- retrieval bucket은 기존 저장/표시 호환성을 위해 `familiar / verification`을 유지하되, 신규 MVP 검색에서는 `fallback` bucket을 생성하지 않는다.
+- KR social registry는 공식 인증 계정/원문 확인에 쓰이는 주요 플랫폼 도메인만 `familiar_social`로 등록하고, 익명 커뮤니티/개인 블로그/게시판 도메인은 registry에 넣지 않는다.
+
 ## 2026-04-02
 
 ### Reviews Preview Integration

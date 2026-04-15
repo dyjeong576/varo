@@ -170,6 +170,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       },
       generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
       userCountryCode: "KR",
@@ -243,7 +245,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     expect(result.handoffSourceIds).toEqual(["trump-tariff-update"]);
   });
 
-  it("preview search에 필요한 국가/role만 domain registry에서 조회한다", async () => {
+  it("사용자 국가나 주제 국가와 무관하게 KR domain registry만 조회한다", async () => {
     const prisma = createPrismaMock();
     prisma.sourceDomainRegistry.findMany.mockResolvedValue([
       {
@@ -259,11 +261,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     ]);
     const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
 
-    const result = await service.loadSearchDomainRegistry({
-      userCountryCode: "KR",
-      topicCountryCode: "KR",
-      topicScope: "domestic",
-    });
+    const result = await service.loadSearchDomainRegistry();
 
     expect(prisma.sourceDomainRegistry.findMany).toHaveBeenCalledWith({
       where: {
@@ -271,9 +269,9 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         usageRole: {
           in: [
             "familiar_news",
+            "familiar_social",
             "verification_official",
             "verification_news",
-            "global_reference",
           ],
         },
         countryCode: {
@@ -315,6 +313,48 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         lastErrorCode: APP_ERROR_CODES.LLM_SCHEMA_ERROR,
       },
     });
+  });
+
+  it("한국 관련성이 없는 review를 out_of_scope 상태로 기록한다", async () => {
+    const prisma = createPrismaMock();
+    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+
+    const result = await service.persistOutOfScopeReview({
+      userId: "user-1",
+      reviewJob: { id: "review-1" },
+      refinement: {
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: false,
+        koreaRelevanceReason:
+          "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
+      },
+      generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+      userCountryCode: "KR",
+    });
+
+    expect(prisma.reviewJob.update).toHaveBeenCalledWith({
+      where: { id: "review-1" },
+      data: expect.objectContaining({
+        status: "out_of_scope",
+        currentStage: "scope_checked",
+        searchedSourceCount: 0,
+        processedSourceCount: 0,
+        lastErrorCode: null,
+      }),
+    });
+    expect(prisma.userHistory.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        reviewJobId: "review-1",
+        entryType: "submitted",
+      },
+    });
+    expect(result.insufficiencyReason).toContain("MVP 검토 범위 밖");
   });
 
   it("사용자 기준 최근 review preview 목록을 조회한다", async () => {

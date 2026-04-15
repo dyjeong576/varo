@@ -50,6 +50,10 @@ export interface PersistedQueryPreviewArtifacts {
   insufficiencyReason: string | null;
 }
 
+export interface PersistedOutOfScopeReview {
+  insufficiencyReason: string;
+}
+
 type ReviewPreviewRecord = Prisma.ReviewJobGetPayload<{
   include: {
     claim: true;
@@ -316,6 +320,48 @@ export class ReviewsQueryPreviewPersistenceService {
     };
   }
 
+  async persistOutOfScopeReview(params: {
+    userId: string;
+    reviewJob: Pick<ReviewJob, "id">;
+    refinement: QueryRefinementResult;
+    generatedQueries: QueryArtifact[];
+    userCountryCode: string | null;
+  }): Promise<PersistedOutOfScopeReview> {
+    const insufficiencyReason =
+      "한국 관련성이 확인되지 않아 MVP 검토 범위 밖으로 기록되었습니다.";
+    const queryRefinementPayload = buildQueryRefinementPayload(
+      params.refinement,
+      params.generatedQueries,
+      params.userCountryCode,
+    );
+    const handoffPayload = buildHandoffPayload(
+      params.refinement.coreClaim,
+      [],
+      [],
+      insufficiencyReason,
+    );
+
+    await this.prisma.reviewJob.update({
+      where: { id: params.reviewJob.id },
+      data: {
+        status: "out_of_scope",
+        currentStage: "scope_checked",
+        searchedSourceCount: 0,
+        processedSourceCount: 0,
+        lastErrorCode: null,
+        queryRefinement: queryRefinementPayload,
+        handoffPayload,
+      },
+    });
+    await this.recordHistoryEntry({
+      userId: params.userId,
+      reviewJobId: params.reviewJob.id,
+      entryType: "submitted",
+    });
+
+    return { insufficiencyReason };
+  }
+
   async markReviewJobFailed(reviewJobId: string, error: unknown): Promise<void> {
     await this.prisma.reviewJob.update({
       where: { id: reviewJobId },
@@ -328,16 +374,8 @@ export class ReviewsQueryPreviewPersistenceService {
     });
   }
 
-  async loadSearchDomainRegistry(params: {
-    userCountryCode: string | null;
-    topicCountryCode: string | null;
-    topicScope: QueryRefinementResult["topicScope"];
-  }): Promise<DomainRegistryEntry[]> {
-    const criteria = collectSearchDomainRegistryCriteria(
-      params.userCountryCode,
-      params.topicCountryCode,
-      params.topicScope,
-    );
+  async loadSearchDomainRegistry(): Promise<DomainRegistryEntry[]> {
+    const criteria = collectSearchDomainRegistryCriteria();
     const entries = await this.prisma.sourceDomainRegistry.findMany({
       where: {
         isActive: true,

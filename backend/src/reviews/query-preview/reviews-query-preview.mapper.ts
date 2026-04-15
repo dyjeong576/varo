@@ -51,6 +51,8 @@ interface QueryRefinementPayload {
   topicScope: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
+  isKoreaRelated: boolean;
+  koreaRelevanceReason: string;
 }
 
 interface HandoffPayload {
@@ -172,6 +174,8 @@ export function buildQueryRefinementPayload(
     topicScope: refinement.topicScope,
     topicCountryCode: refinement.topicCountryCode,
     countryDetectionReason: refinement.countryDetectionReason,
+    isKoreaRelated: refinement.isKoreaRelated,
+    koreaRelevanceReason: refinement.koreaRelevanceReason,
     userCountryCode,
   } as Prisma.InputJsonValue;
 }
@@ -249,6 +253,8 @@ export function mapPreviewResponse(params: {
     claimId: params.claim.id,
     rawClaim: params.claim.rawText,
     createdAt: params.createdAt.toISOString(),
+    isKoreaRelated: params.refinement.isKoreaRelated,
+    koreaRelevanceReason: params.refinement.koreaRelevanceReason,
     status: "partial",
     currentStage: "handoff_ready",
     normalizedClaim: params.normalizedClaim,
@@ -294,6 +300,48 @@ export function mapPreviewResponse(params: {
   };
 }
 
+export function mapOutOfScopePreviewResponse(params: {
+  reviewJob: Pick<ReviewJob, "id" | "clientRequestId">;
+  claim: Pick<ReviewClaimRecord, "id" | "rawText">;
+  createdAt: Date;
+  normalizedClaim: string;
+  refinement: QueryRefinementResult;
+  generatedQueries: QueryArtifact[];
+  insufficiencyReason: string | null;
+}): ReviewQueryProcessingPreviewResponseDto {
+  return {
+    reviewId: params.reviewJob.id,
+    clientRequestId: params.reviewJob.clientRequestId,
+    claimId: params.claim.id,
+    rawClaim: params.claim.rawText,
+    createdAt: params.createdAt.toISOString(),
+    isKoreaRelated: false,
+    koreaRelevanceReason: params.refinement.koreaRelevanceReason,
+    status: "out_of_scope",
+    currentStage: "scope_checked",
+    normalizedClaim: params.normalizedClaim,
+    claimLanguageCode: params.refinement.claimLanguageCode,
+    languageCode: params.refinement.claimLanguageCode,
+    coreClaim: params.refinement.coreClaim,
+    topicScope: params.refinement.topicScope,
+    topicCountryCode: params.refinement.topicCountryCode,
+    countryDetectionReason: params.refinement.countryDetectionReason,
+    generatedQueries: params.generatedQueries,
+    sources: [],
+    evidenceSnippets: [],
+    searchedSourceCount: 0,
+    selectedSourceCount: 0,
+    discardedSourceCount: 0,
+    handoff: {
+      coreClaim: params.refinement.coreClaim,
+      sourceIds: [],
+      snippetIds: [],
+      insufficiencyReason: params.insufficiencyReason,
+    },
+    result: null,
+  };
+}
+
 function parseJsonRecord(value: Prisma.JsonValue | null): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -306,6 +354,10 @@ function parseString(value: unknown, fallback = ""): string {
 
 function parseNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function parseBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function parseGeneratedQueries(value: unknown): QueryArtifact[] {
@@ -355,6 +407,8 @@ function parseQueryRefinementPayload(
       topicScope: "unknown",
       topicCountryCode: null,
       countryDetectionReason: "주제 국가 판정 전입니다.",
+      isKoreaRelated: true,
+      koreaRelevanceReason: "한국 관련성 판정 전입니다.",
     };
   }
 
@@ -370,6 +424,11 @@ function parseQueryRefinementPayload(
     countryDetectionReason: parseString(
       payload.countryDetectionReason,
       "주제 국가 판정 전입니다.",
+    ),
+    isKoreaRelated: parseBoolean(payload.isKoreaRelated, true),
+    koreaRelevanceReason: parseString(
+      payload.koreaRelevanceReason,
+      "한국 관련성 판정 전입니다.",
     ),
   };
 }
@@ -434,6 +493,8 @@ export function mapStoredPreviewResponse(
     evidenceSnippets: reviewJob.evidenceSnippets,
     insufficiencyReason: handoff.insufficiencyReason,
   });
+  const result =
+    reviewJob.status === "out_of_scope" ? null : assembledResult.result;
 
   return {
     reviewId: reviewJob.id,
@@ -441,6 +502,8 @@ export function mapStoredPreviewResponse(
     claimId: reviewJob.claim.id,
     rawClaim: reviewJob.claim.rawText,
     createdAt: reviewJob.createdAt.toISOString(),
+    isKoreaRelated: refinement.isKoreaRelated,
+    koreaRelevanceReason: refinement.koreaRelevanceReason,
     status: reviewJob.status,
     currentStage: reviewJob.currentStage,
     normalizedClaim: reviewJob.claim.normalizedText,
@@ -484,6 +547,6 @@ export function mapStoredPreviewResponse(
       (source) => source.relevanceTier === "discard",
     ).length,
     handoff,
-    result: assembledResult.result,
+    result,
   };
 }

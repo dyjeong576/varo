@@ -54,22 +54,26 @@ Provider 전략은 아래로 고정한다.
 ### 2. Query Refinement
 
 - OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`과 검색 쿼리 3개를 생성한다.
-- OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`도 생성한다.
+- OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason`도 생성한다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
   - 고유명사, 날짜, 수치가 있으면 우선 반영한다.
   - 검색 엔진 친화적인 명사형 질의로 변환한다.
-- `topic_country_code`는 언어가 아니라 claim 의미 기준의 중심 국가를 판정한다.
+- `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
+- `is_korea_related`는 claim 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 직접 포함될 때만 true다.
+- 한국어 기사에 단순 보도된 순수 해외 이슈는 `is_korea_related=false`로 보고 `out_of_scope`로 기록한다.
 - 이 단계의 출력은 이후 search와 relevance filtering의 기준 입력이 된다.
 
 ### 3. Source Search
 
-- Review API는 `user country`와 `topic_country_code` 기준으로 국가별 trusted domain registry를 조회한다.
-- Tavily 검색은 최대 3개의 pass로 구성한다.
-  - `familiar pass`: 한국 사용자면 한국 familiar news 도메인을 `include_domains`에 넣어 검색한다.
-  - `verification pass`: `topic_country_code` 기준 공식/현지 trusted domain과 global reference domain을 `include_domains`에 넣어 검색한다.
-  - `fallback pass`: 앞선 pass 결과만으로 관련 source가 부족하면 일반 Tavily 검색으로 확장한다.
+- Review API는 MVP에서 KR trusted domain registry만 조회한다.
+- 사용자 프로필의 `user_country_code`는 audit artifact에 보존하지만 source search domain 선택에는 사용하지 않는다.
+- `topic_country_code`가 KR이 아니어도 `is_korea_related=true`이면 KR domain registry로 검색한다.
+- Tavily 검색은 KR 도메인 기반 2개의 pass로 구성한다.
+  - `familiar pass`: 한국 familiar news와 주요 social platform 도메인을 `include_domains`에 넣어 검색한다.
+  - `verification pass`: 한국 공식/검증 성격 도메인을 `include_domains`에 넣어 검색한다.
+- domainless fallback search는 MVP에서 수행하지 않는다.
 - 각 pass 결과는 하나의 candidate pool로 병합한다.
 - 이 단계에서는 결과를 최대한 넓게 받되, 후속 relevance filtering이 가능하도록 title, snippet, canonical URL, publisher metadata를 유지한다.
 - 각 source candidate에는 어떤 query에서 수집되었는지 추적할 수 있도록 `origin_query_ids[]`를 연결한다.
@@ -92,14 +96,13 @@ Provider 전략은 아래로 고정한다.
 - 각 source candidate에는 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`를 유지한다.
 - `reference` 단계는 official statement, correction article, low-signal title처럼 제목 신호는 약하지만 claim 검토에는 의미가 있는 source를 조기에 버리지 않기 위해 둔다.
 - 이 단계는 검색 recall을 유지하면서 downstream 노이즈를 줄이는 핵심 필터 역할을 한다.
-- 해외 이슈에서는 한국 familiar 기사만으로 `primary`를 과대 부여하지 않는다.
+- 한국 관련성이 없는 해외 이슈는 relevance filtering 이전에 `out_of_scope`로 종료한다.
 
 ### 6. Relevant Source Selection
 
 - 1차 extraction 대상은 `primary` source만 사용한다.
 - 가능하면 extraction 대상에 `verification bucket` source를 최소 1개 포함한다.
-- `primary` source가 부족하면 fallback search를 시도할 수 있다.
-- fallback 이후에도 부족하면 `reference` source를 제한적으로 승격할 수 있다.
+- `primary` source가 부족하면 `reference` source를 제한적으로 승격할 수 있다.
 - `reference` 승격 이후에도 관련 source가 충분하지 않으면 근거 부족 상태를 유지한 채 다음 단계로 전달한다.
 
 ### 7. Content Extraction and Evidence Preparation
@@ -132,48 +135,46 @@ sequenceDiagram
     User->>Frontend: claim 제출
     Frontend->>ReviewAPI: review 생성 요청
     ReviewAPI->>DB: claim / review job 저장
-    ReviewAPI->>QueryRefiner: raw claim 기반 core_claim + queries[3] + topic country 판정 요청
+    ReviewAPI->>QueryRefiner: raw claim 기반 core_claim + queries[3] + topic country + 한국 관련성 판정 요청
     QueryRefiner-->>ReviewAPI: structured JSON 반환
-    ReviewAPI->>DB: core_claim / generated_queries / topic country 저장
+    ReviewAPI->>DB: core_claim / generated_queries / topic country / 한국 관련성 저장
 
-    ReviewAPI->>DomainRegistry: userCountry + topicCountryCode 기준 trusted domains 조회
-    DomainRegistry-->>ReviewAPI: familiar / verification domain sets 반환
+    alt is_korea_related=false
+        ReviewAPI->>DB: status=out_of_scope / result=null 저장
+        ReviewAPI-->>Frontend: 지원 범위 밖 응답
+    else is_korea_related=true
+        ReviewAPI->>DomainRegistry: KR trusted domains 조회
+        DomainRegistry-->>ReviewAPI: KR familiar / verification domain sets 반환
 
-    opt familiar pass
-        loop query 3개
-            ReviewAPI->>Tavily: include_domains=familiar domains 검색
-            Tavily-->>ReviewAPI: familiar results 반환
+        opt familiar pass
+            loop query 3개
+                ReviewAPI->>Tavily: include_domains=KR familiar domains 검색
+                Tavily-->>ReviewAPI: familiar results 반환
+            end
         end
-    end
 
-    opt verification pass
-        loop query 3개
-            ReviewAPI->>Tavily: include_domains=verification domains 검색
-            Tavily-->>ReviewAPI: verification results 반환
+        opt verification pass
+            loop query 3개
+                ReviewAPI->>Tavily: include_domains=KR verification domains 검색
+                Tavily-->>ReviewAPI: verification results 반환
+            end
         end
-    end
 
-    ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / retrieval bucket 부여
-    ReviewAPI->>RelevanceFilter: topic country + bucket metadata 기반 relevance 판정 요청
-    RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
-
-    alt relevant source가 부족한 경우
-        ReviewAPI->>Tavily: fallback search 요청
-        Tavily-->>ReviewAPI: fallback results 반환
-        ReviewAPI->>RelevanceFilter: fallback candidate 재판정 요청
+        ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / retrieval bucket 부여
+        ReviewAPI->>RelevanceFilter: topic country + bucket metadata 기반 relevance 판정 요청
         RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
+
+        ReviewAPI->>DB: relevance / origin_query_ids / retrievalBucket / sourceCountryCode 저장
+
+        alt extract 대상이 있는 경우
+            ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
+            Extractor-->>ReviewAPI: content / snippet 후보 반환
+        else extract 대상이 부족한 경우
+            ReviewAPI->>ReviewAPI: verification source 부족 또는 evidence 부족 상태 유지
+        end
+
+        ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
     end
-
-    ReviewAPI->>DB: relevance / origin_query_ids / retrievalBucket / sourceCountryCode 저장
-
-    alt extract 대상이 있는 경우
-        ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
-        Extractor-->>ReviewAPI: content / snippet 후보 반환
-    else extract 대상이 부족한 경우
-        ReviewAPI->>ReviewAPI: verification source 부족 또는 evidence 부족 상태 유지
-    end
-
-    ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
 ```
 
 ### Dev Test Endpoint Sequence
@@ -204,15 +205,16 @@ sequenceDiagram
         QueryPreviewService->>DB: claim / review job 생성
         QueryPreviewService->>DB: preview user country 조회
         QueryPreviewService->>Providers: query refinement
-        Providers-->>QueryPreviewService: core_claim + generated_queries + topic country
-        QueryPreviewService->>DB: search 대상 domain registry 조회
-        DB-->>QueryPreviewService: familiar / verification registry
-        QueryPreviewService->>Providers: Tavily search + relevance filtering
-        opt verification source 부족
-            QueryPreviewService->>Providers: fallback search + relevance 재판정
+        Providers-->>QueryPreviewService: core_claim + generated_queries + topic country + 한국 관련성
+        alt 한국 관련성이 없는 경우
+            QueryPreviewService->>DB: out_of_scope 상태 저장
+        else 한국 관련 claim
+            QueryPreviewService->>DB: KR search 대상 domain registry 조회
+            DB-->>QueryPreviewService: KR familiar / verification registry
+            QueryPreviewService->>Providers: Tavily KR search + relevance filtering
+            QueryPreviewService->>Providers: extraction 대상 content 추출
+            QueryPreviewService->>DB: source / evidence / handoff payload 저장
         end
-        QueryPreviewService->>Providers: extraction 대상 content 추출
-        QueryPreviewService->>DB: source / evidence / handoff payload 저장
         DB-->>QueryPreviewService: persisted artifacts
         QueryPreviewService-->>ReviewsService: preview response
         ReviewsService-->>Controller: preview response
@@ -225,8 +227,8 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason` |
-| Source Search | `generated_queries[]`, user country, domain registry | title, snippet, canonical URL, publisher metadata를 포함한 search candidates |
+| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason` |
+| Source Search | `generated_queries[]`, KR domain registry | title, snippet, canonical URL, publisher metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]` |
 | Relevance Filtering | `core_claim`, title, snippet, candidate metadata, country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]` |
 | Relevant Source Selection | relevance 판정 결과 | extraction 대상 source 목록 |
@@ -244,6 +246,9 @@ sequenceDiagram
 - `topic_scope`
 - `topic_country_code`
 - `country_detection_reason`
+- `user_country_code`
+- `is_korea_related`
+- `korea_relevance_reason`
 - source별 `origin_query_ids`
 - source별 `relevance_tier`
 - source별 `relevance_reason`
@@ -271,7 +276,7 @@ sequenceDiagram
 
 - query refinement 실패 시에는 원문 claim 그대로 검색하는 임시 fallback을 둘 수 있지만, 결과 해석에서 query refinement 실패 사실을 내부적으로 식별 가능해야 한다.
 - Tavily 검색 결과가 적거나 `primary` source가 부족하면 무리하게 결론을 강화하지 않는다.
-- `primary` source가 부족한 경우에는 fallback search를 시도할 수 있고, 그래도 부족하면 `reference`를 제한적으로 승격한다.
+- `primary` source가 부족한 경우에는 `reference`를 제한적으로 승격한다.
 - `reference` 승격 이후에도 부족하면 근거 부족 상태를 유지한 채 interpretation 단계로 handoff 한다.
 - extract 대상이 없거나 본문 추출이 실패하면, evidence 부족 상태를 유지한 채 uncertainty-heavy input으로 interpretation 단계에 handoff 한다.
 - 동일 보도의 재인용이나 제목만 유사한 기사 다수를 근거 수로 과대 해석하지 않는다.

@@ -45,6 +45,8 @@ export interface ReviewPreviewDetailResponse {
   claimId: string;
   rawClaim: string;
   createdAt: string;
+  isKoreaRelated: boolean;
+  koreaRelevanceReason: string;
   status: string;
   currentStage: string;
   normalizedClaim: string;
@@ -84,7 +86,7 @@ export interface ReviewPreviewDetailResponse {
       analysis: number;
       other: number;
     };
-  };
+  } | null;
 }
 
 export type ReviewSourceCategory =
@@ -157,6 +159,9 @@ export interface ReviewPreviewDetail {
   normalizedClaim: string;
   createdAt: string;
   createdAtLabel: string;
+  isKoreaRelated: boolean;
+  koreaRelevanceReason: string;
+  isOutOfScope: boolean;
   status: string;
   statusLabel: string;
   currentStage: string;
@@ -177,13 +182,13 @@ export interface ReviewPreviewDetail {
   selectedSourceCount: number;
   discardedSourceCount: number;
   insufficiencyReason: string | null;
-  verdict: "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False";
-  verdictLabel: string;
-  confidenceScore: number;
-  consensusLevel: "high" | "medium" | "low";
+  verdict: "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False" | null;
+  verdictLabel: string | null;
+  confidenceScore: number | null;
+  consensusLevel: "high" | "medium" | "low" | null;
   consensusLabel: string;
-  analysisSummary: string;
-  uncertaintySummary: string;
+  analysisSummary: string | null;
+  uncertaintySummary: string | null;
   uncertaintyItems: string[];
   agreementCount: number;
   conflictCount: number;
@@ -195,7 +200,7 @@ export interface ReviewPreviewDetail {
     analysis: number;
     other: number;
   };
-  resultMode: "rule_based_preview";
+  resultMode: "rule_based_preview" | null;
 }
 
 export type ReviewTaskStatus =

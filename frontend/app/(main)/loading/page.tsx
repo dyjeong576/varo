@@ -36,6 +36,7 @@ function LoadingContent() {
   const isSubmitting =
     task?.status === "pending" || task?.status === "submitting";
   const isCompleted = task?.status === "succeeded" && Boolean(task.reviewId);
+  const isOutOfScope = task?.previewStatus === "out_of_scope";
 
   const activeStageIndex = useMemo(() => {
     if (isCompleted) {
@@ -116,13 +117,15 @@ function LoadingContent() {
     <div className="flex flex-col min-h-full px-6 pt-8 pb-8 bg-[#F8FAFC] font-sans">
       <div className="mb-10 text-center mt-2">
         <h1 className="text-[22px] font-extrabold text-gray-900 mb-2">
-          팩트체크 분석 중
+          {isOutOfScope ? "지원 범위 확인 완료" : "팩트체크 분석 중"}
         </h1>
         <h2 className="text-[15px] font-bold text-primary break-keep">
           {claimQuery || "입력된 주장 분석 중..."}
         </h2>
         <p className="mt-4 text-[13px] text-gray-500">
-          신뢰할 수 있는 정보를 위해 다각도로 검증 중입니다.
+          {isOutOfScope
+            ? "현재 MVP는 한국 관련 claim만 검토합니다."
+            : "신뢰할 수 있는 정보를 위해 다각도로 검증 중입니다."}
         </p>
       </div>
 
@@ -164,16 +167,24 @@ function LoadingContent() {
       </div>
 
       {isCompleted && task.reviewId ? (
-        <div className="w-full max-w-sm mx-auto mb-6 rounded-[18px] border border-blue-100 bg-blue-50 px-5 py-4">
-          <p className="text-sm font-semibold text-blue-800">
-            근거 수집이 완료되었습니다. 결과를 열어 source와 evidence를 확인할 수 있습니다.
+        <div className={`w-full max-w-sm mx-auto mb-6 rounded-[18px] border px-5 py-4 ${
+          isOutOfScope
+            ? "border-slate-200 bg-white"
+            : "border-blue-100 bg-blue-50"
+        }`}>
+          <p className={`text-sm font-semibold ${
+            isOutOfScope ? "text-slate-700" : "text-blue-800"
+          }`}>
+            {isOutOfScope
+              ? "한국 관련성이 확인되지 않아 판단 없이 기록되었습니다. 상세 화면에서 범위 확인 이유를 볼 수 있습니다."
+              : "근거 수집이 완료되었습니다. 결과를 열어 source와 evidence를 확인할 수 있습니다."}
           </p>
           <div className="mt-4 flex gap-3">
             <button
               onClick={() => router.push(`/reviews/${task.reviewId}`)}
               className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
             >
-              결과 보기
+              {isOutOfScope ? "기록 보기" : "결과 보기"}
               <ArrowRight className="h-4 w-4" />
             </button>
             <button

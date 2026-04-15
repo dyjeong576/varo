@@ -55,6 +55,10 @@ describe("ReviewsQueryPreviewService", () => {
     ]),
     resetQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
     persistQueryPreviewResult: jest.fn(),
+    persistOutOfScopeReview: jest.fn().mockResolvedValue({
+      insufficiencyReason:
+        "한국 관련성이 확인되지 않아 MVP 검토 범위 밖으로 기록되었습니다.",
+    }),
     markReviewJobFailed: jest.fn().mockResolvedValue(undefined),
     ensurePreviewUser: jest.fn().mockResolvedValue({
       id: "preview-user-1",
@@ -87,8 +91,9 @@ describe("ReviewsQueryPreviewService", () => {
     expect(persistence.createClaimAndReviewJob).not.toHaveBeenCalled();
   });
 
-  it("country-aware query processing preview를 저장하고 응답 메타데이터를 반환한다", async () => {
+  it("사용자 국가와 무관하게 주제 국가를 유지하고 KR domain registry로 검색한다", async () => {
     const persistence = createPersistenceMock();
+    persistence.resolveUserCountryCode.mockResolvedValue("US");
     const providers = {
       refineQuery: jest.fn().mockResolvedValue({
         claimLanguageCode: "ko",
@@ -102,6 +107,8 @@ describe("ReviewsQueryPreviewService", () => {
         topicCountryCode: "US",
         countryDetectionReason:
           "미국 대통령과 관세 정책 단서가 확인되어 미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([
         {
@@ -228,15 +235,11 @@ describe("ReviewsQueryPreviewService", () => {
     expect(persistence.resolveUserCountryCode).toHaveBeenCalledWith("user-1");
     expect(providers.searchSources).toHaveBeenCalledWith(
       expect.objectContaining({
-        userCountryCode: "KR",
+        userCountryCode: "US",
         topicCountryCode: "US",
       }),
     );
-    expect(persistence.loadSearchDomainRegistry).toHaveBeenCalledWith({
-      userCountryCode: "KR",
-      topicCountryCode: "US",
-      topicScope: "foreign",
-    });
+    expect(persistence.loadSearchDomainRegistry).toHaveBeenCalledWith();
   });
 
   it("같은 clientRequestId로 다시 호출하면 같은 reviewId를 재사용한다", async () => {
@@ -264,6 +267,8 @@ describe("ReviewsQueryPreviewService", () => {
           topicScope: "foreign",
           topicCountryCode: "US",
           countryDetectionReason: "미국 이슈로 판단했습니다.",
+          isKoreaRelated: true,
+          koreaRelevanceReason: "기존 저장 payload에는 한국 관련성 판정이 포함되어 있습니다.",
         },
         handoffPayload: {
           coreClaim: "트럼프의 관세 발표",
@@ -289,6 +294,8 @@ describe("ReviewsQueryPreviewService", () => {
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
@@ -352,6 +359,8 @@ describe("ReviewsQueryPreviewService", () => {
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
@@ -409,6 +418,8 @@ describe("ReviewsQueryPreviewService", () => {
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
@@ -492,6 +503,8 @@ describe("ReviewsQueryPreviewService", () => {
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       },
       handoffPayload: {
         coreClaim: "트럼프의 관세 발표",
@@ -551,11 +564,64 @@ describe("ReviewsQueryPreviewService", () => {
     expect(result.sources[0]?.publishedAt).toBe("2026-04-01T01:00:00.000Z");
     expect(result.sources[0]?.stance).toBe("support");
     expect(result.handoff.sourceIds).toEqual(["source-2"]);
-    expect(result.result.mode).toBe("rule_based_preview");
-    expect(result.result.verdict).toBe("Unclear");
+    expect(result.result?.mode).toBe("rule_based_preview");
+    expect(result.result?.verdict).toBe("Unclear");
   });
 
-  it("verification source가 부족하면 fallback search를 수행한다", async () => {
+  it("한국 관련성이 없으면 out_of_scope로 저장하고 source 수집을 건너뛴다", async () => {
+    const persistence = createPersistenceMock();
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        claimLanguageCode: "ko",
+        coreClaim: "트럼프의 관세 발표",
+        generatedQueries: [
+          { id: "q1", text: "트럼프 관세 발표", rank: 1 },
+          { id: "q2", text: "미국 관세 정책", rank: 2 },
+          { id: "q3", text: "Trump tariff", rank: 3 },
+        ],
+        topicScope: "foreign",
+        topicCountryCode: "US",
+        countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: false,
+        koreaRelevanceReason:
+          "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
+      }),
+      searchSources: jest.fn(),
+      searchFallbackSources: jest.fn(),
+      applyRelevanceFiltering: jest.fn(),
+      extractContent: jest.fn(),
+    } as unknown as ReviewsProvidersService;
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const result = await service.createQueryProcessingPreview("user-1", {
+      claim: "트럼프가 오늘 관세 발표했대",
+    });
+
+    expect(result.status).toBe("out_of_scope");
+    expect(result.currentStage).toBe("scope_checked");
+    expect(result.result).toBeNull();
+    expect(result.sources).toEqual([]);
+    expect(result.isKoreaRelated).toBe(false);
+    expect(result.koreaRelevanceReason).toContain("한국");
+    expect(persistence.persistOutOfScopeReview).toHaveBeenCalledWith({
+      userId: "user-1",
+      reviewJob: expect.objectContaining({ id: "review-1" }),
+      refinement: expect.objectContaining({ isKoreaRelated: false }),
+      generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+      userCountryCode: "KR",
+    });
+    expect(providers.searchSources).not.toHaveBeenCalled();
+    expect(
+      (providers as unknown as { searchFallbackSources: jest.Mock }).searchFallbackSources,
+    ).not.toHaveBeenCalled();
+    expect(providers.applyRelevanceFiltering).not.toHaveBeenCalled();
+    expect(providers.extractContent).not.toHaveBeenCalled();
+  });
+
+  it("verification source가 부족해도 domainless fallback search를 수행하지 않는다", async () => {
     const persistence = createPersistenceMock();
     const providers = {
       refineQuery: jest.fn().mockResolvedValue({
@@ -569,6 +635,8 @@ describe("ReviewsQueryPreviewService", () => {
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([
         {
@@ -587,23 +655,7 @@ describe("ReviewsQueryPreviewService", () => {
           domainRegistryId: "kr-familiar",
         },
       ]),
-      searchFallbackSources: jest.fn().mockResolvedValue([
-        {
-          id: "c2",
-          sourceType: "news",
-          publisherName: "Reuters",
-          publishedAt: null,
-          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          rawTitle: "Trump tariff announcement update",
-          rawSnippet: "원문 검증 보도입니다.",
-          normalizedHash: "hash-2",
-          originQueryIds: ["q2"],
-          sourceCountryCode: "US",
-          retrievalBucket: "fallback",
-          domainRegistryId: "us-verification",
-        },
-      ]),
+      searchFallbackSources: jest.fn().mockResolvedValue([]),
       applyRelevanceFiltering: jest
         .fn()
         .mockResolvedValueOnce([
@@ -624,50 +676,8 @@ describe("ReviewsQueryPreviewService", () => {
             relevanceTier: "reference",
             relevanceReason: "보조 근거입니다.",
           },
-        ])
-        .mockResolvedValueOnce([
-          {
-            id: "c1",
-            sourceType: "news",
-            publisherName: "연합뉴스",
-            publishedAt: null,
-            canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
-            originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
-            rawTitle: "트럼프 관세 발표 관련 한국 보도",
-            rawSnippet: "국내 종합 기사입니다.",
-            normalizedHash: "hash-1",
-            originQueryIds: ["q1"],
-            sourceCountryCode: "KR",
-            retrievalBucket: "familiar",
-            domainRegistryId: "kr-familiar",
-            relevanceTier: "reference",
-            relevanceReason: "보조 근거입니다.",
-          },
-          {
-            id: "c2",
-            sourceType: "news",
-            publisherName: "Reuters",
-            publishedAt: null,
-            canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-            originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-            rawTitle: "Trump tariff announcement update",
-            rawSnippet: "원문 검증 보도입니다.",
-            normalizedHash: "hash-2",
-            originQueryIds: ["q2"],
-            sourceCountryCode: "US",
-            retrievalBucket: "fallback",
-            domainRegistryId: "us-verification",
-            relevanceTier: "primary",
-            relevanceReason: "fallback으로 확보한 검증 source입니다.",
-          },
         ]),
-      extractContent: jest.fn().mockResolvedValue([
-        {
-          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          contentText: "추출 본문",
-          snippetText: "추출 snippet",
-        },
-      ]),
+      extractContent: jest.fn().mockResolvedValue([]),
     } as unknown as ReviewsProvidersService;
     persistence.persistQueryPreviewResult.mockResolvedValue({
       createdSources: [
@@ -685,35 +695,12 @@ describe("ReviewsQueryPreviewService", () => {
           retrievalBucket: "familiar",
           domainRegistryId: "kr-familiar",
         },
-        {
-          id: "source-2",
-          sourceType: "news",
-          publisherName: "Reuters",
-          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          rawTitle: "Trump tariff announcement update",
-          rawSnippet: "원문 검증 보도입니다.",
-          relevanceTier: "primary",
-          relevanceReason: "fallback으로 확보한 검증 source입니다.",
-          originQueryIds: ["q2"],
-          sourceCountryCode: "US",
-          retrievalBucket: "fallback",
-          domainRegistryId: "us-verification",
-        },
       ],
-      evidenceSnippets: [
-        {
-          id: "snippet-source-2",
-          reviewJobId: "review-1",
-          sourceId: "source-2",
-          snippetText: "추출 snippet",
-          stance: "neutral",
-          startOffset: null,
-          endOffset: null,
-        },
-      ],
+      evidenceSnippets: [],
       discardedSourceCount: 0,
-      handoffSourceIds: ["source-2"],
-      insufficiencyReason: null,
+      handoffSourceIds: [],
+      insufficiencyReason:
+        "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
     });
     const service = new ReviewsQueryPreviewService(
       persistence as never,
@@ -724,8 +711,10 @@ describe("ReviewsQueryPreviewService", () => {
       claim: "트럼프가 오늘 관세 발표했대",
     });
 
-    expect(providers.searchFallbackSources).toHaveBeenCalledTimes(1);
-    expect(result.sources.some((source) => source.retrievalBucket === "fallback")).toBe(true);
+    expect(
+      (providers as unknown as { searchFallbackSources: jest.Mock }).searchFallbackSources,
+    ).not.toHaveBeenCalled();
+    expect(result.sources.some((source) => source.retrievalBucket === "fallback")).toBe(false);
   });
 
   it("refinement가 실패해도 claim은 남기고 review job을 failed로 기록한다", async () => {

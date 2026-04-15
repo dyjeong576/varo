@@ -22,6 +22,8 @@ interface OpenAiQueryRefinementPayload {
   topicScope: TopicScope;
   topicCountryCode: string | null;
   countryDetectionReason: string;
+  isKoreaRelated: boolean;
+  koreaRelevanceReason: string;
 }
 
 interface OpenAiRelevanceDecision {
@@ -55,6 +57,8 @@ export class ReviewsOpenAiClient {
               "topicScope",
               "topicCountryCode",
               "countryDetectionReason",
+              "isKoreaRelated",
+              "koreaRelevanceReason",
             ],
             properties: {
               languageCode: { type: "string" },
@@ -73,6 +77,8 @@ export class ReviewsOpenAiClient {
                 anyOf: [{ type: "string" }, { type: "null" }],
               },
               countryDetectionReason: { type: "string" },
+              isKoreaRelated: { type: "boolean" },
+              koreaRelevanceReason: { type: "string" },
             },
           },
         },
@@ -90,7 +96,9 @@ export class ReviewsOpenAiClient {
   - 예: "테슬라 한국 철수" / "테슬라 코리아 사업 중단" / "테슬라 한국 매장 폐점"
 - 고유명사(기업명, 인명, 지명)는 원문 그대로 유지
 
-languageCode는 원문 언어를 유지하세요. topicCountryCode는 핵심 뉴스/주장의 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요. topicScope는 domestic, foreign, multi_country, unknown 중 하나만 선택하세요. countryDetectionReason에는 왜 그렇게 판정했는지 짧게 설명하세요.`,
+languageCode는 원문 언어를 유지하세요. topicCountryCode는 사용자 프로필 국가가 아니라 claim/context 의미 기준의 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요. topicScope는 domestic, foreign, multi_country, unknown 중 하나만 선택하세요. countryDetectionReason에는 왜 그렇게 판정했는지 짧게 설명하세요.
+
+MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 claim 자체에 한국 장소, 한국 정부/기관, 한국 기업/법인, 한국 시장, 한국 국민/이용자, 한국 정책, 국내 서비스 영향이 직접 포함되면 true입니다. 단순히 해외 이슈가 한국어로 보도됐다는 이유만으로 true로 두지 마세요. koreaRelevanceReason에는 한국 관련성을 인정하거나 제외한 이유를 짧게 설명하세요.`,
           },
           {
             role: "user",
@@ -115,9 +123,12 @@ languageCode는 원문 언어를 유지하세요. topicCountryCode는 핵심 뉴
       typeof payload.languageCode !== "string" ||
       typeof payload.coreClaim !== "string" ||
       typeof payload.countryDetectionReason !== "string" ||
+      typeof payload.isKoreaRelated !== "boolean" ||
+      typeof payload.koreaRelevanceReason !== "string" ||
       !payload.languageCode.trim() ||
       !payload.coreClaim.trim() ||
       !payload.countryDetectionReason.trim() ||
+      !payload.koreaRelevanceReason.trim() ||
       !["domestic", "foreign", "multi_country", "unknown"].includes(
         payload.topicScope,
       ) ||
@@ -141,6 +152,8 @@ languageCode는 원문 언어를 유지하세요. topicCountryCode는 핵심 뉴
       topicScope: payload.topicScope,
       topicCountryCode,
       countryDetectionReason: payload.countryDetectionReason.trim(),
+      isKoreaRelated: payload.isKoreaRelated,
+      koreaRelevanceReason: payload.koreaRelevanceReason.trim(),
     };
   }
 
@@ -181,7 +194,7 @@ languageCode는 원문 언어를 유지하세요. topicCountryCode는 핵심 뉴
           {
             role: "system",
             content:
-              "당신은 뉴스 검토용 relevance filter입니다. core claim, 기사 제목, snippet, 출처 유형, retrieval bucket, source country를 보고 extraction 이전 단계에서 source를 분류하세요. foreign topic에서는 한국 familiar 기사만으로 primary를 과대 부여하지 말고, verification source를 우선하세요. primary는 직접 검증 근거, reference는 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
+              "당신은 한국 관련 뉴스 검토용 relevance filter입니다. core claim, 기사 제목, snippet, 출처 유형, retrieval bucket, source country를 보고 extraction 이전 단계에서 source를 분류하세요. primary는 직접 검증 근거, reference는 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
           },
           {
             role: "user",

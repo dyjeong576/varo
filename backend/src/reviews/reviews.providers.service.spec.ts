@@ -100,6 +100,9 @@ describe("ReviewsProvidersService", () => {
                     topicCountryCode: "US",
                     countryDetectionReason:
                       "미국 대통령과 관세 발표 단서가 확인되어 미국 이슈로 판단했습니다.",
+                    isKoreaRelated: false,
+                    koreaRelevanceReason:
+                      "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
                   }),
                 },
               ],
@@ -119,10 +122,11 @@ describe("ReviewsProvidersService", () => {
     expect(result.claimLanguageCode).toBe("ko");
     expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
+    expect(result.isKoreaRelated).toBe(false);
     expect(result.generatedQueries).toHaveLength(3);
   });
 
-  it("real mode에서 verification include_domains를 Tavily에 전달한다", async () => {
+  it("real mode에서 사용자/주제 국가와 무관하게 KR include_domains를 Tavily에 전달한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -148,9 +152,9 @@ describe("ReviewsProvidersService", () => {
       queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
       coreClaim: "테슬라 한국 철수",
       claimLanguageCode: "ko",
-      userCountryCode: "KR",
-      topicCountryCode: "KR",
-      topicScope: "domestic",
+      userCountryCode: "US",
+      topicCountryCode: "US",
+      topicScope: "foreign",
       domainRegistry: [
         {
           id: "kr-familiar",
@@ -172,14 +176,45 @@ describe("ReviewsProvidersService", () => {
           priority: 20,
           isActive: true,
         },
+        {
+          id: "kr-social",
+          domain: "youtube.com",
+          countryCode: "KR",
+          languageCode: null,
+          sourceKind: "social_platform",
+          usageRole: "familiar_social",
+          priority: 30,
+          isActive: true,
+        },
+        {
+          id: "us-verification",
+          domain: "reuters.com",
+          countryCode: "US",
+          languageCode: "en",
+          sourceKind: "news_agency",
+          usageRole: "verification_news",
+          priority: 5,
+          isActive: true,
+        },
       ],
     });
 
     expect(result[0]).toMatchObject({
-      retrievalBucket: "verification",
+      retrievalBucket: "familiar",
       sourceCountryCode: "KR",
     });
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      "https://api.tavily.com/search",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining(
+          "\"include_domains\":[\"yna.co.kr\",\"youtube.com\"]",
+        ),
+      }),
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
       "https://api.tavily.com/search",
       expect.objectContaining({
         method: "POST",

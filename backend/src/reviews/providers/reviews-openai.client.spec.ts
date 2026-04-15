@@ -47,6 +47,9 @@ describe("ReviewsOpenAiClient", () => {
                     topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason: "미국 이슈로 판단했습니다.",
+                    isKoreaRelated: false,
+                    koreaRelevanceReason:
+                      "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
                   }),
                 },
               ],
@@ -60,6 +63,8 @@ describe("ReviewsOpenAiClient", () => {
     const result = await client.refineQuery("openai-test-key", "트럼프가 오늘 관세 발표했대");
 
     expect(result.topicCountryCode).toBe("US");
+    expect(result.isKoreaRelated).toBe(false);
+    expect(result.koreaRelevanceReason).toContain("한국");
     expect(result.generatedQueries).toHaveLength(3);
   });
 });

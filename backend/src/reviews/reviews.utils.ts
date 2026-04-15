@@ -4,8 +4,17 @@ import {
   QueryArtifact,
   RetrievalBucket,
   SearchCandidate,
-  TopicScope,
 } from "./reviews.types";
+
+const SOCIAL_SOURCE_DOMAINS = [
+  "youtube.com",
+  "youtu.be",
+  "instagram.com",
+  "threads.net",
+  "facebook.com",
+  "x.com",
+  "twitter.com",
+];
 
 export function normalizeClaimText(rawClaim: string): string {
   return rawClaim.replace(/\s+/g, " ").replace(/[!?]{2,}/g, "?").trim();
@@ -61,6 +70,16 @@ export function deduplicateCandidates(candidates: SearchCandidate[]): SearchCand
 export function classifySourceType(url: string, title: string): string {
   const lowerUrl = url.toLowerCase();
   const lowerTitle = title.toLowerCase();
+  const hostname = extractHostname(url);
+
+  if (
+    hostname &&
+    SOCIAL_SOURCE_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    )
+  ) {
+    return "social";
+  }
 
   if (
     lowerUrl.includes(".gov") ||
@@ -289,48 +308,26 @@ export function countRelevantSources(candidates: SearchCandidate[]): number {
   return candidates.filter((candidate) => candidate.relevanceTier !== "discard").length;
 }
 
-export function collectSearchDomainRegistryCriteria(
-  userCountryCode: string | null,
-  topicCountryCode: string | null,
-  topicScope: TopicScope,
-): {
+export function collectSearchDomainRegistryCriteria(): {
   usageRoles: string[];
   countryCodes: string[];
 } {
-  const familiarCriteria = buildDomainSelectionCriteria(
-    "familiar",
-    userCountryCode,
-    topicCountryCode,
-    topicScope,
-  );
-  const verificationCriteria = buildDomainSelectionCriteria(
-    "verification",
-    userCountryCode,
-    topicCountryCode,
-    topicScope,
-  );
-
   return {
-    usageRoles: [...new Set([...familiarCriteria.usageRoles, ...verificationCriteria.usageRoles])],
-    countryCodes: [
-      ...new Set([...familiarCriteria.countryCodes, ...verificationCriteria.countryCodes]),
+    usageRoles: [
+      "familiar_news",
+      "familiar_social",
+      "verification_official",
+      "verification_news",
     ],
+    countryCodes: ["KR"],
   };
 }
 
 export function selectDomainsForBucket(
   registry: DomainRegistryEntry[],
   bucket: "familiar" | "verification",
-  userCountryCode: string | null,
-  topicCountryCode: string | null,
-  topicScope: TopicScope,
 ): string[] {
-  const criteria = buildDomainSelectionCriteria(
-    bucket,
-    userCountryCode,
-    topicCountryCode,
-    topicScope,
-  );
+  const criteria = buildDomainSelectionCriteria(bucket);
 
   return registry
     .filter(
@@ -346,26 +343,16 @@ export function selectDomainsForBucket(
 
 function buildDomainSelectionCriteria(
   bucket: "familiar" | "verification",
-  userCountryCode: string | null,
-  topicCountryCode: string | null,
-  topicScope: TopicScope,
 ): {
   usageRoles: string[];
   countryCodes: string[];
 } {
-  const includeGlobalReference = bucket === "verification" && topicScope !== "domestic";
-
   return {
     usageRoles:
       bucket === "familiar"
-        ? ["familiar_news"]
-        : ["verification_official", "verification_news", "global_reference"],
-    countryCodes:
-      bucket === "familiar"
-        ? [userCountryCode].filter((value): value is string => Boolean(value))
-        : [topicCountryCode, includeGlobalReference ? "GLOBAL" : null].filter(
-            (value): value is string => Boolean(value),
-          ),
+        ? ["familiar_news", "familiar_social"]
+        : ["verification_official", "verification_news"],
+    countryCodes: ["KR"],
   };
 }
 

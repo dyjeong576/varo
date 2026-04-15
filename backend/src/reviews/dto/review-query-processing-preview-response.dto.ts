@@ -238,6 +238,18 @@ export class ReviewQueryProcessingPreviewResponseDto {
   })
   createdAt!: string;
 
+  @ApiProperty({
+    description: "MVP 기준 한국 관련 claim인지 여부",
+    example: true,
+  })
+  isKoreaRelated!: boolean;
+
+  @ApiProperty({
+    description: "한국 관련성 판단 이유",
+    example: "한국 시장 철수 여부를 다루는 claim이므로 한국 관련 이슈입니다.",
+  })
+  koreaRelevanceReason!: string;
+
   @ApiProperty({ description: "review 상태", example: "partial" })
   status!: string;
 
@@ -305,8 +317,9 @@ export class ReviewQueryProcessingPreviewResponseDto {
 
   @ApiProperty({
     description:
-      "최종 truth 판정이 아닌, 현재 수집된 출처를 기준으로 계산한 임시 결과 화면용 분석 데이터",
+      "최종 truth 판정이 아닌, 현재 수집된 출처를 기준으로 계산한 임시 결과 화면용 분석 데이터. MVP 지원 범위 밖이면 null입니다.",
     type: ReviewAnalysisResultDto,
+    nullable: true,
   })
-  result!: ReviewAnalysisResultDto;
+  result!: ReviewAnalysisResultDto | null;
 }

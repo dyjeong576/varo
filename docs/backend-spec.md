@@ -132,6 +132,7 @@
 - `analyzing`
 - `completed`
 - `partial`
+- `out_of_scope`
 - `failed`
 
 ### 6.3 review 원칙
@@ -140,6 +141,7 @@
 - verdict는 기사 수가 아니라 evidence 구조를 바탕으로 계산한다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
+- MVP에서는 한국 관련성이 없는 claim을 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 
 ### 6.4 worker 책임
 

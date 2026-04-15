@@ -45,6 +45,8 @@ export interface QueryRefinementResult {
   topicScope: TopicScope;
   topicCountryCode: string | null;
   countryDetectionReason: string;
+  isKoreaRelated: boolean;
+  koreaRelevanceReason: string;
 }
 
 export interface SearchSourcesInput {

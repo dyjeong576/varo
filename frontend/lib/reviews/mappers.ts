@@ -35,6 +35,8 @@ export function getReviewStatusLabel(status: string): string {
       return "처리 실패";
     case "completed":
       return "완료";
+    case "out_of_scope":
+      return "지원 범위 밖";
     default:
       return status;
   }
@@ -48,6 +50,8 @@ export function getReviewStageLabel(stage: string): string {
       return "출처 검색 중";
     case "handoff_ready":
       return "근거 수집 완료";
+    case "scope_checked":
+      return "범위 확인 완료";
     case "failed":
       return "실행 실패";
     default:
@@ -158,7 +162,9 @@ function getTopicScopeLabel(topicScope: string): string {
   }
 }
 
-function getVerdictLabel(verdict: ReviewPreviewDetailResponse["result"]["verdict"]): string {
+type ReviewResultResponse = NonNullable<ReviewPreviewDetailResponse["result"]>;
+
+function getVerdictLabel(verdict: ReviewResultResponse["verdict"]): string {
   switch (verdict) {
     case "Likely True":
       return "대체로 사실";
@@ -173,7 +179,7 @@ function getVerdictLabel(verdict: ReviewPreviewDetailResponse["result"]["verdict
 }
 
 function getConsensusLabel(
-  consensusLevel: ReviewPreviewDetailResponse["result"]["consensusLevel"],
+  consensusLevel: ReviewResultResponse["consensusLevel"] | null,
 ): string {
   switch (consensusLevel) {
     case "high":
@@ -181,8 +187,9 @@ function getConsensusLabel(
     case "medium":
       return "중간";
     case "low":
-    default:
       return "낮음";
+    default:
+      return "범위 밖";
   }
 }
 
@@ -251,7 +258,9 @@ export function mapReviewPreviewSummary(
     selectedSourceCount: summary.selectedSourceCount,
     lastErrorCode: summary.lastErrorCode,
     subtitle:
-      summary.selectedSourceCount > 0
+      summary.status === "out_of_scope"
+        ? "지원 범위 밖"
+        : summary.selectedSourceCount > 0
         ? `선별 근거 ${summary.selectedSourceCount}건`
         : currentStageLabel,
   };
@@ -263,9 +272,12 @@ export function mapReviewPreviewDetail(
   const sources = detail.sources.map(mapSource);
   const evidenceSnippets = mapEvidenceSnippets(detail, sources);
   const pendingMessage =
-    detail.status === "failed"
+    detail.status === "out_of_scope"
+      ? "현재 MVP는 한국 관련 claim만 검토합니다. 이 기록은 판단 없이 범위 확인 결과만 표시합니다."
+      : detail.status === "failed"
       ? "임시 결과 생성이 중단되어 저장된 근거만 표시하고 있습니다."
       : "이 결과는 현재 수집된 출처 기준으로 계산된 임시 분석입니다.";
+  const result = detail.result;
 
   return {
     reviewId: detail.reviewId,
@@ -275,6 +287,9 @@ export function mapReviewPreviewDetail(
     normalizedClaim: detail.normalizedClaim,
     createdAt: detail.createdAt,
     createdAtLabel: formatDateTime(detail.createdAt),
+    isKoreaRelated: detail.isKoreaRelated,
+    koreaRelevanceReason: detail.koreaRelevanceReason,
+    isOutOfScope: detail.status === "out_of_scope",
     status: detail.status,
     statusLabel: getReviewStatusLabel(detail.status),
     currentStage: detail.currentStage,
@@ -304,18 +319,25 @@ export function mapReviewPreviewDetail(
     selectedSourceCount: detail.selectedSourceCount,
     discardedSourceCount: detail.discardedSourceCount,
     insufficiencyReason: detail.handoff.insufficiencyReason,
-    verdict: detail.result.verdict,
-    verdictLabel: getVerdictLabel(detail.result.verdict),
-    confidenceScore: detail.result.confidenceScore,
-    consensusLevel: detail.result.consensusLevel,
-    consensusLabel: getConsensusLabel(detail.result.consensusLevel),
-    analysisSummary: detail.result.analysisSummary,
-    uncertaintySummary: detail.result.uncertaintySummary,
-    uncertaintyItems: detail.result.uncertaintyItems,
-    agreementCount: detail.result.agreementCount,
-    conflictCount: detail.result.conflictCount,
-    contextCount: detail.result.contextCount,
-    sourceBreakdown: detail.result.sourceBreakdown,
-    resultMode: detail.result.mode,
+    verdict: result?.verdict ?? null,
+    verdictLabel: result ? getVerdictLabel(result.verdict) : null,
+    confidenceScore: result?.confidenceScore ?? null,
+    consensusLevel: result?.consensusLevel ?? null,
+    consensusLabel: getConsensusLabel(result?.consensusLevel ?? null),
+    analysisSummary: result?.analysisSummary ?? null,
+    uncertaintySummary: result?.uncertaintySummary ?? null,
+    uncertaintyItems: result?.uncertaintyItems ?? [],
+    agreementCount: result?.agreementCount ?? 0,
+    conflictCount: result?.conflictCount ?? 0,
+    contextCount: result?.contextCount ?? 0,
+    sourceBreakdown:
+      result?.sourceBreakdown ?? {
+        official: 0,
+        press: 0,
+        social: 0,
+        analysis: 0,
+        other: 0,
+      },
+    resultMode: result?.mode ?? null,
   };
 }
