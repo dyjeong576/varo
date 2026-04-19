@@ -93,11 +93,11 @@ export default function SourceCard({ source }: SourceCardProps) {
             </a>
           </div>
 
-          <div className="mt-4 space-y-3">
-            <h5 className="text-sm font-bold leading-6 text-[#191b24]">
+          <div className="mt-4 min-w-0 space-y-3">
+            <h5 className="line-clamp-2 overflow-hidden break-words text-sm font-bold leading-6 text-[#191b24]">
               {source.title}
             </h5>
-            <p className="rounded-2xl bg-[#f7f9fc] px-4 py-3 text-sm italic leading-6 text-[#48505d]">
+            <p className="line-clamp-3 overflow-hidden break-words rounded-2xl bg-[#f7f9fc] px-4 py-3 text-sm italic leading-6 text-[#48505d]">
               {source.snippet ? `"${source.snippet}"` : "표시할 snippet이 아직 없습니다."}
             </p>
           </div>

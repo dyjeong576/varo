@@ -121,6 +121,10 @@ export function markAllNotificationsRead(): void {
   );
 }
 
+export function clearNotifications(): void {
+  writeNotifications([]);
+}
+
 export function subscribeNotifications(callback: () => void): () => void {
   if (typeof window === "undefined") {
     return () => undefined;

@@ -1,4 +1,4 @@
-export type CommunityCategory = "Issue" | "Policy" | "FactCheck";
+export type CommunityCategory = "Issue" | "Policy" | "FactCheck" | "General";
 
 export interface CommunityAuthor {
   name: string;

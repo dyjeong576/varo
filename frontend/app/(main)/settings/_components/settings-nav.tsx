@@ -1,9 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { User, BellRing, Lock, HelpCircle, LogOut, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  User,
+  BellRing,
+  Lock,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import { api } from "@/lib/api/client";
+import { clearNotifications } from "@/lib/notifications/store";
+import { clearReviewTasks } from "@/lib/reviews/task-store";
 
 export function SettingsNav() {
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const sections = [
     {
       title: "계정",
@@ -20,6 +36,30 @@ export function SettingsNav() {
       ]
     }
   ];
+
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setLogoutError(null);
+    setIsLoggingOut(true);
+
+    try {
+      await api.auth.logout();
+      clearReviewTasks();
+      clearNotifications();
+      router.replace("/login");
+      router.refresh();
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error
+          ? error.message
+          : "로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      );
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className="flex flex-col space-y-8">
@@ -49,9 +89,25 @@ export function SettingsNav() {
       ))}
 
       <div className="pt-4 px-1">
-        <button className="flex items-center gap-3 w-full p-4 rounded-2xl text-red-500 font-semibold hover:bg-red-50 transition-colors">
-          <LogOut className="w-5 h-5" />
-          <span className="text-[15px]">로그아웃</span>
+        {logoutError ? (
+          <p className="mb-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {logoutError}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="flex items-center gap-3 w-full p-4 rounded-2xl text-red-500 font-semibold hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:text-red-300 disabled:hover:bg-transparent"
+        >
+          {isLoggingOut ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <LogOut className="w-5 h-5" />
+          )}
+          <span className="text-[15px]">
+            {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
+          </span>
         </button>
       </div>
     </div>

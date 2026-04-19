@@ -387,6 +387,11 @@ export function removeReviewTask(draftId: string): void {
   );
 }
 
+export function clearReviewTasks(): void {
+  inFlightRequests.clear();
+  writeTaskRecords([]);
+}
+
 export function subscribeReviewTasks(callback: () => void): () => void {
   if (typeof window === "undefined") {
     return () => undefined;

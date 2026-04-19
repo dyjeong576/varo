@@ -11,6 +11,7 @@ const categories: { label: string; value: CommunityCategory }[] = [
   { label: "현안 토론", value: "Issue" },
   { label: "정책 제언", value: "Policy" },
   { label: "팩트체크 제보", value: "FactCheck" },
+  { label: "자유 게시판", value: "General" },
 ];
 
 export function CategorySelector({ selectedCategory, onSelect }: CategorySelectorProps) {

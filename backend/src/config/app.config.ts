@@ -192,6 +192,6 @@ export function getAppConfig(): AppConfig {
     openAiApiKey: getOptional("OPENAI_API_KEY") ?? null,
     tavilyApiKey: getOptional("TAVILY_API_KEY") ?? null,
     tavilySearchTimeoutMs: readPositiveInteger("TAVILY_SEARCH_TIMEOUT_MS", 40000),
-    tavilyExtractTimeoutMs: readPositiveInteger("TAVILY_EXTRACT_TIMEOUT_MS", 80000),
+    tavilyExtractTimeoutMs: readPositiveInteger("TAVILY_EXTRACT_TIMEOUT_MS", 180000),
   };
 }

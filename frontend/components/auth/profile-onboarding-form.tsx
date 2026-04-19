@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api/client";
+import {
+  KOREA_COUNTRY_NAME,
+  KOREA_MAJOR_CITIES,
+} from "@/lib/profile/location-options";
 
 const GENDER_OPTIONS = ["남성", "여성", "기타", "응답 안 함"] as const;
 const AGE_OPTIONS = ["10대", "20대", "30대", "40대", "50대", "60대 이상"] as const;
@@ -14,7 +18,7 @@ export function ProfileOnboardingForm() {
     realName: "",
     gender: GENDER_OPTIONS[0],
     ageRange: AGE_OPTIONS[2],
-    country: "대한민국",
+    country: KOREA_COUNTRY_NAME,
     city: "",
   });
   const [error, setError] = useState<string | null>(null);
@@ -90,8 +94,9 @@ export function ProfileOnboardingForm() {
           활동 국가
           <input
             value={formData.country}
-            onChange={(event) => handleChange("country", event.target.value)}
-            className="h-12 rounded-2xl border border-gray-200 px-4 text-[15px] font-medium text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            disabled
+            readOnly
+            className="h-12 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-[15px] font-medium text-gray-500"
             required
           />
         </label>
@@ -99,13 +104,21 @@ export function ProfileOnboardingForm() {
 
       <label className="flex flex-col gap-2 text-sm font-semibold text-gray-700">
         활동 도시
-        <input
+        <select
           value={formData.city}
           onChange={(event) => handleChange("city", event.target.value)}
           className="h-12 rounded-2xl border border-gray-200 px-4 text-[15px] font-medium text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-          placeholder="예: 서울특별시"
           required
-        />
+        >
+          <option value="" disabled>
+            활동 도시를 선택하세요
+          </option>
+          {KOREA_MAJOR_CITIES.map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
+          ))}
+        </select>
       </label>
 
       {error ? (
@@ -116,7 +129,7 @@ export function ProfileOnboardingForm() {
 
       <button
         type="submit"
-        disabled={isSaving}
+        disabled={isSaving || !formData.city}
         className="mt-2 flex h-14 items-center justify-center rounded-2xl bg-[#0050cb] text-base font-bold text-white shadow-lg shadow-[#0050cb]/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
       >
         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : "프로필 저장하고 시작하기"}

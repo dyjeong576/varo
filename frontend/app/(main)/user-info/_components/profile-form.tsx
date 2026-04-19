@@ -2,15 +2,27 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Loader2, Camera, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
 import { api } from "@/lib/api/client";
 import type { UserMeResponse } from "@/lib/api/types";
+import {
+  KOREA_COUNTRY_NAME,
+  KOREA_MAJOR_CITIES,
+  normalizeKoreaCity,
+} from "@/lib/profile/location-options";
 
 export function ProfileForm() {
   const [profile, setProfile] = useState<UserMeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState({ country: "", city: "" });
+  const [formData, setFormData] = useState({
+    country: KOREA_COUNTRY_NAME,
+    city: "",
+  });
+  const [initialLocation, setInitialLocation] = useState({
+    country: KOREA_COUNTRY_NAME,
+    city: "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -26,9 +38,18 @@ export function ProfileForm() {
         }
 
         setProfile(response);
-        setFormData({
-          country: response.profile.country ?? "",
-          city: response.profile.city ?? "",
+        const nextLocation = {
+          country: KOREA_COUNTRY_NAME,
+          city: normalizeKoreaCity(response.profile.city),
+        };
+
+        setFormData(nextLocation);
+        setInitialLocation({
+          country:
+            response.profile.country === KOREA_COUNTRY_NAME
+              ? KOREA_COUNTRY_NAME
+              : "",
+          city: normalizeKoreaCity(response.profile.city),
         });
       } catch (loadError) {
         if (isMounted) {
@@ -56,10 +77,14 @@ export function ProfileForm() {
 
     try {
       const response = await api.users.updateMyProfile({
-        country: formData.country,
+        country: KOREA_COUNTRY_NAME,
         city: formData.city,
       });
       setProfile(response);
+      setInitialLocation({
+        country: KOREA_COUNTRY_NAME,
+        city: normalizeKoreaCity(response.profile.city),
+      });
       setSuccessMessage("성공적으로 저장되었습니다.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "프로필 저장에 실패했습니다.");
@@ -82,7 +107,7 @@ export function ProfileForm() {
   return (
     <form onSubmit={handleSave} className="flex flex-col">
       <div className="flex flex-col items-center mb-10">
-        <div className="relative mb-4 group cursor-pointer">
+        <div className="mb-4">
           <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-50 shadow-sm">
             <Image
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`}
@@ -92,9 +117,6 @@ export function ProfileForm() {
               unoptimized
               className="object-cover bg-blue-50"
             />
-          </div>
-          <div className="absolute right-0 bottom-0 rounded-full border border-gray-100 bg-white p-2 text-gray-500 shadow-md transition-colors group-hover:text-primary">
-            <Camera className="w-4 h-4" />
           </div>
         </div>
         <h2 className="text-lg font-bold text-gray-900">{displayName}</h2>
@@ -140,25 +162,30 @@ export function ProfileForm() {
           
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-gray-500">국가</label>
-            <select
+            <input
               value={formData.country}
-              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-              className="h-12 w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 text-[14px] font-medium text-gray-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="대한민국">대한민국</option>
-              <option value="일본">일본</option>
-              <option value="미국">미국</option>
-            </select>
+              disabled
+              readOnly
+              className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-[14px] font-medium text-gray-500"
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-gray-500">도시</label>
-            <input
-              type="text"
+            <select
               value={formData.city}
               onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              className="h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-[14px] font-medium text-gray-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
+              className="h-12 w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 text-[14px] font-medium text-gray-900 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="" disabled>
+                활동 도시를 선택하세요
+              </option>
+              {KOREA_MAJOR_CITIES.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -179,8 +206,9 @@ export function ProfileForm() {
         type="submit"
         disabled={
           isSaving ||
-          (formData.country === (profile.profile.country ?? "") &&
-            formData.city === (profile.profile.city ?? ""))
+          !formData.city ||
+          (formData.country === initialLocation.country &&
+            formData.city === initialLocation.city)
         }
         className="w-full mt-auto mb-4 h-14 rounded-2xl bg-gray-900 text-white font-bold text-[15px] flex items-center justify-center disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
       >

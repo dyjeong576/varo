@@ -115,6 +115,6 @@ export class ReviewsProvidersService {
   }
 
   private getTavilyExtractTimeoutMs(): number {
-    return this.configService.get<number>("tavilyExtractTimeoutMs", 80000);
+    return this.configService.get<number>("tavilyExtractTimeoutMs", 180000);
   }
 }

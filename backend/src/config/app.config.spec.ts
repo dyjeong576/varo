@@ -62,7 +62,7 @@ describe("app.config", () => {
     expect(config.openAiApiKey).toBeNull();
     expect(config.tavilyApiKey).toBeNull();
     expect(config.tavilySearchTimeoutMs).toBe(40000);
-    expect(config.tavilyExtractTimeoutMs).toBe(80000);
+    expect(config.tavilyExtractTimeoutMs).toBe(180000);
   });
 
   it("prod에서 www/api 표준 호스트를 쓰면 세션 쿠키 domain을 자동 추론한다", () => {

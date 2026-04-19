@@ -31,18 +31,18 @@ export default function EvidenceSnippetList({
               href={snippet.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-[24px] border border-[#e6ebf3] bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c7dbff] hover:shadow-[0_18px_36px_rgba(0,80,203,0.08)]"
+              className="block min-w-0 rounded-[24px] border border-[#e6ebf3] bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c7dbff] hover:shadow-[0_18px_36px_rgba(0,80,203,0.08)]"
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-start gap-4">
-                  <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eef5ff] text-[#0050cb]">
+                <div className="min-w-0 flex items-start gap-4">
+                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef5ff] text-[#0050cb]">
                     <span className="material-symbols-outlined">article</span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0050cb]">
                       {snippet.sourceTypeLabel}
                     </p>
-                    <h4 className="mt-1 text-sm font-bold text-[#191b24]">
+                    <h4 className="mt-1 line-clamp-2 overflow-hidden break-words text-sm font-bold text-[#191b24]">
                       {snippet.sourcePublisherName}
                     </h4>
                     <p className="mt-1 text-xs text-[#8a94a6]">
@@ -55,10 +55,12 @@ export default function EvidenceSnippetList({
                 </span>
               </div>
 
-              <p className="mt-4 text-sm italic leading-6 text-[#48505d]">
+              <p className="mt-4 line-clamp-3 overflow-hidden break-words text-sm italic leading-6 text-[#48505d]">
                 &quot;{snippet.snippetText}&quot;
               </p>
-              <p className="mt-3 text-xs text-[#8a94a6]">{snippet.sourceTitle}</p>
+              <p className="mt-3 line-clamp-2 overflow-hidden break-words text-xs text-[#8a94a6]">
+                {snippet.sourceTitle}
+              </p>
             </a>
           ))}
         </div>

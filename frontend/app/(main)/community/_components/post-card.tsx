@@ -7,9 +7,11 @@ import { formatCommunityDateTime } from "@/lib/community/format";
 
 interface PostCardProps {
   post: CommunityPost;
+  onAddLike: (postId: string) => Promise<void>;
+  isLikeSubmitting: boolean;
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ post, onAddLike, isLikeSubmitting }: PostCardProps) {
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'Issue': return 'text-[#0050cb] bg-[#0050cb]/5';
@@ -20,24 +22,19 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <Link
-      href={`/community/${post.id}`}
-      className="group flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg lg:p-6"
-    >
-      <div className="mb-3 flex items-start gap-3">
-        <h2 className="flex-1 text-xl font-bold leading-snug tracking-tight text-[#191b24] line-clamp-2">
-          {post.title}
-        </h2>
-        <span
-          className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${getCategoryColor(post.category)}`}
-        >
-          {post.category}
-        </span>
-      </div>
-      
-      <p className="mb-6 flex-1 text-[15px] leading-relaxed text-[#424656] line-clamp-3">
-        {post.content}
-      </p>
+    <article className="group flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg lg:p-6">
+      <Link href={`/community/${post.id}`} className="block">
+        <div className="mb-4 flex items-start gap-3">
+          <h2 className="flex-1 text-xl font-bold leading-snug tracking-tight text-[#191b24] line-clamp-2">
+            {post.title}
+          </h2>
+          <span
+            className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${getCategoryColor(post.category)}`}
+          >
+            {post.category}
+          </span>
+        </div>
+      </Link>
 
       <div className="mt-auto flex flex-col gap-3 border-t border-[#f2f3ff] pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
@@ -54,16 +51,32 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </div>
         <div className="flex flex-wrap gap-4 text-sm font-medium text-[#424656]">
-          <div className="flex items-center gap-1 group">
+          <Link
+            href={`/community/${post.id}`}
+            className="flex items-center gap-1"
+          >
             <MessageSquare className="w-[18px] h-[18px]" />
             <span>댓글 {post.commentCount}</span>
-          </div>
-          <div className="flex items-center gap-1">
+          </Link>
+          <button
+            type="button"
+            disabled={isLikeSubmitting || post.likedByMe}
+            onClick={() => {
+              if (post.likedByMe || isLikeSubmitting) {
+                return;
+              }
+
+              void onAddLike(post.id);
+            }}
+            className={`flex items-center gap-1 transition-colors disabled:cursor-not-allowed ${
+              post.likedByMe ? "text-[#0050cb]" : "hover:text-[#0050cb]"
+            } ${isLikeSubmitting ? "opacity-60" : ""}`}
+          >
             <ThumbsUp className="w-[18px] h-[18px]" />
             <span>공감 {post.likeCount}</span>
-          </div>
+          </button>
         </div>
       </div>
-    </Link>
+    </article>
   );
 }

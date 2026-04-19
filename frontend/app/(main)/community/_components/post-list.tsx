@@ -9,6 +9,7 @@ export function PostList() {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [submittingLikePostId, setSubmittingLikePostId] = useState<string | null>(null);
   const listLayoutClass =
     posts.length > 1 ? "grid grid-cols-1 gap-4 2xl:grid-cols-2 2xl:gap-5" : "space-y-4";
 
@@ -27,6 +28,32 @@ export function PostList() {
     }
     loadPosts();
   }, []);
+
+  async function handleAddLike(postId: string) {
+    setSubmittingLikePostId(postId);
+
+    try {
+      const nextLikeState = await api.community.addLike(postId);
+
+      setPosts((currentPosts) =>
+        currentPosts.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                likedByMe: nextLikeState.likedByMe,
+                likeCount: nextLikeState.likeCount,
+              }
+            : post,
+        ),
+      );
+      setErrorMessage(null);
+    } catch (error) {
+      console.error("Failed to add like:", error);
+      setErrorMessage("공감을 추가하지 못했습니다.");
+    } finally {
+      setSubmittingLikePostId(null);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -81,7 +108,12 @@ export function PostList() {
   return (
     <div className={listLayoutClass}>
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+        <PostCard
+          key={post.id}
+          post={post}
+          onAddLike={handleAddLike}
+          isLikeSubmitting={submittingLikePostId === post.id}
+        />
       ))}
     </div>
   );
