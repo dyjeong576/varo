@@ -5,6 +5,10 @@ import { AppException } from "../../common/exceptions/app-exception";
 import { ReviewsQueryPreviewPersistenceService } from "./reviews-query-preview.persistence.service";
 
 describe("ReviewsQueryPreviewPersistenceService", () => {
+  const createNotificationsServiceMock = () => ({
+    createReviewCompletedNotification: jest.fn().mockResolvedValue(undefined),
+  });
+
   const createPrismaMock = () => ({
     claim: {
       create: jest.fn().mockResolvedValue({
@@ -70,7 +74,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("clientRequestId를 포함해 claim과 review job을 생성한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     const result = await service.createClaimAndReviewJob({
       userId: "user-1",
@@ -99,7 +107,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("clientRequestId로 기존 review preview를 조회한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     await service.findQueryProcessingPreviewByClientRequestId(
       "user-1",
@@ -125,7 +137,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("searching review를 재실행하기 전에 artifact와 집계 상태를 초기화한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     await service.resetQueryProcessingPreview("review-1");
 
@@ -158,7 +174,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("source와 evidence를 저장하고 review job handoff 상태를 업데이트한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     const result = await service.persistQueryPreviewResult({
       userId: "user-1",
@@ -242,11 +262,17 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         entryType: "submitted",
       },
     });
+    expect(notificationsService.createReviewCompletedNotification).toHaveBeenCalledWith({
+      userId: "user-1",
+      reviewId: "review-1",
+      claim: "트럼프의 관세 발표",
+    });
     expect(result.handoffSourceIds).toEqual(["trump-tariff-update"]);
   });
 
   it("사용자 국가나 주제 국가와 무관하게 KR domain registry만 조회한다", async () => {
     const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
     prisma.sourceDomainRegistry.findMany.mockResolvedValue([
       {
         id: "kr-familiar",
@@ -259,7 +285,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         isActive: true,
       },
     ]);
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     const result = await service.loadSearchDomainRegistry();
 
@@ -296,7 +325,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("app exception을 review job failed 상태로 기록한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
     const error = new AppException(
       APP_ERROR_CODES.LLM_SCHEMA_ERROR,
       "질의 정제 실패",
@@ -317,7 +350,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("한국 관련성이 없는 review를 out_of_scope 상태로 기록한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     const result = await service.persistOutOfScopeReview({
       userId: "user-1",
@@ -354,11 +391,17 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         entryType: "submitted",
       },
     });
+    expect(notificationsService.createReviewCompletedNotification).toHaveBeenCalledWith({
+      userId: "user-1",
+      reviewId: "review-1",
+      claim: "트럼프의 관세 발표",
+    });
     expect(result.insufficiencyReason).toContain("MVP 검토 범위 밖");
   });
 
   it("사용자 기준 최근 review preview 목록을 조회한다", async () => {
     const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
     prisma.reviewJob.findMany.mockResolvedValue([
       {
         id: "review-1",
@@ -373,7 +416,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         sources: [{ fetchStatus: "fetched" }, { fetchStatus: "pending" }],
       },
     ]);
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     const result = await service.listRecentQueryProcessingPreviews("user-1");
 
@@ -396,6 +442,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("로그인 사용자가 접근 가능한 review preview 상세를 조회한다", async () => {
     const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
     prisma.reviewJob.findFirst.mockResolvedValue({
       id: "review-404",
       clientRequestId: "pending:review-404",
@@ -411,7 +458,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       sources: [],
       evidenceSnippets: [],
     });
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     const result = await service.getQueryProcessingPreview("user-2", "review-404");
 
@@ -438,8 +488,12 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("다른 사용자의 reviewId는 404를 반환한다", async () => {
     const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
     prisma.reviewJob.findFirst.mockResolvedValue(null);
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     await expect(
       service.getQueryProcessingPreview("user-2", "review-404"),
@@ -451,7 +505,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("reopen history entry를 저장한다", async () => {
     const prisma = createPrismaMock();
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     await service.recordHistoryEntry({
       userId: "user-1",
@@ -470,11 +528,15 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
   it("handoff가 없는 review는 reopen 대상에서 제외한다", async () => {
     const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
     prisma.reviewJob.findUnique.mockResolvedValue({
       id: "review-404",
       handoffPayload: null,
     });
-    const service = new ReviewsQueryPreviewPersistenceService(prisma as never);
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
 
     await expect(service.ensureReopenableReview("review-404")).rejects.toMatchObject({
       status: HttpStatus.NOT_FOUND,

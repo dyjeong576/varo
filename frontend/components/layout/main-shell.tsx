@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { Bell, Home, TrendingUp, MessageSquare } from "lucide-react";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { HistoryDrawer } from "@/components/ui/history-drawer";
 import { APP_NAME } from "@/lib/config/app";
 import {
   getUnreadNotificationCount,
+  refreshNotifications,
   subscribeNotifications,
 } from "@/lib/notifications/store";
 
@@ -20,6 +21,10 @@ export function MainShell({ children }: { children: React.ReactNode }) {
     getUnreadNotificationCount,
     () => 0,
   );
+
+  useEffect(() => {
+    void refreshNotifications().catch(() => undefined);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-[100dvh]">

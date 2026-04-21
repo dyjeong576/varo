@@ -1,5 +1,8 @@
 import {
+  NotificationPreferencesResponse,
+  NotificationsListApiResponse,
   SessionResponse,
+  UpdateNotificationPreferencesPayload,
   UpdateProfilePayload,
   UserMeResponse,
 } from "./types";
@@ -26,6 +29,10 @@ import type {
 } from "@/lib/reviews/types";
 import type { PopularTopic } from "@/lib/types/popular";
 import type { TrendType } from "@/lib/types/popular";
+import type {
+  NotificationPreferences,
+  NotificationsListResponse,
+} from "@/lib/notifications/types";
 
 type PopularTopicApiResponse = Partial<PopularTopic> & {
   requestUserCount?: number;
@@ -139,6 +146,34 @@ function normalizePopularTopic(topic: PopularTopicApiResponse): PopularTopic {
   };
 }
 
+function normalizeNotificationPreferences(
+  preferences: NotificationPreferencesResponse,
+): NotificationPreferences {
+  return {
+    reviewCompleted: preferences.reviewCompleted,
+    communityComment: preferences.communityComment,
+    communityLike: preferences.communityLike,
+  };
+}
+
+function normalizeNotificationsList(
+  response: NotificationsListApiResponse,
+): NotificationsListResponse {
+  return {
+    unreadCount: response.unreadCount,
+    items: response.items.map((item) => ({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      message: item.message,
+      isRead: item.isRead,
+      createdAt: item.createdAt,
+      targetType: item.targetType,
+      targetId: item.targetId,
+    })),
+  };
+}
+
 export const api = {
   reviews: {
     getRecent: async (): Promise<ReviewPreviewSummary[]> => {
@@ -189,6 +224,41 @@ export const api = {
 
       return response.map(normalizePopularTopic);
     },
+  },
+  notifications: {
+    list: async (): Promise<NotificationsListResponse> =>
+      normalizeNotificationsList(
+        await apiRequest<NotificationsListApiResponse>("/api/v1/notifications"),
+      ),
+    markRead: async (notificationId: string): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>(
+        `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+        {
+          method: "POST",
+        },
+      ),
+    markAllRead: async (): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>("/api/v1/notifications/read-all", {
+        method: "POST",
+      }),
+    getPreferences: async (): Promise<NotificationPreferences> =>
+      normalizeNotificationPreferences(
+        await apiRequest<NotificationPreferencesResponse>(
+          "/api/v1/notifications/preferences",
+        ),
+      ),
+    updatePreferences: async (
+      payload: UpdateNotificationPreferencesPayload,
+    ): Promise<NotificationPreferences> =>
+      normalizeNotificationPreferences(
+        await apiRequest<NotificationPreferencesResponse>(
+          "/api/v1/notifications/preferences",
+          {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          },
+        ),
+      ),
   },
   community: {
     getPosts: async (): Promise<CommunityPost[]> =>

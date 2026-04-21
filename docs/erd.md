@@ -227,12 +227,9 @@ erDiagram
   - preview 상태 / stage
   - 오류 메시지
   - 로컬 완료 알림 생성 여부
-- `varo.notifications`
-  - review preview 완료 중심 알림
-  - 읽음 상태
-  - review detail deep link
+- 알림 목록과 읽음 상태는 서버 `notifications`, `notification_reads`를 기준으로 관리한다.
 
-이 보조 저장은 서버 ERD를 대체하지 않고, 현재 프론트 UX를 위한 임시 클라이언트 상태 계층이다.
+클라이언트 보조 저장은 `varo.review-tasks`에 한정되고, 알림 자체는 서버 ERD가 source of truth다.
 
 ## 6. 설계 포인트
 - `users`를 중심으로 review, history, notifications, community가 연결된다.

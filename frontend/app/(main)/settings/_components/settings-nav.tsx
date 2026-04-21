@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { clearNotificationPreferences } from "@/lib/notifications/preferences";
 import { clearNotifications } from "@/lib/notifications/store";
 import { clearReviewTasks } from "@/lib/reviews/task-store";
 
@@ -25,14 +26,13 @@ export function SettingsNav() {
       title: "계정",
       items: [
         { icon: <User className="w-5 h-5" />, label: "내 정보 관리", href: "/user-info" },
-        { icon: <Lock className="w-5 h-5" />, label: "개인정보 보호", href: "#" },
       ]
     },
     {
       title: "앱 설정",
       items: [
-        { icon: <BellRing className="w-5 h-5" />, label: "알림 설정", href: "#" },
-        { icon: <HelpCircle className="w-5 h-5" />, label: "고객 센터", href: "#" },
+        { icon: <BellRing className="w-5 h-5" />, label: "알림 설정", href: "/settings/notifications" },
+        { icon: <HelpCircle className="w-5 h-5" />, label: "고객 센터", href: "/settings/support" },
       ]
     }
   ];
@@ -49,6 +49,7 @@ export function SettingsNav() {
       await api.auth.logout();
       clearReviewTasks();
       clearNotifications();
+      clearNotificationPreferences();
       router.replace("/login");
       router.refresh();
     } catch (error) {

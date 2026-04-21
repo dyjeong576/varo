@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
+import type { CommunityCategory } from "@/lib/types/community";
 import { PostEditorForm } from "../_components/post-editor-form";
 
 export default function WritePostPage() {
@@ -12,7 +13,7 @@ export default function WritePostPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handlePublish = async (payload: {
-    category: "Issue" | "Policy" | "FactCheck";
+    category: CommunityCategory;
     title: string;
     content: string;
   }) => {

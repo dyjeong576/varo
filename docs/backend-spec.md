@@ -240,8 +240,11 @@
 
 #### Notifications
 
-- 장기적으로는 알림 목록 조회 / 읽음 처리 / unread count 조회를 서버가 제공한다.
-- 현재 프론트 문맥에서는 이 영역이 아직 실제 소비 API로 연결되어 있지 않다.
+- `GET /api/v1/notifications`: 현재 사용자의 최근 알림 목록과 unread count를 반환한다.
+- `POST /api/v1/notifications/:notificationId/read`: 특정 알림을 읽음 처리한다.
+- `POST /api/v1/notifications/read-all`: 현재 사용자의 알림을 모두 읽음 처리한다.
+- `GET /api/v1/notifications/preferences`: 현재 사용자의 알림 수신 설정을 조회한다.
+- `PATCH /api/v1/notifications/preferences`: review 완료, 댓글, 좋아요 알림 설정을 수정한다.
 
 #### History
 

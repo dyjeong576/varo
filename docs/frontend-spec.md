@@ -3,7 +3,7 @@
 ## 1. 문서 목적
 
 이 문서는 현재 VARO 프론트엔드 구현을 기준으로 기술 구조와 사용자 경험 범위를 정리한다.  
-핵심 대상은 모바일 웹 우선의 반응형 Next.js 애플리케이션이며, 인증, review preview, 인기, 커뮤니티, 히스토리, 로컬 알림 흐름을 하나의 앱 셸 안에서 연결하는 방식을 설명한다.
+핵심 대상은 모바일 웹 우선의 반응형 Next.js 애플리케이션이며, 인증, review preview, 인기, 커뮤니티, 히스토리, 서버 알림 흐름을 하나의 앱 셸 안에서 연결하는 방식을 설명한다.
 
 ## 2. 프론트엔드 기술 스택
 
@@ -127,16 +127,18 @@
 - 사용자 정보 조회
 - 일부 프로필 수정
 - 읽기 전용과 수정 가능 항목 구분
-- Settings에는 placeholder 메뉴가 함께 노출되지만 현재 `내 정보 관리`만 실제 동작
+- Settings는 `내 정보 관리`, `개인정보 보호`, `알림 설정`, `고객 센터` 진입을 제공
+- 개인정보 보호와 고객 센터는 정보형 서브페이지로 제공
+- 알림 설정은 서버 저장 기반 토글 UI를 제공
+- review 완료, community 댓글, community 좋아요 알림이 모두 실제 서버 생성 흐름에 연결된다
 
 ### 5.10 Notifications
 
 - review preview 완료 알림
-- community / system 타입 UI
+- community 댓글 / 좋아요 알림
 - 읽음 / 미확인 상태
 - review 알림 클릭은 meaningful reopen source로 기록
-
-현재 알림 목록은 서버 API가 아니라 `varo.notifications` localStorage를 기준으로 렌더링된다.
+- 커뮤니티 알림 클릭은 관련 게시글 상세로 이동한다
 
 ## 6. 클라이언트 상태 모델
 
@@ -173,7 +175,9 @@
 
 저장 위치:
 
-- `varo.notifications`: review completion 중심 로컬 알림
+- 서버 `notifications`: 알림 목록과 대상 정보
+- 서버 `notification_reads`: 읽음 상태
+- 서버 `user_notification_preferences`: 알림 수신 토글 설정
 
 ### 6.4 community 상태
 
@@ -253,7 +257,7 @@
 - `POST /api/v1/community/posts/{postId}/comments/{commentId}/likes`
 - `DELETE /api/v1/community/posts/{postId}/comments/{commentId}/likes`
 
-프론트는 도메인별 API client 계층을 통해 서버와 통신하고, 화면 컴포넌트가 HTTP 세부사항을 직접 다루지 않도록 유지한다. 단, notifications는 현재 서버 API를 소비하지 않고 로컬 저장소를 사용한다.
+프론트는 도메인별 API client 계층을 통해 서버와 통신하고, 화면 컴포넌트가 HTTP 세부사항을 직접 다루지 않도록 유지한다. notifications도 동일하게 서버 API를 소비한다.
 
 ## 9. review 화면 정보 구조
 

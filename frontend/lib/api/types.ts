@@ -29,12 +29,40 @@ export interface UserMeResponse {
   profileComplete: boolean;
 }
 
+export interface NotificationPreferencesResponse {
+  reviewCompleted: boolean;
+  communityComment: boolean;
+  communityLike: boolean;
+}
+
+export interface NotificationItemResponse {
+  id: string;
+  type: "review_completed" | "community_comment" | "community_like";
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  targetType: "review" | "community_post";
+  targetId: string;
+}
+
+export interface NotificationsListApiResponse {
+  items: NotificationItemResponse[];
+  unreadCount: number;
+}
+
 export interface UpdateProfilePayload {
   realName?: string;
   gender?: string;
   ageRange?: string;
   country?: string;
   city?: string;
+}
+
+export interface UpdateNotificationPreferencesPayload {
+  reviewCompleted?: boolean;
+  communityComment?: boolean;
+  communityLike?: boolean;
 }
 
 export interface Review {

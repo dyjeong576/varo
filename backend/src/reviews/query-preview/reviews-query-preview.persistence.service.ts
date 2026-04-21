@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
+import { NotificationsService } from "../../notifications/notifications.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   DomainRegistryEntry,
@@ -75,7 +76,10 @@ type ReviewPreviewSummaryRecord = Prisma.ReviewJobGetPayload<{
 
 @Injectable()
 export class ReviewsQueryPreviewPersistenceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findQueryProcessingPreviewByClientRequestId(
     userId: string,
@@ -310,6 +314,11 @@ export class ReviewsQueryPreviewPersistenceService {
       reviewJobId: input.reviewJob.id,
       entryType: "submitted",
     });
+    await this.notificationsService.createReviewCompletedNotification({
+      userId: input.userId,
+      reviewId: input.reviewJob.id,
+      claim: input.refinement.coreClaim,
+    });
 
     return {
       createdSources,
@@ -357,6 +366,11 @@ export class ReviewsQueryPreviewPersistenceService {
       userId: params.userId,
       reviewJobId: params.reviewJob.id,
       entryType: "submitted",
+    });
+    await this.notificationsService.createReviewCompletedNotification({
+      userId: params.userId,
+      reviewId: params.reviewJob.id,
+      claim: params.refinement.coreClaim,
     });
 
     return { insufficiencyReason };

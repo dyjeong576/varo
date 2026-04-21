@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CommunityCommentLikeResponseDto } from "./dto/community-comment-like-response.dto";
 import { CommunityPostDetailResponseDto } from "./dto/community-post-detail-response.dto";
@@ -55,7 +56,10 @@ type CommunityPostDetailRecord = CommunityPostBaseRecord & {
 
 @Injectable()
 export class CommunityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private get db(): any {
     return this.prisma as any;
@@ -148,9 +152,16 @@ export class CommunityService {
     payload: CreateCommunityCommentDto,
   ): Promise<CommunityPostDetailResponseDto> {
     this.ensureCommunityProfile(profile);
-    await this.ensurePostExists(postId);
+    const post = await this.findPostTargetOrThrow(postId);
+    let parentCommentAuthorUserId: string | null = null;
+
     if (payload.parentCommentId) {
-      await this.ensureCommentExists(postId, payload.parentCommentId);
+      const parentComment = await this.findCommentTargetOrThrow(
+        postId,
+        payload.parentCommentId,
+      );
+
+      parentCommentAuthorUserId = parentComment.userId;
     }
 
     await this.db.communityComment.create({
@@ -160,6 +171,13 @@ export class CommunityService {
         content: payload.content.trim(),
         parentCommentId: payload.parentCommentId ?? null,
       },
+    });
+    await this.notificationsService.createCommunityCommentNotifications({
+      actorUserId: userId,
+      postId,
+      postTitle: post.title,
+      postAuthorUserId: post.userId,
+      parentCommentAuthorUserId,
     });
 
     return this.getPostDetail(userId, postId);
@@ -184,21 +202,31 @@ export class CommunityService {
     postId: string,
     commentId: string,
   ): Promise<CommunityCommentLikeResponseDto> {
-    await this.ensureCommentExists(postId, commentId);
-
-    await this.db.communityCommentLike.upsert({
+    const comment = await this.findCommentTargetOrThrow(postId, commentId);
+    const existingLike = await this.db.communityCommentLike.findUnique({
       where: {
         commentId_userId: {
           commentId,
           userId,
         },
       },
-      update: {},
-      create: {
-        commentId,
-        userId,
-      },
     });
+
+    if (!existingLike) {
+      await this.db.communityCommentLike.create({
+        data: {
+          commentId,
+          userId,
+        },
+      });
+      await this.notificationsService.createCommunityLikeNotification({
+        actorUserId: userId,
+        postId,
+        postTitle: comment.post.title,
+        targetUserId: comment.userId,
+        targetKind: "comment",
+      });
+    }
 
     return this.getCommentLikeState(userId, commentId);
   }
@@ -221,21 +249,31 @@ export class CommunityService {
   }
 
   async addLike(userId: string, postId: string): Promise<CommunityPostLikeResponseDto> {
-    await this.ensurePostExists(postId);
-
-    await this.db.communityPostLike.upsert({
+    const post = await this.findPostTargetOrThrow(postId);
+    const existingLike = await this.db.communityPostLike.findUnique({
       where: {
         postId_userId: {
           postId,
           userId,
         },
       },
-      update: {},
-      create: {
-        postId,
-        userId,
-      },
     });
+
+    if (!existingLike) {
+      await this.db.communityPostLike.create({
+        data: {
+          postId,
+          userId,
+        },
+      });
+      await this.notificationsService.createCommunityLikeNotification({
+        actorUserId: userId,
+        postId,
+        postTitle: post.title,
+        targetUserId: post.userId,
+        targetKind: "post",
+      });
+    }
 
     return this.getLikeState(userId, postId);
   }
@@ -319,9 +357,29 @@ export class CommunityService {
   }
 
   private async ensurePostExists(postId: string): Promise<void> {
+    const post = await this.findPostTargetOrThrow(postId);
+
+    void post;
+  }
+
+  private async ensureCommentExists(postId: string, commentId: string): Promise<void> {
+    const comment = await this.findCommentTargetOrThrow(postId, commentId);
+
+    void comment;
+  }
+
+  private async findPostTargetOrThrow(postId: string): Promise<{
+    id: string;
+    userId: string;
+    title: string;
+  }> {
     const post = await this.db.communityPost.findUnique({
       where: { id: postId },
-      select: { id: true },
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+      },
     });
 
     if (!post) {
@@ -331,14 +389,32 @@ export class CommunityService {
         HttpStatus.NOT_FOUND,
       );
     }
+
+    return post;
   }
 
-  private async ensureCommentExists(postId: string, commentId: string): Promise<void> {
+  private async findCommentTargetOrThrow(
+    postId: string,
+    commentId: string,
+  ): Promise<{
+    id: string;
+    postId: string;
+    userId: string;
+    post: {
+      title: string;
+    };
+  }> {
     const comment = await this.db.communityComment.findUnique({
       where: { id: commentId },
       select: {
         id: true,
         postId: true,
+        userId: true,
+        post: {
+          select: {
+            title: true,
+          },
+        },
       },
     });
 
@@ -349,6 +425,8 @@ export class CommunityService {
         HttpStatus.NOT_FOUND,
       );
     }
+
+    return comment;
   }
 
   private async ensureCommentAuthor(

@@ -165,3 +165,22 @@
 - frontend의 local `draftId`는 review 생성 요청의 `clientRequestId`로 유지하고, 같은 값이 서버 응답에 있으면 하나의 history item으로 병합한다.
 - `/loading`의 성공 여부는 HTTP 요청 성공이 아니라 review payload의 `status/currentStage`를 기준으로 판정한다.
 - 서버가 `failed` 상태의 review detail을 반환하면 frontend는 성공 CTA와 completion notification을 만들지 않고 실패 상태를 유지한다.
+
+## 2026-04-19
+
+### Settings Beta Follow-Up
+- `/settings/privacy`, `/settings/notifications`, `/settings/support`를 MVP 정보형 화면으로 추가한다.
+- 개인정보 보호 페이지는 정식 법무 문서가 아니라 현재 구현 기준의 MVP 처리방침 요약으로 제공한다.
+- 알림 설정은 frontend localStorage 기반으로 관리하고 기본값은 `review 완료`, `커뮤니티 댓글`, `커뮤니티 좋아요` 모두 `on`으로 둔다.
+- 이번 단계에서 실제로 생성 제어되는 알림은 `review 완료`만 포함한다.
+- `커뮤니티 댓글/좋아요 알림`은 설정 UI와 저장 구조만 선반영하고 실제 알림 생성/전달은 후속 작업으로 분리한다.
+- 고객 센터 페이지는 FAQ와 임시 문의 안내만 제공하고 실제 문의 접수 채널은 연결하지 않는다.
+
+### Server-Backed Notifications
+- 알림의 source of truth는 browser localStorage가 아니라 server DB/API로 전환한다.
+- 알림 설정은 `user_notification_preferences` 테이블로 저장하고 기본값은 `review 완료`, `커뮤니티 댓글`, `커뮤니티 좋아요` 모두 `on`으로 둔다.
+- 알림 목록 읽음 상태는 `notifications` + `notification_reads` 모델로 관리한다.
+- review 완료 알림은 review preview의 terminal non-failed 완료 시 서버에서 생성한다.
+- 댓글 알림은 게시글 작성자와 부모 댓글 작성자에게 보내고 자기 자신 알림은 생성하지 않는다.
+- 좋아요 알림은 게시글 좋아요와 댓글 좋아요를 모두 포함하며 최초 like 생성 시에만 보낸다.
+- 커뮤니티 알림 target은 MVP에서 post detail 페이지로 통일하고 comment anchor deep link는 후속 범위로 남긴다.

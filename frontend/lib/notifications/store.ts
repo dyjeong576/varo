@@ -1,13 +1,24 @@
-import { AppNotification } from "@/lib/notifications/types";
+import { api } from "@/lib/api/client";
+import type { NotificationsListResponse } from "@/lib/notifications/types";
 import { buildReviewEntryHref } from "@/lib/reviews/navigation";
-import { ReviewPreviewDetail } from "@/lib/reviews/types";
 
-const STORAGE_KEY = "varo.notifications";
 const CHANGE_EVENT = "varo-notifications-changed";
 
-function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
-}
+type NotificationsSnapshot = NotificationsListResponse & {
+  isLoaded: boolean;
+  isLoading: boolean;
+  errorMessage: string | null;
+};
+
+const DEFAULT_SNAPSHOT: NotificationsSnapshot = {
+  items: [],
+  unreadCount: 0,
+  isLoaded: false,
+  isLoading: false,
+  errorMessage: null,
+};
+
+let notificationsSnapshot: NotificationsSnapshot = DEFAULT_SNAPSHOT;
 
 function emitChange(): void {
   if (typeof window === "undefined") {
@@ -17,112 +28,107 @@ function emitChange(): void {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-function readNotifications(): AppNotification[] {
-  if (!canUseStorage()) {
-    return [];
-  }
-
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(
-      (item): item is AppNotification =>
-        Boolean(
-          item &&
-            typeof item === "object" &&
-            typeof (item as AppNotification).id === "string" &&
-            typeof (item as AppNotification).type === "string" &&
-            typeof (item as AppNotification).title === "string" &&
-            typeof (item as AppNotification).message === "string" &&
-            typeof (item as AppNotification).isRead === "boolean" &&
-            typeof (item as AppNotification).createdAt === "string",
-        ),
-    );
-  } catch {
-    return [];
-  }
-}
-
-function writeNotifications(notifications: AppNotification[]): void {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+function setNotificationsSnapshot(nextSnapshot: NotificationsSnapshot): void {
+  notificationsSnapshot = nextSnapshot;
   emitChange();
 }
 
-export function getNotifications(): AppNotification[] {
-  return readNotifications().sort(
-    (left, right) =>
-      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-  );
+export function getNotificationsState(): NotificationsSnapshot {
+  return notificationsSnapshot;
+}
+
+export function getNotifications(): NotificationsSnapshot["items"] {
+  return notificationsSnapshot.items;
 }
 
 export function getUnreadNotificationCount(): number {
-  return getNotifications().filter((notification) => !notification.isRead).length;
+  return notificationsSnapshot.unreadCount;
 }
 
-export function createReviewCompletionNotification(
-  review: Pick<ReviewPreviewDetail, "reviewId" | "claim" | "currentStageLabel">,
-): void {
-  const notifications = readNotifications();
-
-  if (notifications.some((notification) => notification.reviewId === review.reviewId)) {
-    return;
+export function getNotificationHref(params: {
+  targetType: "review" | "community_post";
+  targetId: string;
+}): string {
+  if (params.targetType === "review") {
+    return buildReviewEntryHref(params.targetId, "notification");
   }
 
-  const nextNotification: AppNotification = {
-    id:
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `notification:${Date.now()}`,
-    reviewId: review.reviewId,
-    type: "analysis",
-    title: "근거 수집 완료",
-    message: `"${review.claim}" review preview가 준비되었습니다.`,
-    isRead: false,
-    createdAt: new Date().toISOString(),
-    link: buildReviewEntryHref(review.reviewId, "notification"),
-  };
-
-  writeNotifications([nextNotification, ...notifications].slice(0, 50));
+  return `/community/${encodeURIComponent(params.targetId)}`;
 }
 
-export function markNotificationRead(id: string): void {
-  writeNotifications(
-    readNotifications().map((notification) =>
-      notification.id === id
-        ? {
-            ...notification,
-            isRead: true,
-          }
-        : notification,
-    ),
+export async function refreshNotifications(): Promise<NotificationsListResponse> {
+  if (!notificationsSnapshot.isLoaded) {
+    setNotificationsSnapshot({
+      ...notificationsSnapshot,
+      isLoading: true,
+      errorMessage: null,
+    });
+  }
+
+  try {
+    const response = await api.notifications.list();
+
+    setNotificationsSnapshot({
+      ...response,
+      isLoaded: true,
+      isLoading: false,
+      errorMessage: null,
+    });
+
+    return response;
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "알림 목록을 불러오지 못했습니다.";
+
+    setNotificationsSnapshot({
+      ...notificationsSnapshot,
+      isLoaded: true,
+      isLoading: false,
+      errorMessage,
+    });
+
+    throw error;
+  }
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await api.notifications.markRead(id);
+
+  const nextItems = notificationsSnapshot.items.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          isRead: true,
+        }
+      : item,
   );
+  const nextUnreadCount = nextItems.filter((item) => !item.isRead).length;
+
+  setNotificationsSnapshot({
+    ...notificationsSnapshot,
+    items: nextItems,
+    unreadCount: nextUnreadCount,
+  });
 }
 
-export function markAllNotificationsRead(): void {
-  writeNotifications(
-    readNotifications().map((notification) => ({
-      ...notification,
+export async function markAllNotificationsRead(): Promise<void> {
+  await api.notifications.markAllRead();
+
+  setNotificationsSnapshot({
+    ...notificationsSnapshot,
+    items: notificationsSnapshot.items.map((item) => ({
+      ...item,
       isRead: true,
     })),
-  );
+    unreadCount: 0,
+  });
 }
 
 export function clearNotifications(): void {
-  writeNotifications([]);
+  notificationsSnapshot = DEFAULT_SNAPSHOT;
+  emitChange();
 }
 
 export function subscribeNotifications(callback: () => void): () => void {

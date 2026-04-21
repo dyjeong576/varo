@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
-import { createReviewCompletionNotification } from "@/lib/notifications/store";
+import { refreshNotifications } from "@/lib/notifications/store";
 import {
   getReviewStageLabel,
   getReviewStatusLabel,
@@ -282,22 +282,6 @@ function toFailedTask(
   };
 }
 
-function maybeCreateCompletionNotification(
-  record: ReviewTaskRecord,
-  review: ReviewPreviewDetail,
-): void {
-  if (record.notificationSent || !record.reviewId) {
-    return;
-  }
-
-  createReviewCompletionNotification(review);
-
-  updateTaskRecord(record.draftId, (currentRecord) => ({
-    ...currentRecord,
-    notificationSent: true,
-  }));
-}
-
 export function createReviewTask(claim: string): string {
   const normalizedClaim = normalizeComparableClaim(claim);
   const records = readTaskRecords();
@@ -439,8 +423,8 @@ export function startReviewTask(draftId: string): Promise<void> {
         toSucceededTask(currentRecord, review),
       );
 
-      if (succeededTask && review.status !== "out_of_scope") {
-        maybeCreateCompletionNotification(succeededTask, review);
+      if (succeededTask) {
+        void refreshNotifications().catch(() => undefined);
       }
     } catch (error) {
       const errorMessage =

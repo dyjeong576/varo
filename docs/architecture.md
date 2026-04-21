@@ -164,7 +164,8 @@ VARO는 아래 도메인으로 구성한다.
 - review preview 생성과 결과 조회
 - 인기 / 커뮤니티 / 히스토리 / 알림 UI 렌더링
 - unread badge, loading state, optimistic interaction 처리
-- `varo.review-tasks`, `varo.notifications` localStorage 관리
+- `varo.review-tasks` localStorage 관리
+- 서버 notifications API 기반 badge/list/read state 관리
 
 ### 6.2 Backend API
 - 인증 세션 검증
@@ -187,7 +188,7 @@ VARO는 아래 도메인으로 구성한다.
 - history
 - popular read model input
 - pending draft, reviewId 승격, preview 상태, 오류, 알림 생성 여부
-- review completion 중심 로컬 알림 목록과 읽음 상태
+- 서버 notifications / notification_reads / preferences 기반 알림 목록과 읽음 상태
 
 ## 7. 환경 구성
 지원 환경은 `dev`, `prod` 두 개다.

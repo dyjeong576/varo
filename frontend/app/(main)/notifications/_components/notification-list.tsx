@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { AppNotification } from "@/lib/notifications/types";
+import { NotificationItem } from "@/lib/notifications/types";
 import {
+  getNotificationHref,
   getNotifications,
+  getNotificationsState,
   markAllNotificationsRead,
   markNotificationRead,
+  refreshNotifications,
   subscribeNotifications,
 } from "@/lib/notifications/store";
-import { 
+import {
   FileCheck, 
+  Heart,
   MessageSquare, 
   Bell, 
   ArrowRight, 
@@ -19,44 +23,37 @@ import {
 } from "lucide-react";
 
 export function NotificationList() {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const notificationsState = useSyncExternalStore(
+    subscribeNotifications,
+    getNotificationsState,
+    getNotificationsState,
+  );
+  const notifications = getNotifications();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setNotifications(getNotifications());
-      setIsLoading(false);
-    }, 600);
-
-    const unsubscribe = subscribeNotifications(() => {
-      setNotifications(getNotifications());
-    });
-
-    return () => {
-      clearTimeout(timer);
-      unsubscribe();
-    };
+    void refreshNotifications().catch(() => undefined);
   }, []);
 
-  const getIcon = (type: AppNotification["type"], isRead: boolean) => {
+  const getIcon = (type: NotificationItem["type"], isRead: boolean) => {
     switch(type) {
-      case 'analysis':
+      case "review_completed":
         return <FileCheck className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-blue-600'}`} />;
-      case 'community':
+      case "community_comment":
         return <MessageSquare className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-slate-600'}`} />;
-      case 'system':
-        return <Check className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-gray-600'}`} />;
+      case "community_like":
+        return <Heart className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-slate-600'}`} />;
       default:
-        return <Bell className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-gray-600'}`} />;
+        return <Check className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-gray-600'}`} />;
     }
   };
 
-  const getIconBg = (type: AppNotification["type"], isRead: boolean) => {
+  const getIconBg = (type: NotificationItem["type"], isRead: boolean) => {
     if (isRead) return "bg-[#ecedfa]";
     switch(type) {
-      case 'analysis':
+      case "review_completed":
         return "bg-[#dae1ff]";
-      case 'community':
+      case "community_comment":
+      case "community_like":
         return "bg-[#d6e3fb]";
       default:
         return "bg-[#ecedfa]";
@@ -77,11 +74,11 @@ export function NotificationList() {
     return `${diffDays}일 전`;
   };
 
-  const markAllAsRead = () => {
-    markAllNotificationsRead();
+  const markAllAsRead = async () => {
+    await markAllNotificationsRead();
   };
 
-  if (isLoading) {
+  if (notificationsState.isLoading && !notificationsState.isLoaded) {
     return (
       <div className="flex flex-col space-y-1 mt-4">
         {[1, 2, 3].map(i => (
@@ -93,6 +90,16 @@ export function NotificationList() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (notificationsState.errorMessage) {
+    return (
+      <div className="px-6 py-10">
+        <div className="rounded-3xl border border-[#ffd7d7] bg-[#fff6f6] px-5 py-4 text-sm text-[#b42318]">
+          {notificationsState.errorMessage}
+        </div>
       </div>
     );
   }
@@ -112,7 +119,7 @@ export function NotificationList() {
   const unreadNotifications = notifications.filter(n => !n.isRead);
   const readNotifications = notifications.filter(n => n.isRead);
 
-  const renderNotificationItem = (notif: AppNotification) => {
+  const renderNotificationItem = (notif: NotificationItem) => {
     const content = (
       <>
         <div className={`relative flex-shrink-0 w-12 h-12 rounded-2xl ${getIconBg(notif.type, notif.isRead)} flex items-center justify-center`}>
@@ -141,23 +148,20 @@ export function NotificationList() {
       notif.isRead ? 'bg-[#faf8ff] opacity-70' : 'bg-white'
     } hover:bg-[#f2f3ff]`;
 
-    if (notif.link) {
-      return (
-        <Link
-          key={notif.id}
-          href={notif.link}
-          className={itemClasses}
-          onClick={() => markNotificationRead(notif.id)}
-        >
-          {content}
-        </Link>
-      );
-    }
-
     return (
-      <div key={notif.id} className={itemClasses}>
+      <Link
+        key={notif.id}
+        href={getNotificationHref({
+          targetType: notif.targetType,
+          targetId: notif.targetId,
+        })}
+        className={itemClasses}
+        onClick={() => {
+          void markNotificationRead(notif.id);
+        }}
+      >
         {content}
-      </div>
+      </Link>
     );
   };
 
@@ -169,7 +173,9 @@ export function NotificationList() {
           <div className="px-6 py-3 flex justify-between items-center">
             <h2 className="text-sm font-bold text-[#0050cb] tracking-wide uppercase">읽지 않음</h2>
             <button 
-              onClick={markAllAsRead}
+              onClick={() => {
+                void markAllAsRead();
+              }}
               className="text-[12px] text-[#424656] hover:text-[#0050cb] transition-colors font-medium"
             >
               모두 읽음

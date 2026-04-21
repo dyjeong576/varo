@@ -8,19 +8,22 @@ datasource db {
 }
 
 model User {
-  id           String      @id @default(uuid())
-  email        String      @unique
-  displayName  String?     @map("display_name")
-  authProvider String      @default("google") @map("auth_provider")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  profile      UserProfile?
-  sessions     Session[]
-  reviewJobs   ReviewJob[]
-  historyEntries UserHistory[]
-  communityPosts CommunityPost[]
-  communityComments CommunityComment[]
-  communityPostLikes CommunityPostLike[]
-  communityCommentLikes CommunityCommentLike[]
+  id                      String                     @id @default(uuid())
+  email                   String                     @unique
+  displayName             String?                    @map("display_name")
+  authProvider            String                     @default("google") @map("auth_provider")
+  createdAt               DateTime                   @default(now()) @map("created_at")
+  profile                 UserProfile?
+  sessions                Session[]
+  reviewJobs              ReviewJob[]
+  historyEntries          UserHistory[]
+  communityPosts          CommunityPost[]
+  communityComments       CommunityComment[]
+  communityPostLikes      CommunityPostLike[]
+  communityCommentLikes   CommunityCommentLike[]
+  notifications           Notification[]
+  notificationReads       NotificationRead[]
+  notificationPreference  UserNotificationPreference?
 
   @@map("users")
 }
@@ -225,4 +228,44 @@ model CommunityCommentLike {
   @@id([commentId, userId])
   @@index([userId])
   @@map("community_comment_likes")
+}
+
+model Notification {
+  id               String             @id @default(uuid())
+  userId           String             @map("user_id")
+  notificationType String             @map("notification_type")
+  title            String
+  body             String
+  targetType       String             @map("target_type")
+  targetId         String             @map("target_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reads            NotificationRead[]
+
+  @@index([userId, createdAt])
+  @@index([targetType, targetId])
+  @@map("notifications")
+}
+
+model NotificationRead {
+  notificationId String       @map("notification_id")
+  userId         String       @map("user_id")
+  readAt         DateTime     @default(now()) @map("read_at")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+  @@index([userId, readAt])
+  @@map("notification_reads")
+}
+
+model UserNotificationPreference {
+  userId           String   @id @map("user_id")
+  reviewCompleted  Boolean  @default(true) @map("review_completed")
+  communityComment Boolean  @default(true) @map("community_comment")
+  communityLike    Boolean  @default(true) @map("community_like")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
 }

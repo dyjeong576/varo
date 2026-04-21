@@ -1,26 +1,22 @@
 # Current Task
 
 ## 작업명
-한국 관련 claim 전용 MVP scope 축소
+서버 알림 전면 연동
 
 ## 목표
-- MVP 검토 범위를 한국 관련 claim으로 제한한다.
-- 순수 해외 이슈는 verdict를 만들지 않고 `out_of_scope` 상태로 기록한다.
-- 검색은 KR source domain registry만 사용하고 domainless fallback search를 제거한다.
-- 사용자 국가 코드는 audit 목적으로 유지하되 domain routing에는 사용하지 않는다.
-- backend 응답 계약과 frontend 결과/loading/history UI가 `out_of_scope`를 정상 terminal 상태로 처리하게 한다.
+- review 완료, 커뮤니티 댓글, 좋아요 알림을 서버 DB/API 기준으로 통합한다.
+- 알림 목록, unread badge, 읽음 처리, 알림 설정을 모두 서버 기준으로 동작하게 전환한다.
+- review/community mutation 흐름에서 실제 알림 생성까지 연동한다.
 
 ## 이번 작업 범위
-- `backend/src/reviews` query refinement, search orchestration, preview persistence/mapper, DTO
-- `frontend/lib/reviews` 타입, mapper, task store
-- `frontend/app/(main)/loading/page.tsx`
-- `frontend/app/(main)/reviews/[reviewId]/page.tsx`
-- 관련 backend unit/e2e 테스트
-- PRD, decisions, current-task, backlog 문서 갱신
+- `backend/prisma` 알림 관련 스키마 및 migration
+- `backend/src/notifications` API/DTO/service
+- `backend/src/reviews`, `backend/src/community` 알림 이벤트 생성 연동
+- `frontend/lib/notifications`, `frontend/lib/api`, `/notifications`, `/settings/notifications`, 앱 셸 badge
+- 관련 backend 단위 테스트, frontend lint/build, 문서 갱신
 
 ## 제외 범위
-- interpretation 단계 LLM 결과 생성
-- DB schema migration
-- 비-KR registry row 삭제 또는 비활성화 migration
-- 새로운 frontend 테스트 러너 도입
-- 배포 인프라 변경
+- 브라우저 푸시, 이메일, 웹소켓 같은 실시간 전달 채널
+- 커뮤니티 알림의 댓글 anchor deep link
+- 기존 local notification state 마이그레이션
+- 별도 worker fan-out 도입

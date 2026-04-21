@@ -1,12 +1,28 @@
-export type AppNotificationType = "analysis" | "community" | "system";
+export type NotificationType =
+  | "review_completed"
+  | "community_comment"
+  | "community_like";
 
-export interface AppNotification {
+export type NotificationTargetType = "review" | "community_post";
+
+export interface NotificationItem {
   id: string;
-  reviewId?: string;
-  type: AppNotificationType;
+  type: NotificationType;
   title: string;
   message: string;
   isRead: boolean;
   createdAt: string;
-  link?: string;
+  targetType: NotificationTargetType;
+  targetId: string;
+}
+
+export interface NotificationPreferences {
+  reviewCompleted: boolean;
+  communityComment: boolean;
+  communityLike: boolean;
+}
+
+export interface NotificationsListResponse {
+  items: NotificationItem[];
+  unreadCount: number;
 }

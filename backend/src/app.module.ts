@@ -4,6 +4,7 @@ import { AuthModule } from "./auth/auth.module";
 import { CommunityModule } from "./community/community.module";
 import { TraceIdMiddleware } from "./common/middleware/trace-id.middleware";
 import { HealthModule } from "./health/health.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { PopularModule } from "./popular/popular.module";
 import { getAppConfig } from "./config/app.config";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -22,6 +23,7 @@ import { UsersModule } from "./users/users.module";
     UsersModule,
     ReviewsModule,
     CommunityModule,
+    NotificationsModule,
     PopularModule,
     HealthModule,
   ],
