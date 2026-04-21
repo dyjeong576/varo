@@ -18,6 +18,10 @@ import { SessionAuthGuard } from "../common/guards/session-auth.guard";
 import { ApiErrorResponseDto } from "../shared/dto/api-error-response.dto";
 import { CreateReviewQueryProcessingPreviewDto } from "./dto/create-review-query-processing-preview.dto";
 import { CreateReviewReopenDto } from "./dto/create-review-reopen.dto";
+import {
+  NaverNewsSearchTestRequestDto,
+  NaverNewsSearchTestResponseDto,
+} from "./dto/naver-news-search-test.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "./dto/review-query-processing-preview-response.dto";
 import { ReviewReopenResponseDto } from "./dto/review-reopen-response.dto";
 import { ReviewPreviewSummaryResponseDto } from "./dto/review-preview-summary-response.dto";
@@ -167,6 +171,36 @@ export class ReviewsController {
     this.ensureDevOnly();
 
     return this.reviewsService.createTestQueryProcessingPreview(payload);
+  }
+
+  @Post("naver-news-search/test")
+  @ApiOperation({
+    summary: "Naver 뉴스 검색 테스트 API",
+    description:
+      "로컬/개발 환경에서 세션 없이 Naver News Search API client를 직접 테스트하기 위한 전용 엔드포인트입니다. DB에는 저장하지 않습니다.",
+  })
+  @ApiOkResponse({
+    description: "Naver 뉴스 검색 테스트 성공",
+    type: NaverNewsSearchTestResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: "검색 query 검증 실패",
+    type: ApiErrorResponseDto,
+  })
+  @ApiBadGatewayResponse({
+    description: "Naver provider 처리 실패",
+    type: ApiErrorResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: "dev 환경이 아니어서 사용할 수 없음",
+    type: ApiErrorResponseDto,
+  })
+  async searchNaverNewsForTest(
+    @Body() payload: NaverNewsSearchTestRequestDto,
+  ): Promise<NaverNewsSearchTestResponseDto> {
+    this.ensureDevOnly();
+
+    return this.reviewsService.searchNaverNewsForTest(payload);
   }
 
   private ensureDevOnly(): void {

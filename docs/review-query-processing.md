@@ -11,11 +11,11 @@
 - relevance filtering
 - provider 선택
 
-기존 상위 문서의 provider 표기와 단계 설명은 후속 동기화 전까지 상위 개요로 해석한다.
+상위 문서의 provider 표기와 충돌하면 이 문서의 provider route를 우선 기준으로 삼는다.
 
 ## 문서 목적
 
-이 문서는 VARO의 뉴스 질의 처리 방식을 설명한다. 사용자의 자연어 입력을 바로 검색하지 않고, LLM으로 팩트체크용 검색 쿼리로 정제한 뒤 Tavily 검색과 relevance 필터를 거쳐 evidence 후보를 만드는 흐름을 정의한다.
+이 문서는 VARO의 뉴스 질의 처리 방식을 설명한다. 사용자의 자연어 입력을 바로 검색하지 않고, LLM으로 팩트체크용 검색 쿼리와 검색 provider route로 정제한 뒤 Naver News Search 또는 Tavily 검색과 relevance 필터를 거쳐 evidence 후보를 만드는 흐름을 정의한다.
 
 적용 범위는 MVP review pipeline의 claim intake부터 interpretation handoff 직전까지다.
 
@@ -32,16 +32,18 @@
 핵심 목표는 아래와 같다.
 
 - 사용자 발화에서 검토 대상이 되는 핵심 claim을 분리한다.
-- 검색 엔진 친화적인 query 3개를 생성해 Tavily 검색 품질을 높인다.
+- 검색 엔진 친화적인 query 3개와 `search_route`를 생성해 provider별 검색 품질을 높인다.
 - 제목과 snippet만 비슷하지만 실제 claim 검토와 무관한 결과를 relevance filtering으로 제거한다.
 - 관련 있는 source만 본문 추출과 evidence 생성 단계로 전달한다.
 - interpretation 단계가 더 적은 노이즈와 더 높은 traceability를 가진 입력 패키지를 받게 한다.
 
 Provider 전략은 아래로 고정한다.
 
-- 검색 provider: Tavily
+- 한국 뉴스 검색 provider: Naver News Search
+- 해외/글로벌 뉴스 검색 provider: Tavily Search
+- 본문 추출 provider: Tavily Extract 또는 Source Fetch 계층
 - LLM provider: OpenAI
-- 구조 원칙: 향후 교체 가능한 추상화 전제를 유지하되, MVP 첫 구현은 Tavily + OpenAI 조합으로 설계한다.
+- 구조 원칙: provider router를 두고, 한국 뉴스성 claim은 Naver News Search, 그 외 해외/글로벌 뉴스성 claim은 Tavily Search/Extract로 처리한다.
 
 ## 단계별 처리 흐름
 
@@ -53,31 +55,33 @@ Provider 전략은 아래로 고정한다.
 
 ### 2. Query Refinement
 
-- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`과 검색 쿼리 3개를 생성한다.
-- OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason`도 생성한다.
+- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`, 검색 쿼리 3개, `search_route`를 생성한다.
+- OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`도 생성한다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
   - 고유명사, 날짜, 수치가 있으면 우선 반영한다.
   - 검색 엔진 친화적인 명사형 질의로 변환한다.
 - `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
-- `is_korea_related`는 claim 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 직접 포함될 때만 true다.
-- 한국어 기사에 단순 보도된 순수 해외 이슈는 `is_korea_related=false`로 보고 `out_of_scope`로 기록한다.
+- `search_route`는 아래 3개 중 하나로 고정한다.
+  - `korean_news`: 한국 뉴스성 claim이며 Naver News Search를 사용한다.
+  - `global_news`: 한국 뉴스가 아닌 해외/글로벌 뉴스성 claim이며 Tavily Search를 사용한다.
+  - `unsupported`: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim이다.
+- `unsupported`는 `out_of_scope`로 기록하되, 한국 관련성 여부만으로 해외/글로벌 claim을 제외하지 않는다.
 - 이 단계의 출력은 이후 search와 relevance filtering의 기준 입력이 된다.
 
 ### 3. Source Search
 
-- Review API는 MVP에서 KR trusted domain registry만 조회한다.
-- 사용자 프로필의 `user_country_code`는 audit artifact에 보존하지만 source search domain 선택에는 사용하지 않는다.
-- `topic_country_code`가 KR이 아니어도 `is_korea_related=true`이면 KR domain registry로 검색한다.
-- Tavily 검색은 KR 도메인 기반 2개의 pass로 구성한다.
-  - `familiar pass`: 한국 familiar news와 주요 social platform 도메인을 `include_domains`에 넣어 검색한다.
-  - `verification pass`: 한국 공식/검증 성격 도메인을 `include_domains`에 넣어 검색한다.
-- domainless fallback search는 MVP에서 수행하지 않는다.
-- 각 pass 결과는 하나의 candidate pool로 병합한다.
+- Review API는 `search_route`에 따라 검색 provider를 선택한다.
+  - `korean_news`: Naver News Search API로 검색한다.
+  - `global_news`: Tavily Search로 검색한다.
+  - `unsupported`: 검색하지 않고 `out_of_scope`로 종료한다.
+- 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화한다.
+- Tavily 검색 결과는 기존처럼 title, content/snippet, URL, publisher metadata를 source candidate로 정규화한다.
+- 한국 뉴스 라우트의 기본 검색 provider는 Tavily가 아니며, KR domain registry 기반 Tavily 검색은 MVP 기본 경로에서 사용하지 않는다.
 - 이 단계에서는 결과를 최대한 넓게 받되, 후속 relevance filtering이 가능하도록 title, snippet, canonical URL, publisher metadata를 유지한다.
 - 각 source candidate에는 어떤 query에서 수집되었는지 추적할 수 있도록 `origin_query_ids[]`를 연결한다.
-- 각 source candidate에는 `retrieval_bucket`, `source_country_code`, `domain_registry_matched` 여부를 함께 유지한다.
+- 각 source candidate에는 `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`를 함께 유지한다.
 
 ### 4. Candidate Normalization and Deduplication
 
@@ -88,7 +92,7 @@ Provider 전략은 아래로 고정한다.
 ### 5. Relevance Filtering
 
 - OpenAI는 각 candidate의 제목, snippet, `core_claim`을 입력으로 받아 해당 source가 검토 대상 주장과 관련 있는지 판정한다.
-- relevance 입력에는 `topic_scope`, `topic_country_code`, `retrieval_bucket`, `source_country_code`도 포함한다.
+- relevance 입력에는 `topic_scope`, `topic_country_code`, `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`도 포함한다.
 - relevance 출력은 아래 3단계 모델로 고정한다.
   - `primary`: 즉시 extraction 대상으로 사용
   - `reference`: 1차 대상은 아니지만 primary 부족 시 승격 가능
@@ -96,12 +100,12 @@ Provider 전략은 아래로 고정한다.
 - 각 source candidate에는 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`를 유지한다.
 - `reference` 단계는 official statement, correction article, low-signal title처럼 제목 신호는 약하지만 claim 검토에는 의미가 있는 source를 조기에 버리지 않기 위해 둔다.
 - 이 단계는 검색 recall을 유지하면서 downstream 노이즈를 줄이는 핵심 필터 역할을 한다.
-- 한국 관련성이 없는 해외 이슈는 relevance filtering 이전에 `out_of_scope`로 종료한다.
+- `unsupported` route는 relevance filtering 이전에 `out_of_scope`로 종료한다.
 
 ### 6. Relevant Source Selection
 
 - 1차 extraction 대상은 `primary` source만 사용한다.
-- 가능하면 extraction 대상에 `verification bucket` source를 최소 1개 포함한다.
+- 가능하면 extraction 대상에 공식 발표, 원문 링크, verification 성격 source를 최소 1개 포함한다.
 - `primary` source가 부족하면 `reference` source를 제한적으로 승격할 수 있다.
 - `reference` 승격 이후에도 관련 source가 충분하지 않으면 근거 부족 상태를 유지한 채 다음 단계로 전달한다.
 
@@ -126,7 +130,7 @@ sequenceDiagram
     participant Frontend as "Frontend"
     participant ReviewAPI as "Review API"
     participant QueryRefiner as "OpenAI Query Refiner"
-    participant DomainRegistry as "Domain Registry"
+    participant Naver as "Naver News Search"
     participant Tavily as "Tavily Search"
     participant RelevanceFilter as "OpenAI Relevance Filter"
     participant Extractor as "Content Extractor"
@@ -135,42 +139,49 @@ sequenceDiagram
     User->>Frontend: claim 제출
     Frontend->>ReviewAPI: review 생성 요청
     ReviewAPI->>DB: claim / review job 저장
-    ReviewAPI->>QueryRefiner: raw claim 기반 core_claim + queries[3] + topic country + 한국 관련성 판정 요청
+    ReviewAPI->>QueryRefiner: raw claim 기반 core_claim + queries[3] + topic country + search_route 판정 요청
     QueryRefiner-->>ReviewAPI: structured JSON 반환
-    ReviewAPI->>DB: core_claim / generated_queries / topic country / 한국 관련성 저장
+    ReviewAPI->>DB: core_claim / generated_queries / topic country / search_route 저장
 
-    alt is_korea_related=false
+    alt search_route=unsupported
         ReviewAPI->>DB: status=out_of_scope / result=null 저장
         ReviewAPI-->>Frontend: 지원 범위 밖 응답
-    else is_korea_related=true
-        ReviewAPI->>DomainRegistry: KR trusted domains 조회
-        DomainRegistry-->>ReviewAPI: KR familiar / verification domain sets 반환
-
-        opt familiar pass
-            loop query 3개
-                ReviewAPI->>Tavily: include_domains=KR familiar domains 검색
-                Tavily-->>ReviewAPI: familiar results 반환
-            end
+    else search_route=korean_news
+        loop query 3개
+            ReviewAPI->>Naver: news.json 검색
+            Naver-->>ReviewAPI: title / description / originallink / link / pubDate 반환
         end
-
-        opt verification pass
-            loop query 3개
-                ReviewAPI->>Tavily: include_domains=KR verification domains 검색
-                Tavily-->>ReviewAPI: verification results 반환
-            end
-        end
-
-        ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / retrieval bucket 부여
-        ReviewAPI->>RelevanceFilter: topic country + bucket metadata 기반 relevance 판정 요청
+        ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / provider metadata 부여
+        ReviewAPI->>RelevanceFilter: route + provider metadata 기반 relevance 판정 요청
         RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
-
-        ReviewAPI->>DB: relevance / origin_query_ids / retrievalBucket / sourceCountryCode 저장
+        ReviewAPI->>DB: relevance / origin_query_ids / searchRoute / sourceProvider 저장
 
         alt extract 대상이 있는 경우
             ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
             Extractor-->>ReviewAPI: content / snippet 후보 반환
         else extract 대상이 부족한 경우
-            ReviewAPI->>ReviewAPI: verification source 부족 또는 evidence 부족 상태 유지
+            ReviewAPI->>ReviewAPI: evidence 부족 상태 유지
+        end
+
+        ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
+    else search_route=global_news
+        opt Tavily search
+            loop query 3개
+                ReviewAPI->>Tavily: news/general search
+                Tavily-->>ReviewAPI: search results 반환
+            end
+        end
+
+        ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / provider metadata 부여
+        ReviewAPI->>RelevanceFilter: route + provider metadata 기반 relevance 판정 요청
+        RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
+        ReviewAPI->>DB: relevance / origin_query_ids / searchRoute / sourceProvider 저장
+
+        alt extract 대상이 있는 경우
+            ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
+            Extractor-->>ReviewAPI: content / snippet 후보 반환
+        else extract 대상이 부족한 경우
+            ReviewAPI->>ReviewAPI: evidence 부족 상태 유지
         end
 
         ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
@@ -205,13 +216,11 @@ sequenceDiagram
         QueryPreviewService->>DB: claim / review job 생성
         QueryPreviewService->>DB: preview user country 조회
         QueryPreviewService->>Providers: query refinement
-        Providers-->>QueryPreviewService: core_claim + generated_queries + topic country + 한국 관련성
-        alt 한국 관련성이 없는 경우
+        Providers-->>QueryPreviewService: core_claim + generated_queries + topic country + search_route
+        alt search_route=unsupported
             QueryPreviewService->>DB: out_of_scope 상태 저장
-        else 한국 관련 claim
-            QueryPreviewService->>DB: KR search 대상 domain registry 조회
-            DB-->>QueryPreviewService: KR familiar / verification registry
-            QueryPreviewService->>Providers: Tavily KR search + relevance filtering
+        else searchable route
+            QueryPreviewService->>Providers: route별 Naver 또는 Tavily search + relevance filtering
             QueryPreviewService->>Providers: extraction 대상 content 추출
             QueryPreviewService->>DB: source / evidence / handoff payload 저장
         end
@@ -227,10 +236,10 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason` |
-| Source Search | `generated_queries[]`, KR domain registry | title, snippet, canonical URL, publisher metadata를 포함한 search candidates |
+| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
+| Source Search | `generated_queries[]`, `search_route` | title, snippet, canonical URL, publisher metadata, provider metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]` |
-| Relevance Filtering | `core_claim`, title, snippet, candidate metadata, country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]` |
+| Relevance Filtering | `core_claim`, title, snippet, candidate metadata, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]` |
 | Relevant Source Selection | relevance 판정 결과 | extraction 대상 source 목록 |
 | Content Extraction and Evidence Preparation | extraction 대상 source | content, snippet 후보 |
 | Handoff to Interpretation | `core_claim`, source, snippet 후보, audit 정보 | `interpretation_handoff_payload` |
@@ -247,11 +256,12 @@ sequenceDiagram
 - `topic_country_code`
 - `country_detection_reason`
 - `user_country_code`
-- `is_korea_related`
-- `korea_relevance_reason`
+- `search_route`
+- `search_route_reason`
 - source별 `origin_query_ids`
 - source별 `relevance_tier`
 - source별 `relevance_reason`
+- source별 `source_provider`
 - source별 `retrieval_bucket`
 - source별 `source_country_code`
 
@@ -266,16 +276,15 @@ sequenceDiagram
 이 설계는 구현 variance와 latency, cost 폭주를 막기 위해 아래 상한을 전제로 한다.
 
 - query 수: 3개 고정
-- query당 Tavily 결과: 상위 5개
+- query당 검색 결과: 상위 5개
 - relevance 판정 대상: 최대 15개
 - 1차 extraction 대상: `primary` 최대 5개
 - `reference` 승격 대상: 최대 3개
-- `include_domains` 목록은 pass별 최대 8개로 제한
 
 ## 실패/예외 처리 원칙
 
 - query refinement 실패 시에는 원문 claim 그대로 검색하는 임시 fallback을 둘 수 있지만, 결과 해석에서 query refinement 실패 사실을 내부적으로 식별 가능해야 한다.
-- Tavily 검색 결과가 적거나 `primary` source가 부족하면 무리하게 결론을 강화하지 않는다.
+- Naver 또는 Tavily 검색 결과가 적거나 `primary` source가 부족하면 무리하게 결론을 강화하지 않는다.
 - `primary` source가 부족한 경우에는 `reference`를 제한적으로 승격한다.
 - `reference` 승격 이후에도 부족하면 근거 부족 상태를 유지한 채 interpretation 단계로 handoff 한다.
 - extract 대상이 없거나 본문 추출이 실패하면, evidence 부족 상태를 유지한 채 uncertainty-heavy input으로 interpretation 단계에 handoff 한다.

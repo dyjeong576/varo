@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "../auth/auth.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { ReviewsNaverClient } from "./providers/reviews-naver.client";
 import { ReviewsOpenAiClient } from "./providers/reviews-openai.client";
 import { ReviewsTavilyClient } from "./providers/reviews-tavily.client";
 import { ReviewsQueryPreviewPersistenceService } from "./query-preview/reviews-query-preview.persistence.service";
@@ -16,6 +17,7 @@ import { ReviewsService } from "./reviews.service";
   providers: [
     ReviewsOpenAiClient,
     ReviewsTavilyClient,
+    ReviewsNaverClient,
     ReviewsProvidersService,
     ReviewsQueryPreviewPersistenceService,
     ReviewsQueryPreviewService,

@@ -1,7 +1,13 @@
 import { ReviewsQueryPreviewService } from "./query-preview/reviews-query-preview.service";
+import { ReviewsProvidersService } from "./reviews.providers.service";
 import { ReviewsService } from "./reviews.service";
 
 describe("ReviewsService", () => {
+  const createProvidersServiceMock = () =>
+    ({
+      searchNaverNewsForTest: jest.fn(),
+    }) as unknown as ReviewsProvidersService;
+
   it("query processing preview 요청을 query preview service에 위임한다", async () => {
     const queryPreviewService = {
       createQueryProcessingPreview: jest.fn().mockResolvedValue({ reviewId: "review-1" }),
@@ -10,7 +16,10 @@ describe("ReviewsService", () => {
       getQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
-    const service = new ReviewsService(queryPreviewService);
+    const service = new ReviewsService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+    );
 
     const result = await service.createQueryProcessingPreview("user-1", {
       claim: "테슬라가 한국에서 철수한대",
@@ -37,7 +46,10 @@ describe("ReviewsService", () => {
       getQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
-    const service = new ReviewsService(queryPreviewService);
+    const service = new ReviewsService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+    );
 
     const result = await service.createTestQueryProcessingPreview({
       claim: "테슬라가 한국에서 철수한대",
@@ -59,7 +71,10 @@ describe("ReviewsService", () => {
       getQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
-    const service = new ReviewsService(queryPreviewService);
+    const service = new ReviewsService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+    );
 
     const result = await service.listQueryProcessingPreviews("user-1");
 
@@ -79,7 +94,10 @@ describe("ReviewsService", () => {
         .mockResolvedValue({ reviewId: "review-1" }),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
-    const service = new ReviewsService(queryPreviewService);
+    const service = new ReviewsService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+    );
 
     const result = await service.getQueryProcessingPreview("user-1", "review-1");
 
@@ -98,7 +116,10 @@ describe("ReviewsService", () => {
       getQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn().mockResolvedValue(undefined),
     } as unknown as ReviewsQueryPreviewService;
-    const service = new ReviewsService(queryPreviewService);
+    const service = new ReviewsService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+    );
 
     const result = await service.recordReviewReopen("user-1", "review-1", {
       source: "popular",
@@ -109,5 +130,50 @@ describe("ReviewsService", () => {
       "user-1",
       "review-1",
     );
+  });
+
+  it("Naver 뉴스 검색 테스트 요청을 providers service에 위임한다", async () => {
+    const queryPreviewService = {} as ReviewsQueryPreviewService;
+    const providersService = {
+      searchNaverNewsForTest: jest.fn().mockResolvedValue([
+        {
+          id: "naver-c1",
+          sourceType: "news",
+          publisherName: "yna.co.kr",
+          publishedAt: "2026-04-01T00:00:00.000Z",
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://n.news.naver.com/mnews/article/001/0010000001",
+          rawTitle: "테슬라 한국 철수설",
+          rawSnippet: "기사 설명",
+          normalizedHash: "hash-1",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: null,
+        },
+      ]),
+    } as unknown as ReviewsProvidersService;
+    const service = new ReviewsService(queryPreviewService, providersService);
+
+    const result = await service.searchNaverNewsForTest({
+      query: " 테슬라 한국 철수 ",
+    });
+
+    expect(result.query).toBe("테슬라 한국 철수");
+    expect(result.display).toBe(5);
+    expect(result.start).toBe(1);
+    expect(result.sort).toBe("sim");
+    expect(result.items[0]).toMatchObject({
+      id: "naver-c1",
+      relevanceTier: "reference",
+      domainRegistryMatched: false,
+      stance: "unknown",
+    });
+    expect(providersService.searchNaverNewsForTest).toHaveBeenCalledWith({
+      query: "테슬라 한국 철수",
+      display: 5,
+      start: 1,
+      sort: "sim",
+    });
   });
 });

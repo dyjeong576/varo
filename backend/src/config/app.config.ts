@@ -22,6 +22,9 @@ export interface AppConfig {
   sessionTtlDays: number;
   reviewProviderMode: "mock" | "real";
   openAiApiKey: string | null;
+  naverClientId: string | null;
+  naverClientSecret: string | null;
+  naverSearchTimeoutMs: number;
   tavilyApiKey: string | null;
   tavilySearchTimeoutMs: number;
   tavilyExtractTimeoutMs: number;
@@ -190,6 +193,9 @@ export function getAppConfig(): AppConfig {
     sessionTtlDays: ttl,
     reviewProviderMode: readReviewProviderMode(getOptional("REVIEW_PROVIDER_MODE"), appEnv),
     openAiApiKey: getOptional("OPENAI_API_KEY") ?? null,
+    naverClientId: getOptional("NAVER_CLIENT_ID") ?? null,
+    naverClientSecret: getOptional("NAVER_CLIENT_SECRET") ?? null,
+    naverSearchTimeoutMs: readPositiveInteger("NAVER_SEARCH_TIMEOUT_MS", 40000),
     tavilyApiKey: getOptional("TAVILY_API_KEY") ?? null,
     tavilySearchTimeoutMs: readPositiveInteger("TAVILY_SEARCH_TIMEOUT_MS", 40000),
     tavilyExtractTimeoutMs: readPositiveInteger("TAVILY_EXTRACT_TIMEOUT_MS", 180000),

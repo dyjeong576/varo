@@ -1,5 +1,6 @@
 import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
+import { ReviewsNaverClient } from "./providers/reviews-naver.client";
 import { ReviewsOpenAiClient } from "./providers/reviews-openai.client";
 import { ReviewsTavilyClient } from "./providers/reviews-tavily.client";
 import { ReviewsProvidersService } from "./reviews.providers.service";
@@ -38,6 +39,7 @@ describe("ReviewsProvidersService", () => {
       createConfigServiceMock(values) as never,
       new ReviewsOpenAiClient(),
       new ReviewsTavilyClient(),
+      new ReviewsNaverClient(),
     );
 
   afterEach(() => {
@@ -57,10 +59,11 @@ describe("ReviewsProvidersService", () => {
     });
   });
 
-  it("real mode에서 TAVILY_API_KEY가 없으면 검색을 실패시킨다", async () => {
+  it("real mode에서 NAVER_CLIENT_ID가 없으면 검색을 실패시킨다", async () => {
     const service = createService({
       reviewProviderMode: "real",
-      tavilyApiKey: null,
+      naverClientId: null,
+      naverClientSecret: "naver-secret",
     });
 
     await expect(
@@ -72,6 +75,38 @@ describe("ReviewsProvidersService", () => {
         topicCountryCode: "KR",
         topicScope: "domestic",
         domainRegistry: [],
+      }),
+    ).rejects.toMatchObject({
+      code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    });
+  });
+
+  it("Naver 테스트 검색에서 NAVER_CLIENT_ID가 없으면 실패시킨다", async () => {
+    const service = createService({
+      naverClientId: null,
+      naverClientSecret: "naver-secret",
+    });
+
+    await expect(
+      service.searchNaverNewsForTest({
+        query: "테슬라 한국 철수",
+      }),
+    ).rejects.toMatchObject({
+      code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    });
+  });
+
+  it("Naver 테스트 검색에서 NAVER_CLIENT_SECRET이 없으면 실패시킨다", async () => {
+    const service = createService({
+      naverClientId: "naver-client-id",
+      naverClientSecret: null,
+    });
+
+    await expect(
+      service.searchNaverNewsForTest({
+        query: "테슬라 한국 철수",
       }),
     ).rejects.toMatchObject({
       code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
@@ -126,16 +161,17 @@ describe("ReviewsProvidersService", () => {
     expect(result.generatedQueries).toHaveLength(3);
   });
 
-  it("real mode에서 사용자/주제 국가와 무관하게 KR include_domains를 Tavily에 전달한다", async () => {
+  it("real mode에서 Naver 뉴스 검색으로 source 후보를 수집한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
-          results: [
+          items: [
             {
               title: "테슬라 한국 사업 철수 관련 보도",
-              url: "https://www.yna.co.kr/view/AKR20260401000100001",
-              content: "테슬라 한국 사업 철수 관련 핵심 내용이 담긴 기사입니다.",
-              published_date: "2026-04-01T00:00:00Z",
+              originallink: "https://www.yna.co.kr/view/AKR20260401000100001",
+              link: "https://n.news.naver.com/mnews/article/001/0010000001",
+              description: "테슬라 한국 사업 철수 관련 핵심 내용이 담긴 기사입니다.",
+              pubDate: "Wed, 01 Apr 2026 09:00:00 +0900",
             },
           ],
         },
@@ -144,12 +180,13 @@ describe("ReviewsProvidersService", () => {
 
     const service = createService({
       reviewProviderMode: "real",
-      tavilyApiKey: "tvly-test-key",
-      tavilySearchTimeoutMs: 40000,
+      naverClientId: "naver-client-id",
+      naverClientSecret: "naver-secret",
+      naverSearchTimeoutMs: 40000,
     });
 
     const result = await service.searchSources({
-      queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
+      queries: [{ id: "q2", text: "테슬라 한국 철수", rank: 1 }],
       coreClaim: "테슬라 한국 철수",
       claimLanguageCode: "ko",
       userCountryCode: "US",
@@ -200,27 +237,29 @@ describe("ReviewsProvidersService", () => {
     });
 
     expect(result[0]).toMatchObject({
+      id: "naver-q2-c1",
+      canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+      originalUrl: "https://n.news.naver.com/mnews/article/001/0010000001",
+      originQueryIds: ["q2"],
       retrievalBucket: "familiar",
       sourceCountryCode: "KR",
+      domainRegistryId: null,
     });
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      1,
-      "https://api.tavily.com/search",
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("https://openapi.naver.com/v1/search/news.json?"),
       expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining(
-          "\"include_domains\":[\"yna.co.kr\",\"youtube.com\"]",
-        ),
+        method: "GET",
+        headers: {
+          "X-Naver-Client-Id": "naver-client-id",
+          "X-Naver-Client-Secret": "naver-secret",
+        },
       }),
     );
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      2,
-      "https://api.tavily.com/search",
-      expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining("\"include_domains\":[\"*.go.kr\"]"),
-      }),
-    );
+    const requestedUrl = new URL((global.fetch as jest.Mock).mock.calls[0][0]);
+    expect(requestedUrl.searchParams.get("query")).toBe("테슬라 한국 철수");
+    expect(requestedUrl.searchParams.get("display")).toBe("5");
+    expect(requestedUrl.searchParams.get("start")).toBe("1");
+    expect(requestedUrl.searchParams.get("sort")).toBe("sim");
   });
 
   it("real mode에서 OpenAI relevance 요청에 retrieval bucket과 source country를 포함한다", async () => {

@@ -91,7 +91,7 @@ describe("ReviewsQueryPreviewService", () => {
     expect(persistence.createClaimAndReviewJob).not.toHaveBeenCalled();
   });
 
-  it("사용자 국가와 무관하게 주제 국가를 유지하고 KR domain registry로 검색한다", async () => {
+  it("사용자 국가와 무관하게 주제 국가를 유지하고 Naver 검색 경로로 source를 수집한다", async () => {
     const persistence = createPersistenceMock();
     persistence.resolveUserCountryCode.mockResolvedValue("US");
     const providers = {
@@ -237,9 +237,10 @@ describe("ReviewsQueryPreviewService", () => {
       expect.objectContaining({
         userCountryCode: "US",
         topicCountryCode: "US",
+        domainRegistry: [],
       }),
     );
-    expect(persistence.loadSearchDomainRegistry).toHaveBeenCalledWith();
+    expect(persistence.loadSearchDomainRegistry).not.toHaveBeenCalled();
   });
 
   it("같은 clientRequestId로 다시 호출하면 같은 reviewId를 재사용한다", async () => {

@@ -211,7 +211,7 @@ erDiagram
 ## 4. 서비스 데이터 흐름
 1. 사용자가 로그인하면 `users`, `user_profiles`, `sessions`가 서비스 계정 축을 구성한다.
 2. 사용자가 질문을 제출하면 `claims`와 `review_jobs`가 생성된다.
-3. 분석 과정에서 `sources`, `evidence_snippets`, `external_request_logs`가 쌓인다.
+3. 분석 과정에서 `search_route`에 따라 Naver 또는 Tavily provider가 호출되고, `sources`, `evidence_snippets`, `external_request_logs`가 쌓인다.
 4. 현재 프론트는 `handoff_ready` 전후의 review preview detail을 우선 소비한다.
 5. 완료되면 `review_results`가 생성되고, `user_history`와 장기적으로는 `notifications`가 갱신된다.
 6. review 결과는 `popular_topics` 또는 `user_history` 기반 read model 집계의 입력이 될 수 있다.
@@ -234,5 +234,6 @@ erDiagram
 ## 6. 설계 포인트
 - `users`를 중심으로 review, history, notifications, community가 연결된다.
 - review 도메인은 여전히 VARO의 핵심 차별화 축이며, source와 evidence를 별도 엔티티로 유지한다.
+- review source audit은 `search_route`, `source_provider`, `retrieval_bucket`을 함께 추적하고, external provider 로그는 `naver-search`, `tavily-search`, `tavily-extract`, `source-fetch`, `openai` 단위로 남긴다.
 - `notifications`, `popular_topics`, `user_history`는 서비스 경험을 연결하는 보조 도메인이다.
 - community는 별도 도메인이지만 실명 기반 사용자 모델과 연결된다.

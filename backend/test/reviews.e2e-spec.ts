@@ -113,6 +113,37 @@ describe("ReviewsController (e2e)", () => {
     });
   });
 
+  it("dev 환경에서는 Naver 뉴스 검색 테스트 API를 허용한다", async () => {
+    const reviewsService = {
+      searchNaverNewsForTest: jest.fn().mockResolvedValue({
+        query: "테슬라 한국 철수",
+        display: 5,
+        start: 1,
+        sort: "sim",
+        items: [],
+      }),
+    } as unknown as ReviewsService;
+    const configService = {
+      get: jest.fn((key: string) => {
+        if (key === "appEnv" || key === "APP_ENV") {
+          return "dev";
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+    const controller = new ReviewsController(reviewsService, configService);
+
+    const result = await controller.searchNaverNewsForTest({
+      query: "테슬라 한국 철수",
+    });
+
+    expect(result.query).toBe("테슬라 한국 철수");
+    expect(reviewsService.searchNaverNewsForTest).toHaveBeenCalledWith({
+      query: "테슬라 한국 철수",
+    });
+  });
+
   it("prod 환경에서는 테스트용 무인증 API를 차단한다", async () => {
     const reviewsService = {} as ReviewsService;
     const configService = {
@@ -129,6 +160,28 @@ describe("ReviewsController (e2e)", () => {
     await expect(
       controller.createTestQueryProcessingPreview({
         claim: "테슬라가 한국에서 완전 철수한대",
+      }),
+    ).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("prod 환경에서는 Naver 뉴스 검색 테스트 API를 차단한다", async () => {
+    const reviewsService = {} as ReviewsService;
+    const configService = {
+      get: jest.fn((key: string) => {
+        if (key === "appEnv" || key === "APP_ENV") {
+          return "prod";
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+    const controller = new ReviewsController(reviewsService, configService);
+
+    await expect(
+      controller.searchNaverNewsForTest({
+        query: "테슬라 한국 철수",
       }),
     ).rejects.toMatchObject({
       status: 403,

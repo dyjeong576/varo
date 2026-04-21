@@ -58,6 +58,7 @@
 - `analyzing`
 - `completed`
 - `partial`
+- `out_of_scope`
 - `failed`
 
 ### 5.2 source 타입
@@ -165,8 +166,10 @@
 | `relevance_tier` | varchar(32) nullable | `primary / reference / discard` |
 | `relevance_reason` | text nullable | relevance 판정 이유 |
 | `source_country_code` | varchar(16) nullable | source 국가 코드 |
-| `retrieval_bucket` | varchar(32) nullable | `familiar / verification / fallback` |
+| `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
 | `domain_registry_id` | fk nullable | 매칭된 trusted domain registry |
+
+`search_route`와 `source_provider`는 query refinement artifact 또는 source audit metadata에서 추적 가능해야 하며, 한국 뉴스는 `naver-search`, 해외/글로벌 뉴스는 `tavily-search`를 기본 provider로 기록한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |
@@ -199,7 +202,7 @@
 | --- | --- | --- |
 | `id` | uuid / text id | 로그 식별자 |
 | `review_job_id` | fk nullable | 관련 review |
-| `provider` | varchar(64) | `naver-search`, `source-fetch`, `openai` 등 |
+| `provider` | varchar(64) | `naver-search`, `tavily-search`, `tavily-extract`, `source-fetch`, `openai` 등 |
 | `request_type` | varchar(64) | 요청 종류 |
 | `status` | varchar(32) | `success`, `timeout`, `error` |
 | `status_code` | integer nullable | 외부 응답 코드 |

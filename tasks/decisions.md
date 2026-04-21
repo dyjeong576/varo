@@ -44,25 +44,26 @@
 - source traceability는 source별 `origin_query_ids[]`를 유지하는 방식으로 구현한다.
 - dev 환경의 review provider mode 기본값은 `mock`, prod 기본값은 `real`로 둔다.
 - 1차 extraction 대상은 `primary` 우선, 부족 시 `reference` 제한 승격으로 처리한다.
-- real provider 조합은 Tavily search/extract + OpenAI structured outputs로 고정한다.
+- 초기 실제 provider 조합은 Tavily search/extract + OpenAI structured outputs로 두었으나, 검색 provider 조합은 2026-04-21 Search Provider Routing 결정으로 대체한다.
 - query refinement와 relevance filtering의 OpenAI 모델은 모두 `gpt-5-mini`로 고정한다.
 - 인증 endpoint와 dev 테스트 endpoint는 같은 provider service 경로를 공유한다.
 - `real` 모드에서는 API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
 - `languageCode`는 claim 엔터티에 저장하지 않고, query refinement artifact와 preview API 응답에서만 유지한다.
 
 ### Country-Aware Domain Routing
+- 이 결정의 MVP 검색 provider 범위는 2026-04-21 Search Provider Routing 결정으로 대체되었다.
 - review query processing은 언어와 별도로 `topicCountryCode` / `topicScope`를 LLM이 판정한다.
-- 국가별 trusted domain registry를 DB로 관리하고, Tavily `include_domains`로 familiar / verification pass를 분리한다.
+- 당시 설계에서는 국가별 trusted domain registry를 DB로 관리하고, Tavily `include_domains`로 familiar / verification pass를 분리하기로 했다.
 - 한국 사용자에게는 한국 familiar domain을 우선 제공하되, 해외 이슈에서는 verification source 확보를 우선한다.
 - retrieval bucket은 `familiar / verification / fallback` 3단계로 고정한다.
 - 국가별 domain registry는 MVP에서 소수 핵심 도메인만 큐레이션한다.
 
 ### Korea-Related Only MVP Scope
-- 2026-04-01의 Country-Aware Domain Routing 결정은 MVP 범위에서 대체한다.
-- MVP는 claim 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 포함된 한국 관련 claim만 검토한다.
-- 한국어 기사에 단순 보도된 순수 해외 이슈는 검토하지 않고 `out_of_scope` review job으로 기록한다.
-- `out_of_scope`는 시스템 실패가 아니므로 `lastErrorCode`를 남기지 않고 verdict/result를 생성하지 않는다.
-- source search는 KR `source_domain_registry`만 사용하며, 국가별 해외 verification routing과 domainless fallback search는 MVP 범위에서 제거한다.
+- 이 결정은 2026-04-21의 Search Provider Routing 결정으로 대체되었다.
+- 당시 MVP는 claim 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 포함된 경우만 검토하기로 했다.
+- 당시에는 국내 맥락이 없는 순수 해외 이슈를 검토하지 않고 `out_of_scope` review job으로 기록하기로 했다.
+- `out_of_scope`는 시스템 실패가 아니므로 `lastErrorCode`를 남기지 않고 verdict/result를 생성하지 않는 원칙은 유지한다.
+- 당시 source search는 KR `source_domain_registry`만 사용하며, 국가별 해외 verification routing과 domainless fallback search는 MVP 범위에서 제거하기로 했다.
 - `userCountryCode`는 사용자 프로필/audit 목적으로 조회하고 query refinement artifact에 보존하지만, domain routing에는 사용하지 않는다.
 - `topicCountryCode`는 사용자 국가가 아니라 claim/context 기준의 주제 국가로 유지하며, domain routing에는 사용하지 않는다.
 - retrieval bucket은 기존 저장/표시 호환성을 위해 `familiar / verification`을 유지하되, 신규 MVP 검색에서는 `fallback` bucket을 생성하지 않는다.
@@ -184,3 +185,15 @@
 - 댓글 알림은 게시글 작성자와 부모 댓글 작성자에게 보내고 자기 자신 알림은 생성하지 않는다.
 - 좋아요 알림은 게시글 좋아요와 댓글 좋아요를 모두 포함하며 최초 like 생성 시에만 보낸다.
 - 커뮤니티 알림 target은 MVP에서 post detail 페이지로 통일하고 comment anchor deep link는 후속 범위로 남긴다.
+
+## 2026-04-21
+
+### Search Provider Routing
+- 2026-04-01의 Korea-Related Only MVP Scope 결정은 검색 범위 기준에서 대체한다.
+- MVP는 한국 유저를 기본 사용자로 두되, 해외/글로벌 뉴스성 claim도 검토 범위에 포함한다.
+- query refinement는 `search_route`를 `korean_news / global_news / unsupported` 중 하나로 판정한다.
+- `korean_news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
+- `global_news` route는 Tavily Search/Extract를 기본 검색 및 추출 provider로 사용한다.
+- `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim에만 사용하며, `out_of_scope` review job으로 기록한다.
+- 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
+- `real` 모드에서는 Naver, Tavily, OpenAI API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.

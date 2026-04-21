@@ -7,12 +7,11 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import cookieParser = require("cookie-parser");
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import expressBasicAuth = require("express-basic-auth");
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
-  const appName = configService.get<string>("appName", "VARO");
-  const appTagline = configService.get<string>("appTagline", "Verified Analysis, Reasoned Opinion");
 
   app.set("trust proxy", 1);
   app.setGlobalPrefix("api/v1");
@@ -30,7 +29,31 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-    const document = SwaggerModule.createDocument(
+  setupSwagger(app, configService)
+  const port = configService.get<number>("PORT", 4000);
+  await app.listen(port);
+}
+
+void bootstrap();
+
+function setupSwagger(app: NestExpressApplication,configService: ConfigService){
+  const appName = configService.get<string>("appName", "VARO");
+  const appTagline = configService.get<string>("appTagline", "Verified Analysis, Reasoned Opinion");
+
+    if (!configService.get<string>("SYSTEM", "local")) {
+    app.use(
+      ["/api"],
+      expressBasicAuth({
+        challenge: true,
+        users: {
+          [process.env.SWAGGER_USER as string]: process.env
+            .SWAGGER_PASSWORD as string,
+        },
+      })
+    );
+  }
+
+      const document = SwaggerModule.createDocument(
       app,
       new DocumentBuilder()
         .setTitle(`${appName} 백엔드 API 문서`)
@@ -53,8 +76,4 @@ async function bootstrap(): Promise<void> {
       customSiteTitle: `${appName} API 문서`,
     });
 
-  const port = configService.get<number>("PORT", 4000);
-  await app.listen(port);
 }
-
-void bootstrap();

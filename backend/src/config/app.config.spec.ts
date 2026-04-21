@@ -60,6 +60,9 @@ describe("app.config", () => {
     expect(config.sessionCookieDomain).toBe("varocheck.com");
     expect(config.reviewProviderMode).toBe("mock");
     expect(config.openAiApiKey).toBeNull();
+    expect(config.naverClientId).toBeNull();
+    expect(config.naverClientSecret).toBeNull();
+    expect(config.naverSearchTimeoutMs).toBe(40000);
     expect(config.tavilyApiKey).toBeNull();
     expect(config.tavilySearchTimeoutMs).toBe(40000);
     expect(config.tavilyExtractTimeoutMs).toBe(180000);

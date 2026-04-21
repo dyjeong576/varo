@@ -103,7 +103,6 @@ export class ReviewsQueryPreviewService {
         });
       }
 
-      const domainRegistry = await this.loadSearchDomainRegistry();
       const initialCandidates = await this.providersService.searchSources({
         queries: generatedQueries,
         coreClaim: refinement.coreClaim,
@@ -111,7 +110,7 @@ export class ReviewsQueryPreviewService {
         userCountryCode,
         topicCountryCode: refinement.topicCountryCode,
         topicScope: refinement.topicScope,
-        domainRegistry,
+        domainRegistry: [],
       });
       let relevanceCandidates = await this.providersService.applyRelevanceFiltering({
         coreClaim: refinement.coreClaim,
@@ -212,10 +211,6 @@ export class ReviewsQueryPreviewService {
       reviewJobId: reviewJob.id,
       entryType: "reopened",
     });
-  }
-
-  private loadSearchDomainRegistry() {
-    return this.persistenceService.loadSearchDomainRegistry();
   }
 
   private buildPreviewFailureLogMessage(params: {

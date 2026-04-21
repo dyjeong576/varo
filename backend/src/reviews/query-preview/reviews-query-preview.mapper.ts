@@ -53,6 +53,8 @@ interface QueryRefinementPayload {
   countryDetectionReason: string;
   isKoreaRelated: boolean;
   koreaRelevanceReason: string;
+  searchRoute?: string;
+  searchProvider?: string;
 }
 
 interface HandoffPayload {
@@ -136,7 +138,7 @@ export function buildInsufficiencyReason(
   }
 
   if (!hasVerificationSource(candidates)) {
-    return "verification bucket source가 부족해 친숙한 국내 기사 중심으로 handoff 됩니다.";
+    return "공식/검증 성격 source가 부족해 뉴스 검색 결과 중심으로 handoff 됩니다.";
   }
 
   if (extractionTargetCount < primaryExtractionLimit) {
@@ -176,6 +178,8 @@ export function buildQueryRefinementPayload(
     countryDetectionReason: refinement.countryDetectionReason,
     isKoreaRelated: refinement.isKoreaRelated,
     koreaRelevanceReason: refinement.koreaRelevanceReason,
+    searchRoute: refinement.isKoreaRelated ? "korean_news" : "unsupported",
+    searchProvider: refinement.isKoreaRelated ? "naver-search" : null,
     userCountryCode,
   } as Prisma.InputJsonValue;
 }

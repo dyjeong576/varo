@@ -2,6 +2,8 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
+import { NaverNewsSearchTestRequestDto } from "./dto/naver-news-search-test.dto";
+import { ReviewsNaverClient } from "./providers/reviews-naver.client";
 import { ReviewsOpenAiClient } from "./providers/reviews-openai.client";
 import { ReviewsTavilyClient } from "./providers/reviews-tavily.client";
 import {
@@ -11,7 +13,6 @@ import {
   SearchCandidate,
   SearchSourcesInput,
 } from "./reviews.types";
-import { selectDomainsForBucket } from "./reviews.utils";
 
 @Injectable()
 export class ReviewsProvidersService {
@@ -19,6 +20,7 @@ export class ReviewsProvidersService {
     private readonly configService: ConfigService,
     private readonly openAiClient: ReviewsOpenAiClient,
     private readonly tavilyClient: ReviewsTavilyClient,
+    private readonly naverClient: ReviewsNaverClient,
   ) {}
 
   async refineQuery(rawClaim: string): Promise<QueryRefinementResult> {
@@ -27,39 +29,43 @@ export class ReviewsProvidersService {
   }
 
   async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
-    const apiKey = this.getRequiredTavilyApiKey();
-    const timeoutMs = this.getTavilySearchTimeoutMs();
-    const familiarDomains = selectDomainsForBucket(
-      input.domainRegistry,
-      "familiar",
-    );
-    const verificationDomains = selectDomainsForBucket(
-      input.domainRegistry,
-      "verification",
+    const clientId = this.getRequiredNaverClientId();
+    const clientSecret = this.getRequiredNaverClientSecret();
+    const timeoutMs = this.getNaverSearchTimeoutMs();
+    const queryResults = await Promise.all(
+      input.queries.map((query) =>
+        this.naverClient.searchNews({
+          clientId,
+          clientSecret,
+          timeoutMs,
+          query: query.text,
+          queryId: query.id,
+          display: 5,
+          start: 1,
+          sort: "sim",
+        }),
+      ),
     );
 
-    const [familiarCandidates, verificationCandidates] = await Promise.all([
-      familiarDomains.length > 0
-        ? this.tavilyClient.searchSources({
-            apiKey,
-            timeoutMs,
-            input,
-            bucket: "familiar",
-            includeDomains: familiarDomains,
-          })
-        : Promise.resolve([]),
-      verificationDomains.length > 0
-        ? this.tavilyClient.searchSources({
-            apiKey,
-            timeoutMs,
-            input,
-            bucket: "verification",
-            includeDomains: verificationDomains,
-          })
-        : Promise.resolve([]),
-    ]);
+    return queryResults.flat();
+  }
 
-    return [...familiarCandidates, ...verificationCandidates];
+  async searchNaverNewsForTest(
+    input: NaverNewsSearchTestRequestDto,
+  ): Promise<SearchCandidate[]> {
+    const clientId = this.getRequiredNaverClientId();
+    const clientSecret = this.getRequiredNaverClientSecret();
+    const timeoutMs = this.getNaverSearchTimeoutMs();
+
+    return this.naverClient.searchNews({
+      clientId,
+      clientSecret,
+      timeoutMs,
+      query: input.query,
+      display: input.display,
+      start: input.start,
+      sort: input.sort,
+    });
   }
 
   async applyRelevanceFiltering(
@@ -108,6 +114,41 @@ export class ReviewsProvidersService {
     }
 
     return apiKey;
+  }
+
+  private getRequiredNaverClientId(): string {
+    const clientId = this.configService.get<string | null>("naverClientId", null);
+
+    if (!clientId) {
+      throw new AppException(
+        APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+        "Naver 뉴스 검색 테스트에는 NAVER_CLIENT_ID가 필요합니다.",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return clientId;
+  }
+
+  private getRequiredNaverClientSecret(): string {
+    const clientSecret = this.configService.get<string | null>(
+      "naverClientSecret",
+      null,
+    );
+
+    if (!clientSecret) {
+      throw new AppException(
+        APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+        "Naver 뉴스 검색 테스트에는 NAVER_CLIENT_SECRET이 필요합니다.",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return clientSecret;
+  }
+
+  private getNaverSearchTimeoutMs(): number {
+    return this.configService.get<number>("naverSearchTimeoutMs", 40000);
   }
 
   private getTavilySearchTimeoutMs(): number {

@@ -15,7 +15,8 @@
 - Queue / Cache: Redis
 - External Auth: Google login
 - External Providers:
-  - Tavily search / extract
+  - Naver News Search
+  - Tavily Search / Extract
   - OpenAI structured outputs
 
 ## 3. 서비스 모듈 구조
@@ -141,7 +142,8 @@
 - verdict는 기사 수가 아니라 evidence 구조를 바탕으로 계산한다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
-- MVP에서는 한국 관련성이 없는 claim을 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
+- `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
+- 한국 뉴스성 claim은 Naver News Search, 해외/글로벌 뉴스성 claim은 Tavily Search/Extract로 검색한다.
 
 ### 6.4 worker 책임
 
@@ -304,21 +306,28 @@
 - Authorized JavaScript origins와 Authorized redirect URIs는 별개다. origin만 등록하고 redirect URI를 누락하면 `redirect_uri_mismatch`가 발생한다.
 - OAuth 콜백은 백엔드가 처리하지만, 콜백 완료 후 최종 화면 이동은 `FRONTEND_BASE_URL` 기준 절대 URL로 리다이렉트한다.
 
-### 10.2 Tavily Search / Extract
+### 10.2 Naver News Search
 
-- review 도메인의 source 후보 수집
+- 한국 뉴스성 claim의 source 후보 수집
+- `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
+- `dev`에서는 mock 가능
+- `prod`에서는 실제 provider 사용
+
+### 10.3 Tavily Search / Extract
+
+- 해외/글로벌 뉴스성 claim의 source 후보 수집
 - source 본문 추출
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
-### 10.3 OpenAI Structured Outputs
+### 10.4 OpenAI Structured Outputs
 
 - review 도메인의 structured interpretation 생성
 - 입력에 없는 사실을 생성하지 않도록 제한
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
-### 10.4 Source Fetch
+### 10.5 Source Fetch
 
 - source 원문 HTML 수집
 - timeout / redirect / extraction 처리
@@ -349,6 +358,7 @@
 
 - `partial`은 정상 응답 본문 내 상태값으로 표현한다.
 - 근거 부족은 결과 내부의 `uncertainty`와 도메인 상태로 드러낸다.
+- `SOURCE_SEARCH_FAILED`는 사용자 노출 문구에서는 일반 검색 실패로 표현하되, 내부 로그와 provider error detail에는 `naver-search` 또는 `tavily-search` 원인을 구분해 남긴다.
 
 ## 12. 보안 / env / 운영
 
@@ -380,6 +390,9 @@
 - `SESSION_COOKIE_DOMAIN`
 - `SESSION_TTL_DAYS`
 - `OPENAI_API_KEY`
+- `NAVER_CLIENT_ID`
+- `NAVER_CLIENT_SECRET`
+- `NAVER_SEARCH_TIMEOUT_MS`
 - `TAVILY_API_KEY`
 - `TAVILY_SEARCH_TIMEOUT_MS`
 - `TAVILY_EXTRACT_TIMEOUT_MS`

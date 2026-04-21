@@ -252,6 +252,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         currentStage: "handoff_ready",
         searchedSourceCount: 1,
         processedSourceCount: 1,
+        queryRefinement: expect.objectContaining({
+          searchRoute: "korean_news",
+          searchProvider: "naver-search",
+        }),
         lastErrorCode: null,
       }),
     });
