@@ -55,7 +55,7 @@ jobs:
                   RELEVANT_CHANGED=true
                   ;;
                 backend/*)
-                  BACKEND_CHANGD=true
+                  BACKEND_CHANGED=true
                   RELEVANT_CHANGED=true
                   ;;
                 ops/nginx/*|docker-compose.prod.yml|deploy.sh|.dockerignore|.github/workflows/cd.yml)
