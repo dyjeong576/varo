@@ -169,7 +169,7 @@
 | `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
 | `domain_registry_id` | fk nullable | 매칭된 trusted domain registry |
 
-`search_route`와 `source_provider`는 query refinement artifact 또는 source audit metadata에서 추적 가능해야 하며, 한국 뉴스는 `naver-search`, 해외/글로벌 뉴스는 `tavily-search`를 기본 provider로 기록한다.
+`search_route`와 `source_provider`는 query refinement artifact 또는 source audit metadata에서 추적 가능해야 하며, 한국 뉴스는 `naver-search`, 해외/글로벌 뉴스는 `tavily-search`를 기본 provider로 기록한다. query refinement artifact에는 사용자-facing `generated_queries`와 별도로 글로벌 route용 영어 `search_claim`, `search_queries`를 함께 보존한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |

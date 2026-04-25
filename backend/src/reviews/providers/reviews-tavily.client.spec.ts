@@ -48,6 +48,8 @@ describe("ReviewsTavilyClient", () => {
       candidates: [
         {
           id: "c1",
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "Reuters",
           publishedAt: null,

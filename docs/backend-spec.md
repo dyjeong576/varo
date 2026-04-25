@@ -144,6 +144,7 @@
 - source와 snippet까지 추적 가능해야 한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - 한국 뉴스성 claim은 Naver News Search, 해외/글로벌 뉴스성 claim은 Tavily Search/Extract로 검색한다.
+- 글로벌 route의 Tavily 검색 입력은 영어 `search_claim / search_queries` 아티팩트를 사용하고, 사용자-facing `core_claim / generated_queries`는 원문을 유지한다.
 
 ### 6.4 worker 책임
 

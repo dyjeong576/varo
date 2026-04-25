@@ -55,13 +55,15 @@ Provider 전략은 아래로 고정한다.
 
 ### 2. Query Refinement
 
-- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`, 검색 쿼리 3개, `search_route`를 생성한다.
+- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`, 사용자-facing `generated_queries` 3개, 실제 provider 검색용 `search_claim`, `search_queries` 3개, `search_route`를 생성한다.
 - OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`도 생성한다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
   - 고유명사, 날짜, 수치가 있으면 우선 반영한다.
   - 검색 엔진 친화적인 명사형 질의로 변환한다.
+  - `generated_queries`는 사용자-facing trace용이므로 원문 언어를 유지한다.
+  - `global_news` route의 `search_claim`, `search_queries`는 Tavily 검색을 위해 영어로 변환한다.
 - `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
 - `search_route`는 아래 3개 중 하나로 고정한다.
   - `korean_news`: 한국 뉴스성 claim이며 Naver News Search를 사용한다.
@@ -74,7 +76,7 @@ Provider 전략은 아래로 고정한다.
 
 - Review API는 `search_route`에 따라 검색 provider를 선택한다.
   - `korean_news`: Naver News Search API로 검색한다.
-  - `global_news`: Tavily Search로 검색한다.
+  - `global_news`: Tavily Search로 검색한다. 이때 실제 검색 입력은 영어 `search_claim`, `search_queries`를 사용한다.
   - `unsupported`: 검색하지 않고 `out_of_scope`로 종료한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화한다.
 - Tavily 검색 결과는 기존처럼 title, content/snippet, URL, publisher metadata를 source candidate로 정규화한다.
@@ -236,7 +238,7 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
+| Query Refinement | 정규화 claim | `core_claim`, `generated_queries[]`, `search_claim`, `search_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
 | Source Search | `generated_queries[]`, `search_route` | title, snippet, canonical URL, publisher metadata, provider metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]` |
 | Relevance Filtering | `core_claim`, title, snippet, candidate metadata, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]` |
@@ -258,6 +260,8 @@ sequenceDiagram
 - `user_country_code`
 - `search_route`
 - `search_route_reason`
+- `search_claim`
+- `search_queries`
 - source별 `origin_query_ids`
 - source별 `relevance_tier`
 - source별 `relevance_reason`

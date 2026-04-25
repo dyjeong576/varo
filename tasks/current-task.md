@@ -1,21 +1,25 @@
 # Current Task
 
 ## 작업명
-Naver client review pipeline 1차 연동
+글로벌 검색 provider routing 전환
 
 ## 목표
-- 한국 관련 claim의 review query source search를 Naver News Search client로 전환한다.
-- 기존 query-processing-preview 저장, relevance filtering, extraction 흐름은 유지한다.
-- `search_route` 전면 전환 없이 현재 `isKoreaRelated` 기준 흐름에 Naver 검색을 연결한다.
+- MVP 검색 범위를 국가 무관 뉴스성 claim 전체로 정리한다.
+- `search_route`를 `korean_news / global_news / unsupported` 기준으로 실제 review pipeline에 연결한다.
+- 한국 뉴스성 claim은 Naver, 해외/글로벌 뉴스성 claim은 Tavily Search/Extract를 사용한다.
+- 글로벌 route에서는 사용자-facing query는 원문 유지, Tavily 검색 입력만 영어 아티팩트로 사용한다.
 
 ## 이번 작업 범위
 - `backend/src/reviews/providers`
 - `backend/src/reviews/reviews.providers.service.ts`
 - `backend/src/reviews/query-preview`
+- `docs/prd.md`
+- `docs/backend-spec.md`
+- `docs/review-query-processing.md`
+- `docs/data-model.md`
+- `tasks/decisions.md`
 - 관련 backend 단위 테스트 및 build 검증
 
 ## 제외 범위
 - Prisma migration
-- review pipeline의 `search_route` 전면 연결
-- 해외/global Tavily 지원 확대
 - frontend 화면 구현

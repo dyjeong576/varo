@@ -182,6 +182,8 @@ export class ReviewsTavilyClient {
 
         return {
           id: `${input.query.id}-${input.bucket}-c${index + 1}`,
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
           sourceType: classifySourceType(canonicalUrl, rawTitle),
           publisherName: this.inferPublisherName(canonicalUrl),
           publishedAt: this.readPublishedAt(result),

@@ -194,6 +194,8 @@
 - query refinement는 `search_route`를 `korean_news / global_news / unsupported` 중 하나로 판정한다.
 - `korean_news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
 - `global_news` route는 Tavily Search/Extract를 기본 검색 및 추출 provider로 사용한다.
+- `search_route`는 검색 provider 분기의 authoritative field로 사용하고, `isKoreaRelated`는 UX/설명용 메타데이터로만 유지한다.
+- `global_news` route에서는 사용자-facing `core_claim / generated_queries`는 원문을 유지하고, 실제 Tavily 검색 입력은 영어 `search_claim / search_queries`로 별도 생성해 사용한다.
 - `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim에만 사용하며, `out_of_scope` review job으로 기록한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
 - `real` 모드에서는 Naver, Tavily, OpenAI API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.

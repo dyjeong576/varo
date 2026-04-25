@@ -68,6 +68,7 @@ describe("ReviewsProvidersService", () => {
 
     await expect(
       service.searchSources({
+        searchRoute: "korean_news",
         queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
         coreClaim: "테슬라 한국 철수",
         claimLanguageCode: "ko",
@@ -131,6 +132,15 @@ describe("ReviewsProvidersService", () => {
                       "Trump tariff announcement",
                       "미국 관세 정책 발표",
                     ],
+                    searchRoute: "global_news",
+                    searchRouteReason:
+                      "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
+                    searchClaim: "Trump tariff announcement",
+                    searchQueries: [
+                      "Trump tariff announcement",
+                      "US tariff policy announcement",
+                      "Trump tariff update",
+                    ],
                     topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason:
@@ -157,27 +167,34 @@ describe("ReviewsProvidersService", () => {
     expect(result.claimLanguageCode).toBe("ko");
     expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
+    expect(result.searchRoute).toBe("global_news");
+    expect(result.searchClaim).toBe("Trump tariff announcement");
     expect(result.isKoreaRelated).toBe(false);
     expect(result.generatedQueries).toHaveLength(3);
   });
 
-  it("real mode에서 Naver 뉴스 검색으로 source 후보를 수집한다", async () => {
-    global.fetch = jest.fn().mockResolvedValue(
-      createFetchResponse({
-        jsonData: {
-          items: [
-            {
-              title: "테슬라 한국 사업 철수 관련 보도",
-              originallink: "https://www.yna.co.kr/view/AKR20260401000100001",
-              link: "https://n.news.naver.com/mnews/article/001/0010000001",
-              description: "테슬라 한국 사업 철수 관련 핵심 내용이 담긴 기사입니다.",
-              pubDate: "Wed, 01 Apr 2026 09:00:00 +0900",
-            },
-          ],
+  it("real mode에서 한국 관련 검색을 Naver 뉴스 검색 client에 위임한다", async () => {
+    const searchNewsSpy = jest
+      .spyOn(ReviewsNaverClient.prototype, "searchNews")
+      .mockResolvedValue([
+        {
+          id: "naver-q2-c1",
+          searchRoute: "korean_news",
+          sourceProvider: "naver-search",
+          sourceType: "news",
+          publisherName: "yna.co.kr",
+          publishedAt: "2026-04-01T00:00:00.000Z",
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://n.news.naver.com/mnews/article/001/0010000001",
+          rawTitle: "테슬라 한국 사업 철수 관련 보도",
+          rawSnippet: "테슬라 한국 사업 철수 관련 핵심 내용이 담긴 기사입니다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["q2"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: null,
         },
-      }),
-    ) as typeof fetch;
-
+      ]);
     const service = createService({
       reviewProviderMode: "real",
       naverClientId: "naver-client-id",
@@ -186,6 +203,7 @@ describe("ReviewsProvidersService", () => {
     });
 
     const result = await service.searchSources({
+      searchRoute: "korean_news",
       queries: [{ id: "q2", text: "테슬라 한국 철수", rank: 1 }],
       coreClaim: "테슬라 한국 철수",
       claimLanguageCode: "ko",
@@ -245,21 +263,71 @@ describe("ReviewsProvidersService", () => {
       sourceCountryCode: "KR",
       domainRegistryId: null,
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("https://openapi.naver.com/v1/search/news.json?"),
-      expect.objectContaining({
-        method: "GET",
-        headers: {
-          "X-Naver-Client-Id": "naver-client-id",
-          "X-Naver-Client-Secret": "naver-secret",
+    expect(searchNewsSpy).toHaveBeenCalledWith({
+      clientId: "naver-client-id",
+      clientSecret: "naver-secret",
+      timeoutMs: 40000,
+      query: "테슬라 한국 철수",
+      queryId: "q2",
+      display: 10,
+      start: 1,
+      sort: "sim",
+    });
+  });
+
+  it("real mode에서 글로벌 검색을 Tavily search client에 위임한다", async () => {
+    const searchSourcesSpy = jest
+      .spyOn(ReviewsTavilyClient.prototype, "searchSources")
+      .mockResolvedValue([
+        {
+          id: "q1-verification-c1",
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
+          sourceType: "news",
+          publisherName: "reuters.com",
+          publishedAt: "2026-04-01T00:00:00.000Z",
+          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
+          rawTitle: "Trump tariff announcement update",
+          rawSnippet: "원문 검증 보도입니다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "US",
+          retrievalBucket: "verification",
+          domainRegistryId: null,
         },
+      ]);
+    const service = createService({
+      reviewProviderMode: "real",
+      tavilyApiKey: "tvly-test-key",
+      tavilySearchTimeoutMs: 41000,
+    });
+
+    const result = await service.searchSources({
+      searchRoute: "global_news",
+      queries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
+      coreClaim: "트럼프의 관세 발표",
+      claimLanguageCode: "ko",
+      userCountryCode: "KR",
+      topicCountryCode: "US",
+      topicScope: "foreign",
+      domainRegistry: [],
+    });
+
+    expect(result[0]).toMatchObject({
+      id: "q1-verification-c1",
+      searchRoute: "global_news",
+      sourceProvider: "tavily-search",
+    });
+    expect(searchSourcesSpy).toHaveBeenCalledWith({
+      apiKey: "tvly-test-key",
+      timeoutMs: 41000,
+      input: expect.objectContaining({
+        searchRoute: "global_news",
+        queries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
       }),
-    );
-    const requestedUrl = new URL((global.fetch as jest.Mock).mock.calls[0][0]);
-    expect(requestedUrl.searchParams.get("query")).toBe("테슬라 한국 철수");
-    expect(requestedUrl.searchParams.get("display")).toBe("5");
-    expect(requestedUrl.searchParams.get("start")).toBe("1");
-    expect(requestedUrl.searchParams.get("sort")).toBe("sim");
+      bucket: "verification",
+    });
   });
 
   it("real mode에서 OpenAI relevance 요청에 retrieval bucket과 source country를 포함한다", async () => {
@@ -296,11 +364,14 @@ describe("ReviewsProvidersService", () => {
     const result = await service.applyRelevanceFiltering({
       coreClaim: "트럼프의 관세 발표",
       claimLanguageCode: "ko",
+      searchRoute: "global_news",
       topicCountryCode: "US",
       topicScope: "foreign",
       candidates: [
         {
           id: "c1",
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "연합뉴스",
           publishedAt: null,
@@ -336,11 +407,14 @@ describe("ReviewsProvidersService", () => {
       service.applyRelevanceFiltering({
       coreClaim: "트럼프의 관세 발표",
       claimLanguageCode: "ko",
+      searchRoute: "global_news",
       topicCountryCode: "US",
       topicScope: "foreign",
       candidates: [
         {
           id: "c1",
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "연합뉴스",
           publishedAt: null,
@@ -356,6 +430,29 @@ describe("ReviewsProvidersService", () => {
         },
       ],
     }),
+    ).rejects.toMatchObject({
+      code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    });
+  });
+
+  it("global search에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {
+    const service = createService({
+      reviewProviderMode: "real",
+      tavilyApiKey: null,
+    });
+
+    await expect(
+      service.searchSources({
+        searchRoute: "global_news",
+        queries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
+        coreClaim: "트럼프의 관세 발표",
+        claimLanguageCode: "ko",
+        userCountryCode: "KR",
+        topicCountryCode: "US",
+        topicScope: "foreign",
+        domainRegistry: [],
+      }),
     ).rejects.toMatchObject({
       code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
       status: HttpStatus.INTERNAL_SERVER_ERROR,

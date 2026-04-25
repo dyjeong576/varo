@@ -48,12 +48,15 @@ interface QueryRefinementPayload {
   languageCode: string;
   coreClaim: string;
   generatedQueries: QueryArtifact[];
+  searchRoute?: string;
+  searchRouteReason?: string;
+  searchClaim?: string;
+  searchQueries?: QueryArtifact[];
   topicScope: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
   isKoreaRelated: boolean;
   koreaRelevanceReason: string;
-  searchRoute?: string;
   searchProvider?: string;
 }
 
@@ -164,6 +167,12 @@ export function buildQueryRefinementPayload(
   generatedQueries: QueryArtifact[],
   userCountryCode: string | null,
 ): Prisma.InputJsonValue {
+  const searchRoute =
+    refinement.searchRoute ??
+    (refinement.isKoreaRelated ? "korean_news" : "unsupported");
+  const searchQueries = refinement.searchQueries ?? generatedQueries;
+  const searchProvider = buildSearchProvider(searchRoute);
+
   return {
     claimLanguageCode: refinement.claimLanguageCode,
     languageCode: refinement.claimLanguageCode,
@@ -178,8 +187,16 @@ export function buildQueryRefinementPayload(
     countryDetectionReason: refinement.countryDetectionReason,
     isKoreaRelated: refinement.isKoreaRelated,
     koreaRelevanceReason: refinement.koreaRelevanceReason,
-    searchRoute: refinement.isKoreaRelated ? "korean_news" : "unsupported",
-    searchProvider: refinement.isKoreaRelated ? "naver-search" : null,
+    searchRoute,
+    searchRouteReason:
+      refinement.searchRouteReason ?? "검색 route 판정 이유가 기록되지 않았습니다.",
+    searchClaim: refinement.searchClaim ?? refinement.coreClaim,
+    searchQueries: searchQueries.map((query) => ({
+      id: query.id,
+      text: query.text,
+      rank: query.rank,
+    })),
+    searchProvider,
     userCountryCode,
   } as Prisma.InputJsonValue;
 }
@@ -227,6 +244,18 @@ export function parseOriginQueryIds(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function buildSearchProvider(searchRoute: string): string | null {
+  if (searchRoute === "korean_news") {
+    return "naver-search";
+  }
+
+  if (searchRoute === "global_news") {
+    return "tavily-search";
+  }
+
+  return null;
 }
 
 export function mapPreviewResponse(params: {
@@ -319,7 +348,7 @@ export function mapOutOfScopePreviewResponse(params: {
     claimId: params.claim.id,
     rawClaim: params.claim.rawText,
     createdAt: params.createdAt.toISOString(),
-    isKoreaRelated: false,
+    isKoreaRelated: params.refinement.isKoreaRelated,
     koreaRelevanceReason: params.refinement.koreaRelevanceReason,
     status: "out_of_scope",
     currentStage: "scope_checked",
@@ -408,6 +437,10 @@ function parseQueryRefinementPayload(
       languageCode: "unknown",
       coreClaim: normalizedClaim,
       generatedQueries: [],
+      searchRoute: "unsupported",
+      searchRouteReason: "검색 route 판정 전입니다.",
+      searchClaim: normalizedClaim,
+      searchQueries: [],
       topicScope: "unknown",
       topicCountryCode: null,
       countryDetectionReason: "주제 국가 판정 전입니다.",
@@ -417,19 +450,36 @@ function parseQueryRefinementPayload(
   }
 
   const claimLanguageCode = parseString(payload.claimLanguageCode, "unknown");
+  const isKoreaRelated = parseBoolean(payload.isKoreaRelated, true);
+  const searchRoute = parseString(
+    payload.searchRoute,
+    isKoreaRelated ? "korean_news" : "unsupported",
+  );
+  const generatedQueries = parseGeneratedQueries(payload.generatedQueries);
+  const searchQueries = parseGeneratedQueries(payload.searchQueries);
 
   return {
     claimLanguageCode,
     languageCode: parseString(payload.languageCode, claimLanguageCode),
     coreClaim: parseString(payload.coreClaim, normalizedClaim),
-    generatedQueries: parseGeneratedQueries(payload.generatedQueries),
+    generatedQueries,
+    searchRoute,
+    searchRouteReason: parseString(
+      payload.searchRouteReason,
+      "검색 route 판정 전입니다.",
+    ),
+    searchClaim: parseString(
+      payload.searchClaim,
+      parseString(payload.coreClaim, normalizedClaim),
+    ),
+    searchQueries: searchQueries.length > 0 ? searchQueries : generatedQueries,
     topicScope: parseString(payload.topicScope, "unknown"),
     topicCountryCode: parseNullableString(payload.topicCountryCode),
     countryDetectionReason: parseString(
       payload.countryDetectionReason,
       "주제 국가 판정 전입니다.",
     ),
-    isKoreaRelated: parseBoolean(payload.isKoreaRelated, true),
+    isKoreaRelated,
     koreaRelevanceReason: parseString(
       payload.koreaRelevanceReason,
       "한국 관련성 판정 전입니다.",

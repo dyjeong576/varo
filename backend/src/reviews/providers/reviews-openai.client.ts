@@ -2,10 +2,12 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
 import {
+  QueryArtifact,
   QueryRefinementResult,
   RelevanceFilteringInput,
   ReviewRelevanceTier,
   SearchCandidate,
+  SearchRoute,
   TopicScope,
 } from "../reviews.types";
 import { normalizeCountryCode } from "../reviews.utils";
@@ -14,11 +16,20 @@ import { postJson } from "./reviews-provider-http";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
+const SEARCH_ROUTES: SearchRoute[] = [
+  "korean_news",
+  "global_news",
+  "unsupported",
+];
 
 interface OpenAiQueryRefinementPayload {
   languageCode: string;
   coreClaim: string;
   generatedQueries: string[];
+  searchRoute: SearchRoute;
+  searchRouteReason: string;
+  searchClaim: string;
+  searchQueries: string[];
   topicScope: TopicScope;
   topicCountryCode: string | null;
   countryDetectionReason: string;
@@ -54,6 +65,10 @@ export class ReviewsOpenAiClient {
               "languageCode",
               "coreClaim",
               "generatedQueries",
+              "searchRoute",
+              "searchRouteReason",
+              "searchClaim",
+              "searchQueries",
               "topicScope",
               "topicCountryCode",
               "countryDetectionReason",
@@ -64,6 +79,18 @@ export class ReviewsOpenAiClient {
               languageCode: { type: "string" },
               coreClaim: { type: "string" },
               generatedQueries: {
+                type: "array",
+                items: { type: "string" },
+                minItems: 3,
+                maxItems: 3,
+              },
+              searchRoute: {
+                type: "string",
+                enum: SEARCH_ROUTES,
+              },
+              searchRouteReason: { type: "string" },
+              searchClaim: { type: "string" },
+              searchQueries: {
                 type: "array",
                 items: { type: "string" },
                 minItems: 3,
@@ -91,6 +118,7 @@ export class ReviewsOpenAiClient {
 - 2~4개 핵심 명사만 사용 (조사, 부사, 메타 표현 제거)
   - 나쁜 예: "테슬라 한국 완전 철수 공식 발표 여부"
   - 좋은 예: "테슬라 한국 철수"
+- generatedQueries 3개는 사용자-facing trace용이므로 원문 언어를 유지하세요.
 - "여부", "가능성", "공식", "발표", "관련" 같은 메타 표현은 절대 포함하지 마세요
 - 3개 쿼리는 서로 다른 각도로 작성 (동의어 변형, 주체 변경 등)
   - 예: "테슬라 한국 철수" / "테슬라 코리아 사업 중단" / "테슬라 한국 매장 폐점"
@@ -98,7 +126,18 @@ export class ReviewsOpenAiClient {
 
 languageCode는 원문 언어를 유지하세요. topicCountryCode는 사용자 프로필 국가가 아니라 claim/context 의미 기준의 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요. topicScope는 domestic, foreign, multi_country, unknown 중 하나만 선택하세요. countryDetectionReason에는 왜 그렇게 판정했는지 짧게 설명하세요.
 
-MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 claim 자체에 한국 장소, 한국 정부/기관, 한국 기업/법인, 한국 시장, 한국 국민/이용자, 한국 정책, 국내 서비스 영향이 직접 포함되면 true입니다. 단순히 해외 이슈가 한국어로 보도됐다는 이유만으로 true로 두지 마세요. koreaRelevanceReason에는 한국 관련성을 인정하거나 제외한 이유를 짧게 설명하세요.`,
+searchRoute는 korean_news, global_news, unsupported 중 하나만 반환하세요.
+- korean_news: 한국 뉴스성 claim. Naver News Search를 사용합니다.
+- global_news: 해외/글로벌 뉴스성 claim. Tavily Search를 사용합니다.
+- unsupported: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 어렵습니다.
+
+searchRouteReason에는 route 선택 이유를 짧게 설명하세요.
+searchClaim과 searchQueries는 실제 검색 provider에 전달할 입력입니다.
+- korean_news: searchClaim/searchQueries를 generatedQueries와 같은 언어 맥락으로 작성하세요.
+- global_news: searchClaim/searchQueries를 자연스러운 영어로 번역하세요. 날짜, 수치, 고유명사는 유지하세요.
+- unsupported: searchClaim/searchQueries는 generatedQueries와 같은 맥락으로 채우되 실제 검색에는 사용되지 않습니다.
+
+isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 장소, 한국 정부/기관, 한국 기업/법인, 한국 시장, 한국 국민/이용자, 한국 정책, 국내 서비스 영향이 직접 포함되면 true입니다. 단순히 해외 이슈가 한국어로 보도됐다는 이유만으로 true로 두지 마세요. koreaRelevanceReason에는 한국 관련성을 인정하거나 제외한 이유를 짧게 설명하세요.`,
           },
           {
             role: "user",
@@ -108,31 +147,31 @@ MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 c
         "질의 정제 요청에 실패했습니다.",
       );
 
-    const queries = payload.generatedQueries
-      .map((query) =>
-        query
-          .trim()
-          .split(/\s+/)
-          .map((word) => (word.length >= 2 ? `"${word}"` : word))
-          .join(" "),
-      )
-      .filter(Boolean);
+    const queries = this.normalizeQueries(payload.generatedQueries);
+    const searchQueries = this.normalizeQueries(payload.searchQueries);
     const topicCountryCode = normalizeCountryCode(payload.topicCountryCode);
 
     if (
       typeof payload.languageCode !== "string" ||
       typeof payload.coreClaim !== "string" ||
+      typeof payload.searchRoute !== "string" ||
+      typeof payload.searchRouteReason !== "string" ||
+      typeof payload.searchClaim !== "string" ||
       typeof payload.countryDetectionReason !== "string" ||
       typeof payload.isKoreaRelated !== "boolean" ||
       typeof payload.koreaRelevanceReason !== "string" ||
       !payload.languageCode.trim() ||
       !payload.coreClaim.trim() ||
+      !SEARCH_ROUTES.includes(payload.searchRoute) ||
+      !payload.searchRouteReason.trim() ||
+      !payload.searchClaim.trim() ||
       !payload.countryDetectionReason.trim() ||
       !payload.koreaRelevanceReason.trim() ||
       !["domestic", "foreign", "multi_country", "unknown"].includes(
         payload.topicScope,
       ) ||
-      queries.length !== 3
+      queries.length !== 3 ||
+      searchQueries.length !== 3
     ) {
       throw new AppException(
         APP_ERROR_CODES.LLM_SCHEMA_ERROR,
@@ -144,11 +183,11 @@ MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 c
     return {
       claimLanguageCode: payload.languageCode.trim(),
       coreClaim: payload.coreClaim.trim(),
-      generatedQueries: queries.map((query, index) => ({
-        id: `q${index + 1}`,
-        text: query,
-        rank: index + 1,
-      })),
+      generatedQueries: this.toQueryArtifacts(queries),
+      searchRoute: payload.searchRoute,
+      searchRouteReason: payload.searchRouteReason.trim(),
+      searchClaim: payload.searchClaim.trim(),
+      searchQueries: this.toQueryArtifacts(searchQueries),
       topicScope: payload.topicScope,
       topicCountryCode,
       countryDetectionReason: payload.countryDetectionReason.trim(),
@@ -194,7 +233,7 @@ MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 c
           {
             role: "system",
             content:
-              "당신은 한국 관련 뉴스 검토용 relevance filter입니다. core claim, 기사 제목, snippet, 출처 유형, retrieval bucket, source country를 보고 extraction 이전 단계에서 source를 분류하세요. primary는 직접 검증 근거, reference는 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
+              "당신은 VARO 뉴스 근거 수집 relevance filter입니다. search route, provider, core claim, 기사 제목, snippet, 출처 유형, retrieval bucket, source country를 보고 extraction 이전 단계에서 source를 분류하세요. primary는 직접 검증 근거, reference는 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
           },
           {
             role: "user",
@@ -202,10 +241,13 @@ MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 c
               {
                 coreClaim: input.coreClaim,
                 claimLanguageCode: input.claimLanguageCode,
+                searchRoute: input.searchRoute,
                 topicCountryCode: input.topicCountryCode,
                 topicScope: input.topicScope,
                 candidates: input.candidates.map((candidate) => ({
                   candidateId: candidate.id,
+                  searchRoute: candidate.searchRoute,
+                  sourceProvider: candidate.sourceProvider,
                   title: candidate.rawTitle,
                   snippet: candidate.rawSnippet,
                   publisherName: candidate.publisherName,
@@ -245,6 +287,26 @@ MVP 검토 가능 범위는 한국 관련 claim만입니다. isKoreaRelated는 c
           decision?.relevanceReason ?? "관련성 판정 결과가 누락되었습니다.",
       };
     });
+  }
+
+  private normalizeQueries(queries: string[]): string[] {
+    return queries
+      .map((query) =>
+        query
+          .trim()
+          .split(/\s+/)
+          .map((word) => (word.length >= 2 ? `"${word}"` : word))
+          .join(" "),
+      )
+      .filter(Boolean);
+  }
+
+  private toQueryArtifacts(queries: string[]): QueryArtifact[] {
+    return queries.map((query, index) => ({
+      id: `q${index + 1}`,
+      text: query,
+      rank: index + 1,
+    }));
   }
 
   private async requestStructuredOutput<T>(

@@ -129,6 +129,8 @@ export class ReviewsNaverClient {
 
     return {
       id: `naver-${queryId}-c${rank}`,
+      searchRoute: "korean_news",
+      sourceProvider: "naver-search",
       sourceType: "news",
       publisherName: this.inferPublisherName(canonicalUrl),
       publishedAt: this.readPublishedAt(item.pubDate),

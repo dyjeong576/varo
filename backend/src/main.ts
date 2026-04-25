@@ -40,14 +40,13 @@ function setupSwagger(app: NestExpressApplication,configService: ConfigService){
   const appName = configService.get<string>("appName", "VARO");
   const appTagline = configService.get<string>("appTagline", "Verified Analysis, Reasoned Opinion");
 
-    if (!configService.get<string>("SYSTEM", "local")) {
+    if (configService.get<string>("NODE_ENV")!="development") {
     app.use(
       ["/api"],
       expressBasicAuth({
         challenge: true,
         users: {
-          [process.env.SWAGGER_USER as string]: process.env
-            .SWAGGER_PASSWORD as string,
+          [configService.get<string>("SWAGGER_USER")]: configService.get<string>("SWAGGER_PASSWORD")
         },
       })
     );

@@ -71,7 +71,7 @@ export default function HomePage() {
         <div className="mt-5 inline-flex max-w-[92%] items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-3.5 py-2 text-[12px] font-bold leading-snug text-blue-700 shadow-[0_6px_20px_rgba(37,99,235,0.08)]">
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="break-keep">
-            현재는 한국 관련 뉴스와 주장만 검토합니다.
+            현재 VARO는 한국어 출처에 최적화되어 있습니다.
           </span>
         </div>
       </div>

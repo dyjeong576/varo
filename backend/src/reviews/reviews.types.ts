@@ -1,6 +1,8 @@
 export type ReviewRelevanceTier = "primary" | "reference" | "discard";
 export type TopicScope = "domestic" | "foreign" | "multi_country" | "unknown";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
+export type SearchRoute = "korean_news" | "global_news" | "unsupported";
+export type SearchProvider = "naver-search" | "tavily-search";
 
 export interface DomainRegistryEntry {
   id: string;
@@ -21,6 +23,8 @@ export interface QueryArtifact {
 
 export interface SearchCandidate {
   id: string;
+  searchRoute: SearchRoute;
+  sourceProvider: SearchProvider;
   sourceType: string;
   publisherName: string | null;
   publishedAt: string | null;
@@ -42,6 +46,10 @@ export interface QueryRefinementResult {
   claimLanguageCode: string;
   coreClaim: string;
   generatedQueries: QueryArtifact[];
+  searchRoute: SearchRoute;
+  searchRouteReason: string;
+  searchClaim: string;
+  searchQueries: QueryArtifact[];
   topicScope: TopicScope;
   topicCountryCode: string | null;
   countryDetectionReason: string;
@@ -50,6 +58,7 @@ export interface QueryRefinementResult {
 }
 
 export interface SearchSourcesInput {
+  searchRoute: SearchRoute;
   queries: QueryArtifact[];
   coreClaim: string;
   claimLanguageCode: string;
@@ -62,6 +71,7 @@ export interface SearchSourcesInput {
 export interface RelevanceFilteringInput {
   coreClaim: string;
   claimLanguageCode: string;
+  searchRoute: SearchRoute;
   topicCountryCode: string | null;
   topicScope: TopicScope;
   candidates: SearchCandidate[];

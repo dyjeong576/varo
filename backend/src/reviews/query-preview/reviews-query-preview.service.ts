@@ -81,8 +81,16 @@ export class ReviewsQueryPreviewService {
         await this.persistenceService.resolveUserCountryCode(userId);
       const refinement = await this.providersService.refineQuery(normalizedClaim);
       const generatedQueries = refinement.generatedQueries.slice(0, QUERY_COUNT_LIMIT);
+      const searchRoute =
+        refinement.searchRoute ??
+        (refinement.isKoreaRelated ? "korean_news" : "unsupported");
+      const searchQueries =
+        (refinement.searchQueries ?? refinement.generatedQueries).slice(
+          0,
+          QUERY_COUNT_LIMIT,
+        );
 
-      if (!refinement.isKoreaRelated) {
+      if (searchRoute === "unsupported") {
         const persistedOutOfScope =
           await this.persistenceService.persistOutOfScopeReview({
             userId,
@@ -104,7 +112,8 @@ export class ReviewsQueryPreviewService {
       }
 
       const initialCandidates = await this.providersService.searchSources({
-        queries: generatedQueries,
+        searchRoute,
+        queries: searchQueries,
         coreClaim: refinement.coreClaim,
         claimLanguageCode: refinement.claimLanguageCode,
         userCountryCode,
@@ -115,6 +124,7 @@ export class ReviewsQueryPreviewService {
       let relevanceCandidates = await this.providersService.applyRelevanceFiltering({
         coreClaim: refinement.coreClaim,
         claimLanguageCode: refinement.claimLanguageCode,
+        searchRoute,
         topicCountryCode: refinement.topicCountryCode,
         topicScope: refinement.topicScope,
         candidates: deduplicateCandidates(initialCandidates).slice(0, RELEVANCE_LIMIT),

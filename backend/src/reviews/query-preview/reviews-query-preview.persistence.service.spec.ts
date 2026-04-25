@@ -187,6 +187,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        searchRoute: "global_news",
+        searchRouteReason: "미국 정책 발표를 다루는 해외 뉴스성 claim입니다.",
+        searchClaim: "Trump tariff announcement",
+        searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
@@ -198,6 +202,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       relevanceCandidates: [
         {
           id: "c1",
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "Reuters",
           publishedAt: null,
@@ -217,6 +223,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       extractionTargets: [
         {
           id: "c1",
+          searchRoute: "global_news",
+          sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "Reuters",
           publishedAt: null,
@@ -253,8 +261,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         searchedSourceCount: 1,
         processedSourceCount: 1,
         queryRefinement: expect.objectContaining({
-          searchRoute: "korean_news",
-          searchProvider: "naver-search",
+          searchRoute: "global_news",
+          searchProvider: "tavily-search",
+          searchClaim: "Trump tariff announcement",
+          searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
         }),
         lastErrorCode: null,
       }),
@@ -352,7 +362,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     });
   });
 
-  it("한국 관련성이 없는 review를 out_of_scope 상태로 기록한다", async () => {
+  it("unsupported route review를 out_of_scope 상태로 기록한다", async () => {
     const prisma = createPrismaMock();
     const notificationsService = createNotificationsServiceMock();
     const service = new ReviewsQueryPreviewPersistenceService(
@@ -367,6 +377,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
+        searchRoute: "unsupported",
+        searchRouteReason: "기사/공식 발표 검색만으로 검토하기 어려운 요청입니다.",
+        searchClaim: "트럼프의 관세 발표",
+        searchQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
         topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
@@ -400,7 +414,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       reviewId: "review-1",
       claim: "트럼프의 관세 발표",
     });
-    expect(result.insufficiencyReason).toContain("MVP 검토 범위 밖");
+    expect(result.insufficiencyReason).toContain("지원 범위 밖");
   });
 
   it("사용자 기준 최근 review preview 목록을 조회한다", async () => {

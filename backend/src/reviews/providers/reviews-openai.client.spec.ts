@@ -44,6 +44,14 @@ describe("ReviewsOpenAiClient", () => {
                       "Trump tariff announcement",
                       "미국 관세 정책 발표",
                     ],
+                    searchRoute: "global_news",
+                    searchRouteReason: "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
+                    searchClaim: "Trump tariff announcement",
+                    searchQueries: [
+                      "Trump tariff announcement",
+                      "US tariff policy announcement",
+                      "Trump tariff update",
+                    ],
                     topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason: "미국 이슈로 판단했습니다.",
@@ -63,6 +71,9 @@ describe("ReviewsOpenAiClient", () => {
     const result = await client.refineQuery("openai-test-key", "트럼프가 오늘 관세 발표했대");
 
     expect(result.topicCountryCode).toBe("US");
+    expect(result.searchRoute).toBe("global_news");
+    expect(result.searchClaim).toBe("Trump tariff announcement");
+    expect(result.searchQueries).toHaveLength(3);
     expect(result.isKoreaRelated).toBe(false);
     expect(result.koreaRelevanceReason).toContain("한국");
     expect(result.generatedQueries).toHaveLength(3);

@@ -337,7 +337,7 @@ export class ReviewsQueryPreviewPersistenceService {
     userCountryCode: string | null;
   }): Promise<PersistedOutOfScopeReview> {
     const insufficiencyReason =
-      "한국 관련성이 확인되지 않아 MVP 검토 범위 밖으로 기록되었습니다.";
+      "뉴스성 또는 사실성 검토 지원 범위 밖 claim으로 기록되었습니다.";
     const queryRefinementPayload = buildQueryRefinementPayload(
       params.refinement,
       params.generatedQueries,

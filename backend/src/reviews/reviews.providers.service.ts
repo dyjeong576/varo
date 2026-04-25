@@ -29,25 +29,47 @@ export class ReviewsProvidersService {
   }
 
   async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
-    const clientId = this.getRequiredNaverClientId();
-    const clientSecret = this.getRequiredNaverClientSecret();
-    const timeoutMs = this.getNaverSearchTimeoutMs();
-    const queryResults = await Promise.all(
-      input.queries.map((query) =>
-        this.naverClient.searchNews({
-          clientId,
-          clientSecret,
-          timeoutMs,
-          query: query.text,
-          queryId: query.id,
-          display: 5,
-          start: 1,
-          sort: "sim",
-        }),
-      ),
-    );
+    const searchRoute = input.searchRoute ?? "korean_news";
 
-    return queryResults.flat();
+    if (searchRoute === "korean_news") {
+      const clientId = this.getRequiredNaverClientId();
+      const clientSecret = this.getRequiredNaverClientSecret();
+      const timeoutMs = this.getNaverSearchTimeoutMs();
+      const queryResults = await Promise.all(
+        input.queries.map((query) =>
+          this.naverClient.searchNews({
+            clientId,
+            clientSecret,
+            timeoutMs,
+            query: query.text,
+            queryId: query.id,
+            display: 10,
+            start: 1,
+            sort: "sim",
+          }),
+        ),
+      );
+
+      return queryResults.flat();
+    }
+
+    if (searchRoute === "global_news") {
+      const apiKey = this.getRequiredTavilyApiKey();
+      const timeoutMs = this.getTavilySearchTimeoutMs();
+
+      return this.tavilyClient.searchSources({
+        apiKey,
+        timeoutMs,
+        input,
+        bucket: "verification",
+      });
+    }
+
+    throw new AppException(
+      APP_ERROR_CODES.INPUT_VALIDATION_ERROR,
+      "unsupported route는 source search를 수행할 수 없습니다.",
+      HttpStatus.BAD_REQUEST,
+    );
   }
 
   async searchNaverNewsForTest(
@@ -122,7 +144,7 @@ export class ReviewsProvidersService {
     if (!clientId) {
       throw new AppException(
         APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-        "Naver 뉴스 검색 테스트에는 NAVER_CLIENT_ID가 필요합니다.",
+        "Naver 뉴스 검색에는 NAVER_CLIENT_ID가 필요합니다.",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -139,7 +161,7 @@ export class ReviewsProvidersService {
     if (!clientSecret) {
       throw new AppException(
         APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-        "Naver 뉴스 검색 테스트에는 NAVER_CLIENT_SECRET이 필요합니다.",
+        "Naver 뉴스 검색에는 NAVER_CLIENT_SECRET이 필요합니다.",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
