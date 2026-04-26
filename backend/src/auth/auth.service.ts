@@ -24,7 +24,7 @@ export class AuthService {
   }
 
   async handleGoogleCallback(params: {
-    code: string;
+    code?: string;
     stateToken: string;
     stateCookie?: string;
   }): Promise<{
@@ -38,6 +38,14 @@ export class AuthService {
       throw new AppException(
         APP_ERROR_CODES.AUTH_REQUIRED,
         "로그인 검증 정보가 일치하지 않습니다.",
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    if (!code) {
+      throw new AppException(
+        APP_ERROR_CODES.AUTH_REQUIRED,
+        "구글 인증 코드가 없습니다.",
         HttpStatus.UNAUTHORIZED,
       );
     }

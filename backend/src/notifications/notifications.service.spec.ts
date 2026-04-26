@@ -9,6 +9,8 @@ describe("NotificationsService", () => {
         count: jest.fn(),
         findFirst: jest.fn(),
         create: jest.fn(),
+        delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       notificationRead: {
         upsert: jest.fn(),
@@ -104,6 +106,33 @@ describe("NotificationsService", () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it("본인 알림만 삭제한다", async () => {
+    const { prisma, service } = createService();
+    prisma.notification.findFirst.mockResolvedValue({ id: "notification-1" });
+
+    const result = await service.deleteNotification("user-1", "notification-1");
+
+    expect(prisma.notification.delete).toHaveBeenCalledWith({
+      where: {
+        id: "notification-1",
+      },
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("본인 알림 전체를 삭제한다", async () => {
+    const { prisma, service } = createService();
+
+    const result = await service.deleteAll("user-1");
+
+    expect(prisma.notification.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+      },
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
   it("대댓글 알림은 게시글 작성자와 부모 댓글 작성자에게 중복 없이 생성한다", async () => {
     const { prisma, service } = createService();
     prisma.userNotificationPreference.findMany.mockResolvedValue([]);
@@ -153,6 +182,15 @@ describe("NotificationsService", () => {
     prisma.notification.findFirst.mockResolvedValue(null);
 
     await expect(service.markRead("user-1", "missing")).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+    });
+  });
+
+  it("알림이 없으면 404로 삭제를 막는다", async () => {
+    const { prisma, service } = createService();
+    prisma.notification.findFirst.mockResolvedValue(null);
+
+    await expect(service.deleteNotification("user-1", "missing")).rejects.toMatchObject({
       status: HttpStatus.NOT_FOUND,
     });
   });

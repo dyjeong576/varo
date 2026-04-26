@@ -1,5 +1,10 @@
 # Current Task
 
+## 임시 전환 작업
+- `/notifications` 점3개 메뉴, 전체 삭제, 개별 삭제 동작을 보완한다.
+- `/community` 피드의 게시글 공감 버튼을 토글 가능하게 맞춘다.
+- `/history`에서 review와 pending draft를 삭제할 수 있게 보완한다.
+
 ## 작업명
 글로벌 검색 provider routing 전환
 

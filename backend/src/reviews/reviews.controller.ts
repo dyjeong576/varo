@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpStatus,
+  Param,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   ApiBadGatewayResponse,
@@ -113,6 +122,33 @@ export class ReviewsController {
     @Param("reviewId") reviewId: string,
   ): Promise<ReviewQueryProcessingPreviewResponseDto> {
     return this.reviewsService.getQueryProcessingPreview(current.user.id, reviewId);
+  }
+
+  @Delete(":reviewId")
+  @ApiCookieAuth("sessionAuth")
+  @UseGuards(SessionAuthGuard)
+  @ApiOperation({
+    summary: "review preview 삭제",
+    description:
+      "로그인한 사용자의 review preview와 연결된 source, evidence, history, review 대상 알림을 함께 삭제합니다.",
+  })
+  @ApiOkResponse({
+    description: "review preview 삭제 성공",
+    type: ReviewReopenResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: "해당 review를 찾을 수 없음",
+    type: ApiErrorResponseDto,
+  })
+  async deleteQueryProcessingPreview(
+    @CurrentUser() current: { user: { id: string } },
+    @Param("reviewId") reviewId: string,
+  ): Promise<ReviewReopenResponseDto> {
+    return this.reviewsService.deleteQueryProcessingPreview(current.user.id, reviewId);
   }
 
   @Post(":reviewId/reopen")

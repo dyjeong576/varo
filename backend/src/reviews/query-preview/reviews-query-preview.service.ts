@@ -210,6 +210,13 @@ export class ReviewsQueryPreviewService {
     return mapStoredPreviewResponse(reviewJob);
   }
 
+  async deleteQueryProcessingPreview(
+    userId: string,
+    reviewId: string,
+  ): Promise<void> {
+    await this.persistenceService.deleteQueryProcessingPreview(userId, reviewId);
+  }
+
   async recordReviewReopen(
     userId: string,
     reviewId: string,

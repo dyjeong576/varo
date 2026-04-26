@@ -19,6 +19,8 @@ import {
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import type { Request, Response } from "express";
+import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
+import { AppException } from "../common/exceptions/app-exception";
 import { AuthService } from "./auth.service";
 import { SessionService } from "./session.service";
 import { SessionResponseDto } from "./dto/session-response.dto";
@@ -59,35 +61,59 @@ export class AuthController {
     summary: "구글 로그인 콜백 처리",
     description: "구글 인증 완료 후 세션을 발급하고 적절한 화면으로 이동시킵니다.",
   })
-  @ApiQuery({ name: "code", required: true, description: "구글 인증 코드" })
+  @ApiQuery({ name: "code", required: false, description: "구글 인증 코드" })
   @ApiQuery({ name: "state", required: true, description: "로그인 상태 검증 토큰" })
+  @ApiQuery({
+    name: "error",
+    required: false,
+    description: "구글 로그인 취소 또는 실패 코드",
+  })
   @ApiUnauthorizedResponse({
     description: "로그인 검증 실패",
     type: ApiErrorResponseDto,
   })
   async handleGoogleCallback(
-    @Query("code") code: string,
+    @Query("code") code: string | undefined,
     @Query("state") state: string,
+    @Query("error") error: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    const result = await this.authService.handleGoogleCallback({
-      code,
-      stateToken: state,
-      stateCookie: request.cookies?.[this.sessionService.getOauthStateCookieName()],
-    });
+    const frontendBaseUrl = this.getFrontendBaseUrl();
 
-    this.sessionService.clearOauthStateCookie(response);
-    this.sessionService.writeSessionCookie(response, result.sessionId, result.expiresAt);
-    const frontendBaseUrl =
-      this.configService.get<string>("frontendBaseUrl") ??
-      this.configService.get<string>("FRONTEND_BASE_URL");
-
-    if (!frontendBaseUrl) {
-      throw new Error("FRONTEND_BASE_URL이 설정되지 않았습니다.");
+    if (error === "access_denied") {
+      this.sessionService.clearOauthStateCookie(response);
+      response.redirect(
+        buildFrontendRedirectUrl(frontendBaseUrl, "/login?authError=google_access_denied"),
+      );
+      return;
     }
 
-    response.redirect(buildFrontendRedirectUrl(frontendBaseUrl, result.redirectTo));
+    try {
+      const result = await this.authService.handleGoogleCallback({
+        code,
+        stateToken: state,
+        stateCookie: request.cookies?.[this.sessionService.getOauthStateCookieName()],
+      });
+
+      this.sessionService.clearOauthStateCookie(response);
+      this.sessionService.writeSessionCookie(response, result.sessionId, result.expiresAt);
+      response.redirect(buildFrontendRedirectUrl(frontendBaseUrl, result.redirectTo));
+    } catch (authError) {
+      this.sessionService.clearOauthStateCookie(response);
+
+      if (
+        authError instanceof AppException &&
+        authError.code === APP_ERROR_CODES.AUTH_REQUIRED
+      ) {
+        response.redirect(
+          buildFrontendRedirectUrl(frontendBaseUrl, "/login?authError=google_auth_failed"),
+        );
+        return;
+      }
+
+      throw authError;
+    }
   }
 
   @Get("session")
@@ -121,5 +147,17 @@ export class AuthController {
 
     this.sessionService.clearSessionCookie(response);
     response.status(HttpStatus.NO_CONTENT).send();
+  }
+
+  private getFrontendBaseUrl(): string {
+    const frontendBaseUrl =
+      this.configService.get<string>("frontendBaseUrl") ??
+      this.configService.get<string>("FRONTEND_BASE_URL");
+
+    if (!frontendBaseUrl) {
+      throw new Error("FRONTEND_BASE_URL이 설정되지 않았습니다.");
+    }
+
+    return frontendBaseUrl;
   }
 }

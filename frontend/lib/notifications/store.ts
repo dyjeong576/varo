@@ -126,6 +126,29 @@ export async function markAllNotificationsRead(): Promise<void> {
   });
 }
 
+export async function deleteNotification(id: string): Promise<void> {
+  await api.notifications.delete(id);
+
+  const nextItems = notificationsSnapshot.items.filter((item) => item.id !== id);
+  const nextUnreadCount = nextItems.filter((item) => !item.isRead).length;
+
+  setNotificationsSnapshot({
+    ...notificationsSnapshot,
+    items: nextItems,
+    unreadCount: nextUnreadCount,
+  });
+}
+
+export async function deleteAllNotifications(): Promise<void> {
+  await api.notifications.deleteAll();
+
+  setNotificationsSnapshot({
+    ...notificationsSnapshot,
+    items: [],
+    unreadCount: 0,
+  });
+}
+
 export function clearNotifications(): void {
   notificationsSnapshot = DEFAULT_SNAPSHOT;
   emitChange();

@@ -29,11 +29,13 @@ export function PostList() {
     loadPosts();
   }, []);
 
-  async function handleAddLike(postId: string) {
+  async function handleToggleLike(postId: string, likedByMe: boolean) {
     setSubmittingLikePostId(postId);
 
     try {
-      const nextLikeState = await api.community.addLike(postId);
+      const nextLikeState = likedByMe
+        ? await api.community.removeLike(postId)
+        : await api.community.addLike(postId);
 
       setPosts((currentPosts) =>
         currentPosts.map((post) =>
@@ -48,8 +50,8 @@ export function PostList() {
       );
       setErrorMessage(null);
     } catch (error) {
-      console.error("Failed to add like:", error);
-      setErrorMessage("공감을 추가하지 못했습니다.");
+      console.error("Failed to toggle like:", error);
+      setErrorMessage("공감 상태를 변경하지 못했습니다.");
     } finally {
       setSubmittingLikePostId(null);
     }
@@ -111,7 +113,7 @@ export function PostList() {
         <PostCard
           key={post.id}
           post={post}
-          onAddLike={handleAddLike}
+          onToggleLike={handleToggleLike}
           isLikeSubmitting={submittingLikePostId === post.id}
         />
       ))}

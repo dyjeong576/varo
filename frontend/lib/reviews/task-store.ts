@@ -371,6 +371,12 @@ export function removeReviewTask(draftId: string): void {
   );
 }
 
+export function removeReviewTaskByReviewId(reviewId: string): void {
+  writeTaskRecords(
+    readTaskRecords().filter((record) => record.reviewId !== reviewId),
+  );
+}
+
 export function clearReviewTasks(): void {
   inFlightRequests.clear();
   writeTaskRecords([]);

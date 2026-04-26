@@ -15,6 +15,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         id: "claim-1",
         rawText: "트럼프가 오늘 관세 발표했대",
       }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     reviewJob: {
       create: jest.fn().mockResolvedValue({
@@ -23,6 +24,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         clientRequestId: "pending:review-1",
       }),
       update: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
+      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue({
@@ -70,6 +73,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     userHistory: {
       create: jest.fn().mockResolvedValue(undefined),
     },
+    notification: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    $transaction: jest.fn(),
   });
 
   it("clientRequestId를 포함해 claim과 review job을 생성한다", async () => {
@@ -515,6 +522,83 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
 
     await expect(
       service.getQueryProcessingPreview("user-2", "review-404"),
+    ).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: APP_ERROR_CODES.NOT_FOUND,
+    });
+  });
+
+  it("review와 연결된 알림을 삭제하고 orphan claim을 정리한다", async () => {
+    const prisma = createPrismaMock();
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
+    prisma.reviewJob.findFirst.mockResolvedValue({
+      id: "review-1",
+      claimId: "claim-1",
+    });
+    prisma.reviewJob.count.mockResolvedValue(0);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
+
+    await service.deleteQueryProcessingPreview("user-1", "review-1");
+
+    expect(prisma.notification.deleteMany).toHaveBeenCalledWith({
+      where: {
+        targetType: "review",
+        targetId: "review-1",
+      },
+    });
+    expect(prisma.reviewJob.delete).toHaveBeenCalledWith({
+      where: {
+        id: "review-1",
+      },
+    });
+    expect(prisma.claim.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: "claim-1",
+      },
+    });
+  });
+
+  it("같은 claim의 다른 review가 남아 있으면 claim은 유지한다", async () => {
+    const prisma = createPrismaMock();
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
+    prisma.reviewJob.findFirst.mockResolvedValue({
+      id: "review-1",
+      claimId: "claim-1",
+    });
+    prisma.reviewJob.count.mockResolvedValue(1);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
+
+    await service.deleteQueryProcessingPreview("user-1", "review-1");
+
+    expect(prisma.claim.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("본인 소유가 아닌 review 삭제는 404를 반환한다", async () => {
+    const prisma = createPrismaMock();
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
+    prisma.reviewJob.findFirst.mockResolvedValue(null);
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
+
+    await expect(
+      service.deleteQueryProcessingPreview("user-1", "review-404"),
     ).rejects.toMatchObject({
       status: HttpStatus.NOT_FOUND,
       code: APP_ERROR_CODES.NOT_FOUND,

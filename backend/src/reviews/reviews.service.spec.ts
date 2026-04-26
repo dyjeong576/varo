@@ -14,6 +14,7 @@ describe("ReviewsService", () => {
       createTestQueryProcessingPreview: jest.fn(),
       listQueryProcessingPreviews: jest.fn(),
       getQueryProcessingPreview: jest.fn(),
+      deleteQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(
@@ -44,6 +45,7 @@ describe("ReviewsService", () => {
         .mockResolvedValue({ reviewId: "review-1" }),
       listQueryProcessingPreviews: jest.fn(),
       getQueryProcessingPreview: jest.fn(),
+      deleteQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(
@@ -69,6 +71,7 @@ describe("ReviewsService", () => {
         .fn()
         .mockResolvedValue([{ reviewId: "review-1" }]),
       getQueryProcessingPreview: jest.fn(),
+      deleteQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(
@@ -92,6 +95,7 @@ describe("ReviewsService", () => {
       getQueryProcessingPreview: jest
         .fn()
         .mockResolvedValue({ reviewId: "review-1" }),
+      deleteQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn(),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(
@@ -108,12 +112,36 @@ describe("ReviewsService", () => {
     );
   });
 
+  it("review preview 삭제를 query preview service에 위임한다", async () => {
+    const queryPreviewService = {
+      createQueryProcessingPreview: jest.fn(),
+      createTestQueryProcessingPreview: jest.fn(),
+      listQueryProcessingPreviews: jest.fn(),
+      getQueryProcessingPreview: jest.fn(),
+      deleteQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
+      recordReviewReopen: jest.fn(),
+    } as unknown as ReviewsQueryPreviewService;
+    const service = new ReviewsService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+    );
+
+    const result = await service.deleteQueryProcessingPreview("user-1", "review-1");
+
+    expect(result).toEqual({ ok: true });
+    expect(queryPreviewService.deleteQueryProcessingPreview).toHaveBeenCalledWith(
+      "user-1",
+      "review-1",
+    );
+  });
+
   it("review preview 재진입 기록을 query preview service에 위임한다", async () => {
     const queryPreviewService = {
       createQueryProcessingPreview: jest.fn(),
       createTestQueryProcessingPreview: jest.fn(),
       listQueryProcessingPreviews: jest.fn(),
       getQueryProcessingPreview: jest.fn(),
+      deleteQueryProcessingPreview: jest.fn(),
       recordReviewReopen: jest.fn().mockResolvedValue(undefined),
     } as unknown as ReviewsQueryPreviewService;
     const service = new ReviewsService(

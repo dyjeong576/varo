@@ -7,11 +7,11 @@ import { formatCommunityDateTime } from "@/lib/community/format";
 
 interface PostCardProps {
   post: CommunityPost;
-  onAddLike: (postId: string) => Promise<void>;
+  onToggleLike: (postId: string, likedByMe: boolean) => Promise<void>;
   isLikeSubmitting: boolean;
 }
 
-export function PostCard({ post, onAddLike, isLikeSubmitting }: PostCardProps) {
+export function PostCard({ post, onToggleLike, isLikeSubmitting }: PostCardProps) {
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'Issue': return 'text-[#0050cb] bg-[#0050cb]/5';
@@ -60,13 +60,13 @@ export function PostCard({ post, onAddLike, isLikeSubmitting }: PostCardProps) {
           </Link>
           <button
             type="button"
-            disabled={isLikeSubmitting || post.likedByMe}
+            disabled={isLikeSubmitting}
             onClick={() => {
-              if (post.likedByMe || isLikeSubmitting) {
+              if (isLikeSubmitting) {
                 return;
               }
 
-              void onAddLike(post.id);
+              void onToggleLike(post.id, post.likedByMe);
             }}
             className={`flex items-center gap-1 transition-colors disabled:cursor-not-allowed ${
               post.likedByMe ? "text-[#0050cb]" : "hover:text-[#0050cb]"

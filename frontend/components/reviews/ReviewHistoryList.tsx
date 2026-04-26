@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { ReviewPreviewSummary } from "@/lib/reviews/types";
 import { buildReviewEntryHref } from "@/lib/reviews/navigation";
 
@@ -10,6 +10,8 @@ interface ReviewHistoryListProps {
   isLoading?: boolean;
   emptyMessage?: string;
   onNavigate?: () => void;
+  onDelete?: (review: ReviewPreviewSummary) => void | Promise<void>;
+  deletingReviewId?: string | null;
 }
 
 export function ReviewHistoryList({
@@ -17,6 +19,8 @@ export function ReviewHistoryList({
   isLoading = false,
   emptyMessage = "데이터가 없습니다.",
   onNavigate,
+  onDelete,
+  deletingReviewId = null,
 }: ReviewHistoryListProps) {
   if (isLoading) {
     return (
@@ -60,26 +64,44 @@ export function ReviewHistoryList({
           </>
         );
 
-        if (review.reviewId.startsWith("pending:")) {
-          return (
-            <div
-              key={review.reviewId}
-              className="block rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
-            >
+        const contentNode = review.reviewId.startsWith("pending:")
+          ? (
+            <div className="min-w-0 flex-1">
               {content}
             </div>
+          )
+          : (
+            <Link
+              href={buildReviewEntryHref(review.reviewId, "history")}
+              className="min-w-0 flex-1"
+              onClick={onNavigate}
+            >
+              {content}
+            </Link>
           );
-        }
 
         return (
-          <Link
+          <div
             key={review.reviewId}
-            href={buildReviewEntryHref(review.reviewId, "history")}
-            className="block rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/50 hover:bg-blue-50/30"
-            onClick={onNavigate}
+            className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/50 hover:bg-blue-50/30"
           >
-            {content}
-          </Link>
+            {contentNode}
+            {onDelete ? (
+              <button
+                type="button"
+                aria-label="review 삭제"
+                disabled={deletingReviewId === review.reviewId}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void onDelete(review);
+                }}
+                className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
         );
       })}
     </div>

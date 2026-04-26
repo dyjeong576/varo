@@ -204,6 +204,10 @@ export const api = {
 
       return mapReviewPreviewDetail(response);
     },
+    delete: async (reviewId: string): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>(`/api/v1/reviews/${encodeURIComponent(reviewId)}`, {
+        method: "DELETE",
+      }),
     recordReopen: async (
       reviewId: string,
       source: ReviewEntrySource,
@@ -240,6 +244,17 @@ export const api = {
     markAllRead: async (): Promise<{ ok: true }> =>
       apiRequest<{ ok: true }>("/api/v1/notifications/read-all", {
         method: "POST",
+      }),
+    delete: async (notificationId: string): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>(
+        `/api/v1/notifications/${encodeURIComponent(notificationId)}`,
+        {
+          method: "DELETE",
+        },
+      ),
+    deleteAll: async (): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>("/api/v1/notifications/all", {
+        method: "DELETE",
       }),
     getPreferences: async (): Promise<NotificationPreferences> =>
       normalizeNotificationPreferences(

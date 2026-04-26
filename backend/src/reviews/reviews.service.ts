@@ -95,6 +95,15 @@ export class ReviewsService {
     return this.queryPreviewService.getQueryProcessingPreview(userId, reviewId);
   }
 
+  async deleteQueryProcessingPreview(
+    userId: string,
+    reviewId: string,
+  ): Promise<ReviewReopenResponseDto> {
+    await this.queryPreviewService.deleteQueryProcessingPreview(userId, reviewId);
+
+    return { ok: true };
+  }
+
   async recordReviewReopen(
     userId: string,
     reviewId: string,

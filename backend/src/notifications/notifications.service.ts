@@ -128,6 +128,31 @@ export class NotificationsService {
     return { ok: true };
   }
 
+  async deleteNotification(
+    userId: string,
+    notificationId: string,
+  ): Promise<NotificationActionResponseDto> {
+    await this.ensureNotificationOwner(userId, notificationId);
+
+    await this.prisma.notification.delete({
+      where: {
+        id: notificationId,
+      },
+    });
+
+    return { ok: true };
+  }
+
+  async deleteAll(userId: string): Promise<NotificationActionResponseDto> {
+    await this.prisma.notification.deleteMany({
+      where: {
+        userId,
+      },
+    });
+
+    return { ok: true };
+  }
+
   async getPreferences(userId: string): Promise<NotificationPreferencesResponseDto> {
     const preferences = await this.prisma.userNotificationPreference.upsert({
       where: { userId },

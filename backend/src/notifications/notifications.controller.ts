@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBody,
   ApiCookieAuth,
@@ -102,6 +111,25 @@ export class NotificationsController {
     return this.notificationsService.markAllRead(current.user.id);
   }
 
+  @Delete("all")
+  @ApiOperation({
+    summary: "알림 전체 삭제",
+    description: "현재 로그인 사용자의 알림을 모두 삭제합니다.",
+  })
+  @ApiOkResponse({
+    description: "알림 전체 삭제 성공",
+    type: NotificationActionResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  async deleteAll(
+    @CurrentUser() current: { user: { id: string } },
+  ): Promise<NotificationActionResponseDto> {
+    return this.notificationsService.deleteAll(current.user.id);
+  }
+
   @Post(":notificationId/read")
   @ApiOperation({
     summary: "알림 읽음 처리",
@@ -124,5 +152,29 @@ export class NotificationsController {
     @Param("notificationId") notificationId: string,
   ): Promise<NotificationActionResponseDto> {
     return this.notificationsService.markRead(current.user.id, notificationId);
+  }
+
+  @Delete(":notificationId")
+  @ApiOperation({
+    summary: "알림 삭제",
+    description: "특정 알림을 삭제합니다.",
+  })
+  @ApiOkResponse({
+    description: "알림 삭제 성공",
+    type: NotificationActionResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: "해당 알림을 찾을 수 없음",
+    type: ApiErrorResponseDto,
+  })
+  async deleteNotification(
+    @CurrentUser() current: { user: { id: string } },
+    @Param("notificationId") notificationId: string,
+  ): Promise<NotificationActionResponseDto> {
+    return this.notificationsService.deleteNotification(current.user.id, notificationId);
   }
 }

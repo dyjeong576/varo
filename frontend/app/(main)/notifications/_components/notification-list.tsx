@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { NotificationItem } from "@/lib/notifications/types";
 import {
+  deleteNotification,
   getNotificationHref,
   getNotifications,
   getNotificationsState,
@@ -19,7 +20,8 @@ import {
   Bell, 
   ArrowRight, 
   Sparkles,
-  Check
+  Check,
+  X
 } from "lucide-react";
 
 export function NotificationList() {
@@ -121,7 +123,16 @@ export function NotificationList() {
 
   const renderNotificationItem = (notif: NotificationItem) => {
     const content = (
-      <>
+      <Link
+        href={getNotificationHref({
+          targetType: notif.targetType,
+          targetId: notif.targetId,
+        })}
+        className="flex min-w-0 flex-1 gap-4"
+        onClick={() => {
+          void markNotificationRead(notif.id);
+        }}
+      >
         <div className={`relative flex-shrink-0 w-12 h-12 rounded-2xl ${getIconBg(notif.type, notif.isRead)} flex items-center justify-center`}>
           {getIcon(notif.type, notif.isRead)}
           {!notif.isRead && (
@@ -141,27 +152,32 @@ export function NotificationList() {
             {notif.message}
           </p>
         </div>
-      </>
+      </Link>
     );
 
-    const itemClasses = `group px-6 py-4 flex gap-4 transition-colors cursor-pointer active:scale-[0.98] duration-150 ${
+    const itemClasses = `group px-6 py-4 flex items-start gap-3 transition-colors duration-150 ${
       notif.isRead ? 'bg-[#faf8ff] opacity-70' : 'bg-white'
     } hover:bg-[#f2f3ff]`;
 
     return (
-      <Link
+      <div
         key={notif.id}
-        href={getNotificationHref({
-          targetType: notif.targetType,
-          targetId: notif.targetId,
-        })}
         className={itemClasses}
-        onClick={() => {
-          void markNotificationRead(notif.id);
-        }}
       >
         {content}
-      </Link>
+        <button
+          type="button"
+          aria-label="알림 삭제"
+          onClick={() => {
+            void deleteNotification(notif.id).catch((error) => {
+              console.error("Failed to delete notification:", error);
+            });
+          }}
+          className="mt-0.5 rounded-full p-1.5 text-[#727687] transition-colors hover:bg-white hover:text-[#191b24]"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
     );
   };
 

@@ -65,6 +65,7 @@ describe("ReviewsQueryPreviewService", () => {
     }),
     listRecentQueryProcessingPreviews: jest.fn().mockResolvedValue([]),
     getQueryProcessingPreview: jest.fn(),
+    deleteQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
     ensureReopenableReview: jest.fn().mockResolvedValue({
       id: "review-1",
       handoffPayload: {
@@ -851,5 +852,20 @@ describe("ReviewsQueryPreviewService", () => {
       reviewJobId: "review-1",
       entryType: "reopened",
     });
+  });
+
+  it("review 삭제 요청을 persistence에 위임한다", async () => {
+    const persistence = createPersistenceMock();
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      {} as never,
+    );
+
+    await service.deleteQueryProcessingPreview("user-1", "review-1");
+
+    expect(persistence.deleteQueryProcessingPreview).toHaveBeenCalledWith(
+      "user-1",
+      "review-1",
+    );
   });
 });

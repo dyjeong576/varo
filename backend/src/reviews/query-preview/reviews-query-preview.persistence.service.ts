@@ -217,6 +217,59 @@ export class ReviewsQueryPreviewPersistenceService {
     return reviewJob;
   }
 
+  async deleteQueryProcessingPreview(
+    userId: string,
+    reviewId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const reviewJob = await tx.reviewJob.findFirst({
+        where: {
+          id: reviewId,
+          userId,
+        },
+        select: {
+          id: true,
+          claimId: true,
+        },
+      });
+
+      if (!reviewJob) {
+        throw new AppException(
+          APP_ERROR_CODES.NOT_FOUND,
+          "리뷰를 찾을 수 없습니다.",
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      await tx.notification.deleteMany({
+        where: {
+          targetType: "review",
+          targetId: reviewJob.id,
+        },
+      });
+
+      await tx.reviewJob.delete({
+        where: {
+          id: reviewJob.id,
+        },
+      });
+
+      const remainingReviewCount = await tx.reviewJob.count({
+        where: {
+          claimId: reviewJob.claimId,
+        },
+      });
+
+      if (remainingReviewCount === 0) {
+        await tx.claim.deleteMany({
+          where: {
+            id: reviewJob.claimId,
+          },
+        });
+      }
+    });
+  }
+
   async recordHistoryEntry(params: {
     userId: string;
     reviewJobId: string;

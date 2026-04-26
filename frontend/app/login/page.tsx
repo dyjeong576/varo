@@ -12,8 +12,31 @@ export const metadata: Metadata = buildPageMetadata(
   `${APP_NAME} ${APP_TAGLINE}. 수집된 출처를 바탕으로 근거 중심 검토를 시작하세요.`,
 );
 
-export default async function LoginPage() {
+interface LoginPageProps {
+  searchParams?: Promise<{
+    authError?: string | string[];
+  }>;
+}
+
+function getAuthErrorMessage(authError?: string): string | null {
+  if (authError === "google_access_denied") {
+    return "구글 로그인 시도가 취소되었습니다.";
+  }
+
+  if (authError === "google_auth_failed") {
+    return "로그인에 실패했습니다. 다시 시도해 주세요.";
+  }
+
+  return null;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await getServerSession();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const authError = Array.isArray(resolvedSearchParams?.authError)
+    ? resolvedSearchParams?.authError[0]
+    : resolvedSearchParams?.authError;
+  const authErrorMessage = getAuthErrorMessage(authError);
 
   if (session.isAuthenticated) {
     redirect(session.profileComplete ? "/" : "/onboarding/profile");
@@ -37,6 +60,12 @@ export default async function LoginPage() {
         <p className="mb-12 text-center text-lg text-gray-600 break-keep">
           수집된 출처를 바탕으로 판단의 맥락을 정리합니다.
         </p>
+
+        {authErrorMessage ? (
+          <div className="mb-4 w-full rounded-2xl text-center border border-[#ffd7d7] bg-[#fff6f6] px-4 py-3 text-sm text-[#b42318]">
+            {authErrorMessage}
+          </div>
+        ) : null}
 
         <Link
           href={`${API_BASE_URL}/api/v1/auth/google`}
