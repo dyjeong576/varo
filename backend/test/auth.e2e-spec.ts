@@ -64,6 +64,7 @@ describe("AuthController (e2e)", () => {
     await controller.handleGoogleCallback(
       "google-code",
       "state-token",
+      undefined,
       {
         cookies: {
           varo_session_oauth_state: "state-token",
@@ -103,6 +104,7 @@ describe("AuthController (e2e)", () => {
     await controller.handleGoogleCallback(
       "google-code",
       "state-token",
+      undefined,
       {
         cookies: {
           varo_session_oauth_state: "state-token",
@@ -142,6 +144,7 @@ describe("AuthController (e2e)", () => {
     await controller.handleGoogleCallback(
       "google-code",
       "state-token",
+      undefined,
       {
         cookies: {
           varo_session_oauth_state: "state-token",
