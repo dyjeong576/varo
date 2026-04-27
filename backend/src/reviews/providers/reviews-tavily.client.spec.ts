@@ -5,18 +5,32 @@ function createFetchResponse({
   ok = true,
   status = 200,
   jsonData,
+  jsonError,
   textData = "",
+  contentType = "application/json",
 }: {
   ok?: boolean;
   status?: number;
   jsonData?: unknown;
+  jsonError?: Error;
   textData?: string;
+  contentType?: string;
 }) {
   return {
     ok,
     status,
-    json: jest.fn().mockResolvedValue(jsonData),
+    json: jsonError
+      ? jest.fn().mockRejectedValue(jsonError)
+      : jest.fn().mockResolvedValue(jsonData),
     text: jest.fn().mockResolvedValue(textData),
+    clone: jest.fn().mockReturnValue({
+      text: jest.fn().mockResolvedValue(textData),
+    }),
+    headers: {
+      get: jest.fn((name: string) =>
+        name.toLowerCase() === "content-type" ? contentType : null,
+      ),
+    },
   } as unknown as Response;
 }
 
@@ -166,6 +180,34 @@ describe("ReviewsTavilyClient", () => {
       details: {
         status: 429,
         body: "rate limited",
+        urlCount: 1,
+      },
+    });
+  });
+
+  it("extract JSON 파싱 실패는 응답 메타데이터를 details에 포함한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonError: new SyntaxError("Unexpected token '<'"),
+        textData: "<html>blocked</html>",
+        contentType: "text/html",
+      }),
+    ) as typeof fetch;
+
+    const client = new ReviewsTavilyClient();
+
+    await expect(
+      client.extractContent({
+        apiKey: "tvly-test-key",
+        timeoutMs: 40000,
+        candidates: [extractCandidate],
+      }),
+    ).rejects.toMatchObject({
+      code: "EXTRACTION_FAILED",
+      details: {
+        status: 200,
+        contentType: "text/html",
+        bodyLength: 20,
         urlCount: 1,
       },
     });

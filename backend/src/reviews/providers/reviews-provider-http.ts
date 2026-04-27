@@ -2,6 +2,8 @@ import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
 
+const PROVIDER_HTTP_DEBUG_BODY = process.env.PROVIDER_HTTP_DEBUG_BODY === "true";
+
 export async function postJson<T>(
   url: string,
   init: RequestInit,
@@ -31,6 +33,9 @@ export async function postJson<T>(
     });
   }
 
+  const responseText = response.clone
+    ? await response.clone().text().catch(() => "")
+    : "";
   try {
     return (await response.json()) as T;
   } catch {
@@ -38,6 +43,12 @@ export async function postJson<T>(
       errorCode,
       `${errorMessage} 응답 JSON 파싱에 실패했습니다.`,
       HttpStatus.BAD_GATEWAY,
+      {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        bodyLength: responseText.length,
+        ...(PROVIDER_HTTP_DEBUG_BODY ? { body: responseText.slice(0, 500) } : {}),
+      },
     );
   }
 }
