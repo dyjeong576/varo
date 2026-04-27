@@ -115,15 +115,16 @@
 ### 6.1 단계
 
 1. claim 접수
-2. source 검색
-3. 본문 추출
-4. evidence 정리
-5. preview detail 제공 가능 상태로 저장
-6. interpretation 생성
-7. 결과 저장
-8. 완료 알림 생성
-9. history 반영
-10. 인기 집계 입력 반영
+2. claim understanding / search planning
+3. source 검색
+4. 본문 추출
+5. evidence 정리
+6. preview detail 제공 가능 상태로 저장
+7. interpretation 생성
+8. 결과 저장
+9. 완료 알림 생성
+10. history 반영
+11. 인기 집계 입력 반영
 
 ### 6.2 상태값
 
@@ -139,12 +140,13 @@
 ### 6.3 review 원칙
 
 - 결과는 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
-- verdict는 기사 수가 아니라 evidence 구조를 바탕으로 계산한다.
+- verdict는 기사 수나 단순 agreement score가 아니라 evidence 구조와 query purpose별 근거 성격을 바탕으로 계산한다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
+- provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - 한국 뉴스성 claim은 Naver News Search, 해외/글로벌 뉴스성 claim은 Tavily Search/Extract로 검색한다.
-- 글로벌 route의 Tavily 검색 입력은 영어 `search_claim / search_queries` 아티팩트를 사용하고, 사용자-facing `core_claim / generated_queries`는 원문을 유지한다.
+- 글로벌 route의 Tavily 검색 입력은 영어 `search_plan` query 또는 기존 호환용 `search_claim / search_queries` 아티팩트를 사용하고, 사용자-facing `core_claim / generated_queries`는 원문을 유지한다.
 
 ### 6.4 worker 책임
 

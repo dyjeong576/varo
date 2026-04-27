@@ -1,4 +1,5 @@
 import { EvidenceSnippet, Source } from "@prisma/client";
+import { SearchPlan } from "../reviews.types";
 import { assembleReviewResult } from "./review-result-assembler";
 
 function createSource(overrides: Partial<Source>): Source {
@@ -36,6 +37,22 @@ function createSnippet(overrides: Partial<EvidenceSnippet>): EvidenceSnippet {
     stance: "neutral",
     startOffset: null,
     endOffset: null,
+    ...overrides,
+  };
+}
+
+function createSearchPlan(overrides: Partial<SearchPlan> = {}): SearchPlan {
+  return {
+    normalizedClaim: "테슬라 로드스터 공개 일정",
+    claimType: "scheduled_event",
+    verificationGoal: "테슬라 로드스터 공개 일정의 현재 기준 사실성을 확인한다.",
+    searchRoute: "korean_news",
+    queries: [
+      { id: "q1", purpose: "claim_specific", query: "테슬라 로드스터 2026년 4월 공개", priority: 1 },
+      { id: "q2", purpose: "current_state", query: "테슬라 로드스터 출시일", priority: 2 },
+      { id: "q3", purpose: "primary_source", query: "Tesla Roadster official announcement", priority: 3 },
+      { id: "q4", purpose: "contradiction_or_update", query: "테슬라 로드스터 공개 연기", priority: 4 },
+    ],
     ...overrides,
   };
 }
@@ -158,6 +175,81 @@ describe("assembleReviewResult", () => {
     expect(result.result.uncertaintyItems).toContain(
       "지지와 충돌 근거가 함께 있어 단일 결론으로 보기 어렵습니다.",
     );
+  });
+
+  it("scheduled_event의 최신 연기 신호가 있으면 과거 지지 보도만으로 high consensus를 만들지 않는다", () => {
+    const sources = [
+      createSource({
+        id: "source-1",
+        rawTitle: "테슬라 로드스터 2026년 4월 공개 전망",
+        publishedAt: new Date("2025-12-20T01:00:00.000Z"),
+        originQueryIds: ["q1"],
+      }),
+      createSource({
+        id: "source-2",
+        rawTitle: "머스크, 로드스터 4월 말 공개 언급",
+        publishedAt: new Date("2026-04-02T01:00:00.000Z"),
+        canonicalUrl: "https://example.com/source-2",
+        originalUrl: "https://example.com/source-2",
+        originQueryIds: ["q1"],
+      }),
+      createSource({
+        id: "source-3",
+        rawTitle: "테슬라 로드스터 공개 다음 달로 연기",
+        rawSnippet: "2026-04-22 보도기사로 로드스터 공개가 또 연기되었다고 직접 보도함",
+        publishedAt: new Date("2026-04-22T01:00:00.000Z"),
+        canonicalUrl: "https://example.com/source-3",
+        originalUrl: "https://example.com/source-3",
+        originQueryIds: ["q4"],
+      }),
+    ];
+    const evidenceSnippets = [
+      createSnippet({ id: "snippet-1", sourceId: "source-1", snippetText: "4월 공개 전망" }),
+      createSnippet({ id: "snippet-2", sourceId: "source-2", snippetText: "4월 말 공개 언급" }),
+      createSnippet({ id: "snippet-3", sourceId: "source-3", snippetText: "공개가 다음 달로 연기" }),
+    ];
+
+    const result = assembleReviewResult({
+      coreClaim: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
+      rawClaim: "테슬라가 2026년 4월에 로드스터 차량이 공개되는게 맞나?",
+      sources,
+      evidenceSnippets,
+      insufficiencyReason: null,
+      searchPlan: createSearchPlan(),
+    });
+
+    expect(result.sourceStances["source-3"]).toBe("conflict");
+    expect(result.result.verdict).toBe("Mixed Evidence");
+    expect(result.result.consensusLevel).toBe("medium");
+    expect(result.result.confidenceScore).toBeLessThan(80);
+    expect(result.result.uncertaintyItems).toContain(
+      "최신 업데이트/연기 신호가 있어 과거 보도 합의만으로 현재 기준 결론을 강화하지 않습니다.",
+    );
+  });
+
+  it("scheduled_event의 postponed 업데이트 신호도 conflict로 분류한다", () => {
+    const source = createSource({
+      rawTitle: "Tesla Roadster reveal postponed to next month",
+      rawSnippet: "The Roadster event was delayed and moved to next month.",
+      originQueryIds: ["q4"],
+    });
+
+    const result = assembleReviewResult({
+      coreClaim: "Tesla will reveal the Roadster in April 2026",
+      rawClaim: "Is Tesla revealing the Roadster in April 2026?",
+      sources: [source],
+      evidenceSnippets: [
+        createSnippet({
+          sourceId: source.id,
+          snippetText: "Roadster event was postponed to next month",
+        }),
+      ],
+      insufficiencyReason: null,
+      searchPlan: createSearchPlan({ searchRoute: "global_news" }),
+    });
+
+    expect(result.sourceStances[source.id]).toBe("conflict");
+    expect(result.result.consensusLevel).toBe("low");
   });
 
   it("근거가 부족하면 Unclear를 반환한다", () => {

@@ -39,13 +39,51 @@ describe("ReviewsOpenAiClient", () => {
                   text: JSON.stringify({
                     languageCode: "ko",
                     coreClaim: "트럼프의 관세 발표",
+                    normalizedClaim: "트럼프가 관세를 발표했다",
+                    claimType: "policy",
+                    verificationGoal:
+                      "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+                    searchPlan: {
+                      normalizedClaim: "트럼프가 관세를 발표했다",
+                      claimType: "policy",
+                      verificationGoal:
+                        "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+                      searchRoute: "global_news",
+                      queries: [
+                        {
+                          id: "sp1",
+                          purpose: "claim_specific",
+                          query: "Trump tariff announcement",
+                          priority: 1,
+                        },
+                        {
+                          id: "sp2",
+                          purpose: "current_state",
+                          query: "Trump tariffs latest news",
+                          priority: 2,
+                        },
+                        {
+                          id: "sp3",
+                          purpose: "primary_source",
+                          query: "White House Trump tariff announcement",
+                          priority: 3,
+                        },
+                        {
+                          id: "sp4",
+                          purpose: "contradiction_or_update",
+                          query: "Trump tariff announcement update correction",
+                          priority: 4,
+                        },
+                      ],
+                    },
                     generatedQueries: [
                       "트럼프 관세 발표",
                       "Trump tariff announcement",
                       "미국 관세 정책 발표",
                     ],
                     searchRoute: "global_news",
-                    searchRouteReason: "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
+                    searchRouteReason:
+                      "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
                     searchClaim: "Trump tariff announcement",
                     searchQueries: [
                       "Trump tariff announcement",
@@ -68,14 +106,122 @@ describe("ReviewsOpenAiClient", () => {
     ) as typeof fetch;
 
     const client = new ReviewsOpenAiClient();
-    const result = await client.refineQuery("openai-test-key", "트럼프가 오늘 관세 발표했대");
+    const result = await client.refineQuery(
+      "openai-test-key",
+      "트럼프가 오늘 관세 발표했대",
+    );
 
     expect(result.topicCountryCode).toBe("US");
     expect(result.searchRoute).toBe("global_news");
     expect(result.searchClaim).toBe("Trump tariff announcement");
+    expect(result.normalizedClaim).toBe("트럼프가 관세를 발표했다");
+    expect(result.claimType).toBe("policy");
+    expect(result.searchPlan.queries).toHaveLength(4);
+    expect(result.searchPlan.queries.map((query) => query.purpose)).toEqual([
+      "claim_specific",
+      "current_state",
+      "primary_source",
+      "contradiction_or_update",
+    ]);
     expect(result.searchQueries).toHaveLength(3);
+    expect(result.searchQueries[0]?.text).toBe("Trump tariff announcement");
     expect(result.isKoreaRelated).toBe(false);
     expect(result.koreaRelevanceReason).toContain("한국");
     expect(result.generatedQueries).toHaveLength(3);
+    expect(result.generatedQueries[0]?.text).toBe("트럼프 관세 발표");
+  });
+
+  it("search plan purpose가 중복되어도 누락 purpose를 fallback query로 보정한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    languageCode: "ko",
+                    coreClaim: "트럼프의 관세 발표",
+                    normalizedClaim: "트럼프가 관세를 발표했다",
+                    claimType: "policy",
+                    verificationGoal: "트럼프의 관세 발표 여부를 확인한다.",
+                    searchPlan: {
+                      normalizedClaim: "트럼프가 관세를 발표했다",
+                      claimType: "policy",
+                      verificationGoal: "트럼프의 관세 발표 여부를 확인한다.",
+                      searchRoute: "global_news",
+                      queries: [
+                        {
+                          id: "sp1",
+                          purpose: "claim_specific",
+                          query: "Trump tariff announcement",
+                          priority: 1,
+                        },
+                        {
+                          id: "sp2",
+                          purpose: "claim_specific",
+                          query: "Trump tariffs latest news",
+                          priority: 2,
+                        },
+                        {
+                          id: "sp3",
+                          purpose: "primary_source",
+                          query: "White House Trump tariff announcement",
+                          priority: 3,
+                        },
+                        {
+                          id: "sp4",
+                          purpose: "contradiction_or_update",
+                          query: "Trump tariff announcement update correction",
+                          priority: 4,
+                        },
+                      ],
+                    },
+                    generatedQueries: [
+                      "트럼프 관세 발표",
+                      "미국 관세 정책 발표",
+                      "트럼프 관세 업데이트",
+                    ],
+                    searchRoute: "global_news",
+                    searchRouteReason:
+                      "미국 정책 발표를 다루는 해외 뉴스성 claim입니다.",
+                    searchClaim: "Trump tariff announcement",
+                    searchQueries: [
+                      "Trump tariff announcement",
+                      "US tariff policy announcement",
+                      "Trump tariff update",
+                    ],
+                    topicScope: "foreign",
+                    topicCountryCode: "US",
+                    countryDetectionReason: "미국 이슈로 판단했습니다.",
+                    isKoreaRelated: false,
+                    koreaRelevanceReason:
+                      "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new ReviewsOpenAiClient();
+    const result = await client.refineQuery(
+      "openai-test-key",
+      "트럼프가 오늘 관세 발표했대",
+    );
+
+    expect(result.searchPlan.queries.map((query) => query.purpose)).toEqual([
+      "claim_specific",
+      "current_state",
+      "primary_source",
+      "contradiction_or_update",
+    ]);
+    expect(result.searchPlan.queries[1]?.query).toBe(
+      "US tariff policy announcement",
+    );
+  
   });
 });

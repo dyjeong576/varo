@@ -199,3 +199,13 @@
 - `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim에만 사용하며, `out_of_scope` review job으로 기록한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
 - `real` 모드에서는 Naver, Tavily, OpenAI API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
+
+## 2026-04-26
+
+### Claim Understanding 기반 Search Planning
+- review query refinement는 단순 키워드 추출이 아니라 claim understanding + search planning 단계로 확장한다.
+- `search_route`는 provider routing의 authoritative field로 유지하고, `search_plan`은 검증 목적별 검색 질의 생성을 담당한다.
+- 기본 search plan query purpose는 `claim_specific`, `current_state`, `primary_source`, `contradiction_or_update` 4개로 고정한다.
+- provider 검색은 기존 `generated_queries/search_queries`보다 `search_plan.queries`를 우선 사용한다.
+- preview API 응답 shape는 이번 단계에서 변경하지 않고, `search_plan`은 query refinement artifact와 내부 traceability에만 저장한다.
+- Prisma migration은 도입하지 않고 기존 JSON artifact와 `origin_query_ids` 기반 추적을 유지한다.

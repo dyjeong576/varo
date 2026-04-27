@@ -1,4 +1,5 @@
 import { EvidenceSnippet, Source } from "@prisma/client";
+import { QueryPurpose, SearchPlan } from "../reviews.types";
 
 export type ReviewResultVerdict =
   | "Likely True"
@@ -20,6 +21,7 @@ interface ResultAssemblerInput {
   sources: Source[];
   evidenceSnippets: EvidenceSnippet[];
   insufficiencyReason: string | null;
+  searchPlan?: SearchPlan | null;
 }
 
 interface AssembledSourceBreakdown {
@@ -70,6 +72,24 @@ const CONFLICT_KEYWORDS = [
   "debunked",
   "misleading",
   "correction",
+];
+
+const UPDATE_KEYWORDS = [
+  "연기",
+  "미뤄",
+  "변경",
+  "일정 변경",
+  "다음 달",
+  "다음달",
+  "한 달 뒤",
+  "재연기",
+  "delayed",
+  "postponed",
+  "rescheduled",
+  "pushed back",
+  "moved to",
+  "next month",
+  "slipped",
 ];
 
 function categorizeSourceType(sourceType: string): ReviewSourceCategory {
@@ -129,12 +149,74 @@ function includesConflictKeyword(text: string): boolean {
   return CONFLICT_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
 }
 
+function includesUpdateKeyword(text: string): boolean {
+  return UPDATE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function buildQueryPurposesById(searchPlan?: SearchPlan | null): Map<string, QueryPurpose> {
+  return new Map((searchPlan?.queries ?? []).map((query) => [query.id, query.purpose]));
+}
+
+function parseOriginQueryIds(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function sourceHasQueryPurpose(
+  source: Source,
+  queryPurposesById: Map<string, QueryPurpose>,
+  purpose: QueryPurpose,
+): boolean {
+  return parseOriginQueryIds(source.originQueryIds).some(
+    (queryId) => queryPurposesById.get(queryId) === purpose,
+  );
+}
+
+function hasScheduledEventUpdateSignal(params: {
+  source: Source;
+  evidenceSnippets: EvidenceSnippet[];
+  queryPurposesById: Map<string, QueryPurpose>;
+  isScheduledEvent: boolean;
+}): boolean {
+  if (!params.isScheduledEvent) {
+    return false;
+  }
+
+  const text = buildSourceText(params.source, params.evidenceSnippets);
+  if (!text || !includesUpdateKeyword(text)) {
+    return false;
+  }
+
+  return (
+    sourceHasQueryPurpose(
+      params.source,
+      params.queryPurposesById,
+      "contradiction_or_update",
+    ) ||
+    sourceHasQueryPurpose(params.source, params.queryPurposesById, "current_state")
+  );
+}
+
 function determineSourceStance(
   source: Source,
   evidenceSnippets: EvidenceSnippet[],
+  queryPurposesById: Map<string, QueryPurpose>,
+  isScheduledEvent: boolean,
 ): ReviewSourceStance {
   if (source.relevanceTier === "discard") {
     return "unknown";
+  }
+
+  if (
+    hasScheduledEventUpdateSignal({
+      source,
+      evidenceSnippets,
+      queryPurposesById,
+      isScheduledEvent,
+    })
+  ) {
+    return "conflict";
   }
 
   const text = buildSourceText(source, evidenceSnippets);
@@ -226,6 +308,7 @@ function buildConfidenceScore(params: {
   supportCount: number;
   conflictCount: number;
   hasHighTrustSource: boolean;
+  hasCurrentUpdateConflict: boolean;
 }): number {
   const {
     verdict,
@@ -236,6 +319,7 @@ function buildConfidenceScore(params: {
     supportCount,
     conflictCount,
     hasHighTrustSource,
+    hasCurrentUpdateConflict,
   } = params;
 
   let score = 35;
@@ -258,6 +342,10 @@ function buildConfidenceScore(params: {
     score -= 4;
   }
 
+  if (hasCurrentUpdateConflict) {
+    score -= 18;
+  }
+
   return clamp(Math.round(score), 35, 98);
 }
 
@@ -265,7 +353,12 @@ function buildConsensusLevel(
   verdict: ReviewResultVerdict,
   supportCount: number,
   conflictCount: number,
+  hasCurrentUpdateConflict: boolean,
 ): ReviewConsensusLevel {
+  if (hasCurrentUpdateConflict) {
+    return verdict === "Unclear" ? "low" : "medium";
+  }
+
   if (verdict === "Unclear") {
     return "low";
   }
@@ -293,6 +386,7 @@ function buildAnalysisSummary(params: {
   contextCount: number;
   verificationCount: number;
   sourceBreakdown: AssembledSourceBreakdown;
+  hasCurrentUpdateConflict: boolean;
 }): string {
   const {
     coreClaim,
@@ -302,6 +396,7 @@ function buildAnalysisSummary(params: {
     contextCount,
     verificationCount,
     sourceBreakdown,
+    hasCurrentUpdateConflict,
   } = params;
 
   const verdictLead: Record<ReviewResultVerdict, string> = {
@@ -322,6 +417,9 @@ function buildAnalysisSummary(params: {
   return [
     verdictLead[verdict],
     `${dominantCategory} 중심으로 지지 근거 ${supportCount}건, 충돌 근거 ${conflictCount}건, 맥락 보완 근거 ${contextCount}건이 정리됐습니다.`,
+    ...(hasCurrentUpdateConflict
+      ? ["최신 변경 또는 연기 신호가 있어 과거 보도 합의만으로 현재 기준 결론을 강화하지 않습니다."]
+      : []),
     trustSentence,
     "이 결과는 interpretation 생성 전, 현재 저장된 source와 evidence snippet만으로 계산한 임시 분석입니다.",
   ].join(" ");
@@ -336,6 +434,7 @@ function buildUncertaintyItems(params: {
   supportCount: number;
   conflictCount: number;
   discardCount: number;
+  hasCurrentUpdateConflict: boolean;
 }): string[] {
   const items: string[] = [];
 
@@ -349,6 +448,10 @@ function buildUncertaintyItems(params: {
 
   if (params.verdict === "Mixed Evidence") {
     items.push("지지와 충돌 근거가 함께 있어 단일 결론으로 보기 어렵습니다.");
+  }
+
+  if (params.hasCurrentUpdateConflict) {
+    items.push("최신 업데이트/연기 신호가 있어 과거 보도 합의만으로 현재 기준 결론을 강화하지 않습니다.");
   }
 
   if (params.fetchedEvidenceCount < 2) {
@@ -377,12 +480,29 @@ function buildUncertaintySummary(items: string[]): string {
 export function assembleReviewResult(
   input: ResultAssemblerInput,
 ): AssembledReviewResultPayload {
+  const queryPurposesById = buildQueryPurposesById(input.searchPlan);
+  const isScheduledEvent = input.searchPlan?.claimType === "scheduled_event";
   const sourceStances = input.sources.reduce<Record<string, ReviewSourceStance>>(
     (acc, source) => {
-      acc[source.id] = determineSourceStance(source, input.evidenceSnippets);
+      acc[source.id] = determineSourceStance(
+        source,
+        input.evidenceSnippets,
+        queryPurposesById,
+        isScheduledEvent,
+      );
       return acc;
     },
     {},
+  );
+  const hasCurrentUpdateConflict = input.sources.some(
+    (source) =>
+      sourceStances[source.id] === "conflict" &&
+      hasScheduledEventUpdateSignal({
+        source,
+        evidenceSnippets: input.evidenceSnippets,
+        queryPurposesById,
+        isScheduledEvent,
+      }),
   );
 
   const supportSources = input.sources.filter(
@@ -431,6 +551,7 @@ export function assembleReviewResult(
     supportCount: supportSources.length,
     conflictCount: conflictSources.length,
     discardCount,
+    hasCurrentUpdateConflict,
   });
 
   return {
@@ -447,11 +568,13 @@ export function assembleReviewResult(
         supportCount: supportSources.length,
         conflictCount: conflictSources.length,
         hasHighTrustSource,
+        hasCurrentUpdateConflict,
       }),
       consensusLevel: buildConsensusLevel(
         verdict,
         supportSources.length,
         conflictSources.length,
+        hasCurrentUpdateConflict,
       ),
       analysisSummary: buildAnalysisSummary({
         coreClaim: input.coreClaim || input.rawClaim,
@@ -461,6 +584,7 @@ export function assembleReviewResult(
         contextCount: contextSources.length,
         verificationCount,
         sourceBreakdown,
+        hasCurrentUpdateConflict,
       }),
       uncertaintySummary: buildUncertaintySummary(uncertaintyItems),
       uncertaintyItems,

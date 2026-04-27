@@ -231,6 +231,7 @@ function mapEvidenceSnippets(
       id: snippet.id,
       sourceId: snippet.sourceId,
       snippetText: snippet.snippetText,
+      evidenceSummary: snippet.evidenceSummary ?? source?.relevanceReason ?? null,
       sourceTitle: source?.title ?? "제목 정보 없음",
       sourcePublisherName: source?.publisherName ?? "출처명 미상",
       sourceTypeLabel: source?.sourceTypeLabel ?? "기타",

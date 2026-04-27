@@ -2,9 +2,11 @@ import type { EvidenceSnippet, Prisma, ReviewJob, Source } from "@prisma/client"
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import {
   ExtractedSource,
+  QueryPurpose,
   QueryArtifact,
   QueryRefinementResult,
   SearchCandidate,
+  SearchPlan,
 } from "../reviews.types";
 import { hasVerificationSource } from "../reviews.utils";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
@@ -47,6 +49,10 @@ interface QueryRefinementPayload {
   claimLanguageCode: string;
   languageCode: string;
   coreClaim: string;
+  normalizedClaim: string;
+  claimType: string;
+  verificationGoal: string;
+  searchPlan: SearchPlan | null;
   generatedQueries: QueryArtifact[];
   searchRoute?: string;
   searchRouteReason?: string;
@@ -66,6 +72,24 @@ interface HandoffPayload {
   snippetIds: string[];
   insufficiencyReason: string | null;
 }
+
+const QUERY_PURPOSES: QueryPurpose[] = [
+  "claim_specific",
+  "current_state",
+  "primary_source",
+  "contradiction_or_update",
+];
+const REVIEW_CLAIM_TYPES = [
+  "scheduled_event",
+  "current_status",
+  "statistic",
+  "quote",
+  "policy",
+  "corporate_action",
+  "incident",
+  "general_fact",
+];
+const SEARCH_ROUTES = ["korean_news", "global_news", "unsupported"];
 
 export function buildSourceCreateInputs(
   reviewJobId: string,
@@ -177,11 +201,22 @@ export function buildQueryRefinementPayload(
     claimLanguageCode: refinement.claimLanguageCode,
     languageCode: refinement.claimLanguageCode,
     coreClaim: refinement.coreClaim,
-    generatedQueries: generatedQueries.map((query) => ({
-      id: query.id,
-      text: query.text,
-      rank: query.rank,
-    })),
+    normalizedClaim: refinement.normalizedClaim,
+    claimType: refinement.claimType,
+    verificationGoal: refinement.verificationGoal,
+    searchPlan: {
+      normalizedClaim: refinement.searchPlan.normalizedClaim,
+      claimType: refinement.searchPlan.claimType,
+      verificationGoal: refinement.searchPlan.verificationGoal,
+      searchRoute: refinement.searchPlan.searchRoute,
+      queries: refinement.searchPlan.queries.map((query) => ({
+        id: query.id,
+        purpose: query.purpose,
+        query: query.query,
+        priority: query.priority,
+      })),
+    },
+    generatedQueries: generatedQueries.map(serializeQueryArtifact),
     topicScope: refinement.topicScope,
     topicCountryCode: refinement.topicCountryCode,
     countryDetectionReason: refinement.countryDetectionReason,
@@ -191,14 +226,19 @@ export function buildQueryRefinementPayload(
     searchRouteReason:
       refinement.searchRouteReason ?? "검색 route 판정 이유가 기록되지 않았습니다.",
     searchClaim: refinement.searchClaim ?? refinement.coreClaim,
-    searchQueries: searchQueries.map((query) => ({
-      id: query.id,
-      text: query.text,
-      rank: query.rank,
-    })),
+    searchQueries: searchQueries.map(serializeQueryArtifact),
     searchProvider,
     userCountryCode,
   } as Prisma.InputJsonValue;
+}
+
+function serializeQueryArtifact(query: QueryArtifact): Record<string, unknown> {
+  return {
+    id: query.id,
+    text: query.text,
+    rank: query.rank,
+    ...(query.purpose ? { purpose: query.purpose } : {}),
+  };
 }
 
 export function buildHandoffPayload(
@@ -246,6 +286,10 @@ export function parseOriginQueryIds(value: unknown): string[] {
     : [];
 }
 
+function buildEvidenceSummary(sourceId: string, sources: Source[]): string | null {
+  return sources.find((source) => source.id === sourceId)?.relevanceReason ?? null;
+}
+
 function buildSearchProvider(searchRoute: string): string | null {
   if (searchRoute === "korean_news") {
     return "naver-search";
@@ -278,6 +322,7 @@ export function mapPreviewResponse(params: {
     sources: params.sources,
     evidenceSnippets: params.evidenceSnippets,
     insufficiencyReason: params.insufficiencyReason,
+    searchPlan: params.refinement.searchPlan,
   });
 
   return {
@@ -319,6 +364,7 @@ export function mapPreviewResponse(params: {
       id: snippet.id,
       sourceId: snippet.sourceId,
       snippetText: snippet.snippetText,
+      evidenceSummary: buildEvidenceSummary(snippet.sourceId, params.sources),
     })),
     searchedSourceCount: params.sources.length,
     selectedSourceCount: params.selectedSourceCount,
@@ -410,13 +456,64 @@ function parseGeneratedQueries(value: unknown): QueryArtifact[] {
       typeof record.rank === "number" && Number.isFinite(record.rank)
         ? record.rank
         : 0;
+    const purpose = QUERY_PURPOSES.includes(record.purpose as QueryPurpose)
+      ? (record.purpose as QueryPurpose)
+      : undefined;
 
     if (!id || !text || rank <= 0) {
       return [];
     }
 
-    return [{ id, text, rank }];
+    return [{ id, text, rank, purpose }];
   });
+}
+
+function parseSearchPlan(value: unknown): SearchPlan | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const claimType = parseString(record.claimType);
+  const searchRoute = parseString(record.searchRoute);
+  const queries = Array.isArray(record.queries)
+    ? record.queries.flatMap((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          return [];
+        }
+
+        const queryRecord = item as Record<string, unknown>;
+        const id = parseString(queryRecord.id);
+        const purpose = queryRecord.purpose as QueryPurpose;
+        const query = parseString(queryRecord.query);
+        const priority =
+          typeof queryRecord.priority === "number" && Number.isFinite(queryRecord.priority)
+            ? queryRecord.priority
+            : 0;
+
+        if (!id || !QUERY_PURPOSES.includes(purpose) || !query || priority <= 0) {
+          return [];
+        }
+
+        return [{ id, purpose, query, priority }];
+      })
+    : [];
+
+  if (
+    !REVIEW_CLAIM_TYPES.includes(claimType) ||
+    !SEARCH_ROUTES.includes(searchRoute) ||
+    queries.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    normalizedClaim: parseString(record.normalizedClaim),
+    claimType: claimType as SearchPlan["claimType"],
+    verificationGoal: parseString(record.verificationGoal),
+    searchRoute: searchRoute as SearchPlan["searchRoute"],
+    queries,
+  };
 }
 
 function parseStringArray(value: unknown): string[] {
@@ -436,6 +533,10 @@ function parseQueryRefinementPayload(
       claimLanguageCode: "unknown",
       languageCode: "unknown",
       coreClaim: normalizedClaim,
+      normalizedClaim,
+      claimType: "general_fact",
+      verificationGoal: "검증 목표 생성 전입니다.",
+      searchPlan: null,
       generatedQueries: [],
       searchRoute: "unsupported",
       searchRouteReason: "검색 route 판정 전입니다.",
@@ -462,6 +563,13 @@ function parseQueryRefinementPayload(
     claimLanguageCode,
     languageCode: parseString(payload.languageCode, claimLanguageCode),
     coreClaim: parseString(payload.coreClaim, normalizedClaim),
+    normalizedClaim: parseString(payload.normalizedClaim, normalizedClaim),
+    claimType: parseString(payload.claimType, "general_fact"),
+    verificationGoal: parseString(
+      payload.verificationGoal,
+      "검증 목표가 기록되지 않았습니다.",
+    ),
+    searchPlan: parseSearchPlan(payload.searchPlan),
     generatedQueries,
     searchRoute,
     searchRouteReason: parseString(
@@ -546,6 +654,7 @@ export function mapStoredPreviewResponse(
     sources: reviewJob.sources,
     evidenceSnippets: reviewJob.evidenceSnippets,
     insufficiencyReason: handoff.insufficiencyReason,
+    searchPlan: refinement.searchPlan,
   });
   const result =
     reviewJob.status === "out_of_scope" ? null : assembledResult.result;
@@ -589,6 +698,7 @@ export function mapStoredPreviewResponse(
       id: snippet.id,
       sourceId: snippet.sourceId,
       snippetText: snippet.snippetText,
+      evidenceSummary: buildEvidenceSummary(snippet.sourceId, reviewJob.sources),
     })),
     searchedSourceCount:
       reviewJob.searchedSourceCount > 0

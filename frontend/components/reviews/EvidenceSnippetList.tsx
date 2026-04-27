@@ -55,7 +55,12 @@ export default function EvidenceSnippetList({
                 </span>
               </div>
 
-              <p className="mt-4 line-clamp-3 overflow-hidden break-words text-sm italic leading-6 text-[#48505d]">
+              {snippet.evidenceSummary ? (
+                <p className="mt-4 rounded-2xl border border-[#e5e7eb] bg-white px-4 py-3 text-sm leading-6 text-[#5f6877]">
+                  {snippet.evidenceSummary}
+                </p>
+              ) : null}
+              <p className="mt-3 line-clamp-3 overflow-hidden break-words text-sm italic leading-6 text-[#48505d]">
                 &quot;{snippet.snippetText}&quot;
               </p>
               <p className="mt-3 line-clamp-2 overflow-hidden break-words text-xs text-[#8a94a6]">

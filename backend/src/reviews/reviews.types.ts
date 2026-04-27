@@ -3,6 +3,20 @@ export type TopicScope = "domestic" | "foreign" | "multi_country" | "unknown";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
 export type SearchRoute = "korean_news" | "global_news" | "unsupported";
 export type SearchProvider = "naver-search" | "tavily-search";
+export type QueryPurpose =
+  | "claim_specific"
+  | "current_state"
+  | "primary_source"
+  | "contradiction_or_update";
+export type ReviewClaimType =
+  | "scheduled_event"
+  | "current_status"
+  | "statistic"
+  | "quote"
+  | "policy"
+  | "corporate_action"
+  | "incident"
+  | "general_fact";
 
 export interface DomainRegistryEntry {
   id: string;
@@ -19,6 +33,22 @@ export interface QueryArtifact {
   id: string;
   text: string;
   rank: number;
+  purpose?: QueryPurpose;
+}
+
+export interface SearchPlanQueryArtifact {
+  id: string;
+  purpose: QueryPurpose;
+  query: string;
+  priority: number;
+}
+
+export interface SearchPlan {
+  normalizedClaim: string;
+  claimType: ReviewClaimType;
+  verificationGoal: string;
+  searchRoute: SearchRoute;
+  queries: SearchPlanQueryArtifact[];
 }
 
 export interface SearchCandidate {
@@ -34,6 +64,7 @@ export interface SearchCandidate {
   rawSnippet: string | null;
   normalizedHash: string;
   originQueryIds: string[];
+  originQueryPurposes?: QueryPurpose[];
   sourceCountryCode: string | null;
   retrievalBucket: RetrievalBucket;
   domainRegistryId: string | null;
@@ -45,6 +76,10 @@ export interface SearchCandidate {
 export interface QueryRefinementResult {
   claimLanguageCode: string;
   coreClaim: string;
+  normalizedClaim: string;
+  claimType: ReviewClaimType;
+  verificationGoal: string;
+  searchPlan: SearchPlan;
   generatedQueries: QueryArtifact[];
   searchRoute: SearchRoute;
   searchRouteReason: string;

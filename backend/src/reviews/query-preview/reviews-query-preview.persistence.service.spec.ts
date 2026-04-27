@@ -193,6 +193,43 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       refinement: {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
+        normalizedClaim: "트럼프가 관세를 발표했다",
+        claimType: "policy",
+        verificationGoal:
+          "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+        searchPlan: {
+          normalizedClaim: "트럼프가 관세를 발표했다",
+          claimType: "policy",
+          verificationGoal:
+            "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+          searchRoute: "global_news",
+          queries: [
+            {
+              id: "sp1",
+              purpose: "claim_specific",
+              query: "Trump tariff announcement",
+              priority: 1,
+            },
+            {
+              id: "sp2",
+              purpose: "current_state",
+              query: "Trump tariffs latest news",
+              priority: 2,
+            },
+            {
+              id: "sp3",
+              purpose: "primary_source",
+              query: "White House Trump tariff announcement",
+              priority: 3,
+            },
+            {
+              id: "sp4",
+              purpose: "contradiction_or_update",
+              query: "Trump tariff announcement update correction",
+              priority: 4,
+            },
+          ],
+        },
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
         searchRoute: "global_news",
         searchRouteReason: "미국 정책 발표를 다루는 해외 뉴스성 claim입니다.",
@@ -271,6 +308,19 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           searchRoute: "global_news",
           searchProvider: "tavily-search",
           searchClaim: "Trump tariff announcement",
+          normalizedClaim: "트럼프가 관세를 발표했다",
+          claimType: "policy",
+          verificationGoal:
+            "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+          searchPlan: expect.objectContaining({
+            searchRoute: "global_news",
+            queries: expect.arrayContaining([
+              expect.objectContaining({
+                purpose: "current_state",
+                query: "Trump tariffs latest news",
+              }),
+            ]),
+          }),
           searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
         }),
         lastErrorCode: null,
@@ -383,6 +433,43 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       refinement: {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
+        normalizedClaim: "트럼프가 관세를 발표했다",
+        claimType: "policy",
+        verificationGoal:
+          "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+        searchPlan: {
+          normalizedClaim: "트럼프가 관세를 발표했다",
+          claimType: "policy",
+          verificationGoal:
+            "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+          searchRoute: "unsupported",
+          queries: [
+            {
+              id: "sp1",
+              purpose: "claim_specific",
+              query: "트럼프 관세 발표",
+              priority: 1,
+            },
+            {
+              id: "sp2",
+              purpose: "current_state",
+              query: "트럼프 관세 최신 뉴스",
+              priority: 2,
+            },
+            {
+              id: "sp3",
+              purpose: "primary_source",
+              query: "백악관 트럼프 관세 발표",
+              priority: 3,
+            },
+            {
+              id: "sp4",
+              purpose: "contradiction_or_update",
+              query: "트럼프 관세 발표 정정 업데이트",
+              priority: 4,
+            },
+          ],
+        },
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
         searchRoute: "unsupported",
         searchRouteReason: "기사/공식 발표 검색만으로 검토하기 어려운 요청입니다.",

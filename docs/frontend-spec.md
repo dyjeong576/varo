@@ -88,9 +88,9 @@
 ### 5.5 Analysis Result
 
 - claim
-- provisional verdict / confidence / consensus
+- provisional verdict / confidence / 수집된 출처 간 일치도
 - source distribution / agreement / conflict summary
-- normalized claim / country detection reason / generated queries
+- normalized claim / country detection reason / search plan
 - evidence snippet list
 - source card 목록
 - source type filter
@@ -266,8 +266,8 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 표시 순서:
 
 1. claim
-2. provisional verdict / confidence / consensus
-3. query context와 generated query
+2. provisional verdict / confidence / 수집된 출처 간 일치도
+3. query context와 search plan
 4. evidence snippet
 5. source card 목록
 6. rule-based analysis summary
@@ -277,6 +277,8 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 
 - 현재 화면은 최종 저장 verdict가 아니라 `rule_based_preview` 임시 결과임을 숨기지 않는다.
 - evidence가 interpretation / verdict보다 먼저 보여야 한다.
+- consensus는 사실 확률이 아니라 수집된 출처 간 일치도 성격으로 표현한다.
+- 최신 출처 기준, 상충/업데이트 신호, 근거 부족은 가능한 경우 별도 UI 개념으로 분리한다.
 - source card에는 출처명, 발행 시각, source type, snippet, 링크를 포함한다.
 - interpretation과 최종 verdict는 아직 생성 전 단계이며, 현재 결과는 저장된 preview artifact 기준 파생 결과임을 명시한다.
 - uncertainty 또는 insufficiency는 별도 블록으로 분리한다.

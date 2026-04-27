@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
 import {
@@ -37,6 +37,11 @@ interface TavilyExtractResponse {
     raw_content?: string;
     content?: string;
   }>;
+  failed_results?: Array<{
+    url?: string;
+    error?: string;
+  }>;
+  request_id?: string;
 }
 
 @Injectable()
@@ -69,27 +74,9 @@ export class ReviewsTavilyClient {
     timeoutMs: number;
     candidates: SearchCandidate[];
   }): Promise<ExtractedSource[]> {
-    const response = await postJson<TavilyExtractResponse>(
-      TAVILY_EXTRACT_URL,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${params.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          urls: params.candidates.map((candidate) => candidate.originalUrl),
-          include_images: false,
-          extract_depth: "advanced",
-          format: "markdown",
-        }),
-      },
-      params.timeoutMs,
-      APP_ERROR_CODES.EXTRACTION_FAILED,
-      "Tavily 추출 요청에 실패했습니다.",
-    );
+    const response = await this.postTavilyExtract(params);
 
-    const extracted = (response.results ?? [])
+    return (response.results ?? [])
       .map((item) => {
         const rawUrl = typeof item.url === "string" ? item.url : null;
         const rawContent =
@@ -117,16 +104,43 @@ export class ReviewsTavilyClient {
         };
       })
       .filter((item): item is ExtractedSource => item !== null);
+  }
 
-    if (params.candidates.length > 0 && extracted.length === 0) {
-      throw new AppException(
+  private async postTavilyExtract(params: {
+    apiKey: string;
+    timeoutMs: number;
+    candidates: SearchCandidate[];
+  }): Promise<TavilyExtractResponse> {
+    try {
+      return await postJson<TavilyExtractResponse>(
+        TAVILY_EXTRACT_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${params.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            urls: params.candidates.map((candidate) => candidate.originalUrl),
+            include_images: false,
+            extract_depth: "advanced",
+            format: "markdown",
+          }),
+        },
+        params.timeoutMs,
         APP_ERROR_CODES.EXTRACTION_FAILED,
-        "추출 가능한 본문을 확보하지 못했습니다.",
-        HttpStatus.BAD_GATEWAY,
+        "Tavily 추출 요청에 실패했습니다.",
       );
-    }
+    } catch (error) {
+      if (error instanceof AppException) {
+        throw new AppException(error.code, error.message, error.getStatus(), {
+          ...(error.details ?? {}),
+          urlCount: params.candidates.length,
+        });
+      }
 
-    return extracted;
+      throw error;
+    }
   }
 
   private async searchSingleQuery(input: {
@@ -163,7 +177,7 @@ export class ReviewsTavilyClient {
     );
 
     return (response.results ?? [])
-      .map((result, index) => {
+      .map((result, index): SearchCandidate | null => {
         const originalUrl =
           typeof result.url === "string" ? result.url.trim() : "";
         const rawTitle =
@@ -193,6 +207,7 @@ export class ReviewsTavilyClient {
           rawSnippet,
           normalizedHash: buildNormalizedHash(canonicalUrl),
           originQueryIds: [input.query.id],
+          originQueryPurposes: input.query.purpose ? [input.query.purpose] : [],
           sourceCountryCode:
             registryMatch?.countryCode === "GLOBAL"
               ? null

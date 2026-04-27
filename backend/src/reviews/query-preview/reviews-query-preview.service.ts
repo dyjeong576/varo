@@ -17,7 +17,6 @@ import { ReviewsQueryPreviewPersistenceService } from "./reviews-query-preview.p
 import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
 import { AppException } from "../../common/exceptions/app-exception";
 
-const QUERY_COUNT_LIMIT = 1;
 const RELEVANCE_LIMIT = 15;
 const PRIMARY_EXTRACTION_LIMIT = 5;
 const REFERENCE_PROMOTION_LIMIT = 3;
@@ -80,15 +79,19 @@ export class ReviewsQueryPreviewService {
       const userCountryCode =
         await this.persistenceService.resolveUserCountryCode(userId);
       const refinement = await this.providersService.refineQuery(normalizedClaim);
-      const generatedQueries = refinement.generatedQueries.slice(0, QUERY_COUNT_LIMIT);
+      const generatedQueries = refinement.generatedQueries;
       const searchRoute =
         refinement.searchRoute ??
         (refinement.isKoreaRelated ? "korean_news" : "unsupported");
       const searchQueries =
-        (refinement.searchQueries ?? refinement.generatedQueries).slice(
-          0,
-          QUERY_COUNT_LIMIT,
-        );
+        refinement.searchPlan?.queries?.length
+          ? refinement.searchPlan.queries.map((query) => ({
+              id: query.id,
+              text: query.query,
+              rank: query.priority,
+              purpose: query.purpose,
+            }))
+          : (refinement.searchQueries ?? refinement.generatedQueries);
 
       if (searchRoute === "unsupported") {
         const persistedOutOfScope =

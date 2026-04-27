@@ -127,6 +127,43 @@ describe("ReviewsProvidersService", () => {
                   text: JSON.stringify({
                     languageCode: "ko",
                     coreClaim: "트럼프의 관세 발표",
+                    normalizedClaim: "트럼프가 관세를 발표했다",
+                    claimType: "policy",
+                    verificationGoal:
+                      "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+                    searchPlan: {
+                      normalizedClaim: "트럼프가 관세를 발표했다",
+                      claimType: "policy",
+                      verificationGoal:
+                        "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+                      searchRoute: "global_news",
+                      queries: [
+                        {
+                          id: "sp1",
+                          purpose: "claim_specific",
+                          query: "Trump tariff announcement",
+                          priority: 1,
+                        },
+                        {
+                          id: "sp2",
+                          purpose: "current_state",
+                          query: "Trump tariffs latest news",
+                          priority: 2,
+                        },
+                        {
+                          id: "sp3",
+                          purpose: "primary_source",
+                          query: "White House Trump tariff announcement",
+                          priority: 3,
+                        },
+                        {
+                          id: "sp4",
+                          purpose: "contradiction_or_update",
+                          query: "Trump tariff announcement update correction",
+                          priority: 4,
+                        },
+                      ],
+                    },
                     generatedQueries: [
                       "트럼프 관세 발표",
                       "Trump tariff announcement",
@@ -169,6 +206,7 @@ describe("ReviewsProvidersService", () => {
     expect(result.topicCountryCode).toBe("US");
     expect(result.searchRoute).toBe("global_news");
     expect(result.searchClaim).toBe("Trump tariff announcement");
+    expect(result.searchPlan.queries).toHaveLength(4);
     expect(result.isKoreaRelated).toBe(false);
     expect(result.generatedQueries).toHaveLength(3);
   });
@@ -204,7 +242,14 @@ describe("ReviewsProvidersService", () => {
 
     const result = await service.searchSources({
       searchRoute: "korean_news",
-      queries: [{ id: "q2", text: "테슬라 한국 철수", rank: 1 }],
+      queries: [
+        {
+          id: "q2",
+          text: "테슬라 한국 철수",
+          rank: 1,
+          purpose: "claim_specific",
+        },
+      ],
       coreClaim: "테슬라 한국 철수",
       claimLanguageCode: "ko",
       userCountryCode: "US",
@@ -269,7 +314,8 @@ describe("ReviewsProvidersService", () => {
       timeoutMs: 40000,
       query: "테슬라 한국 철수",
       queryId: "q2",
-      display: 10,
+      queryPurpose: "claim_specific",
+      display: 5,
       start: 1,
       sort: "sim",
     });
@@ -305,7 +351,14 @@ describe("ReviewsProvidersService", () => {
 
     const result = await service.searchSources({
       searchRoute: "global_news",
-      queries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
+      queries: [
+        {
+          id: "q1",
+          text: "Trump tariff announcement",
+          rank: 1,
+          purpose: "current_state",
+        },
+      ],
       coreClaim: "트럼프의 관세 발표",
       claimLanguageCode: "ko",
       userCountryCode: "KR",
@@ -324,7 +377,14 @@ describe("ReviewsProvidersService", () => {
       timeoutMs: 41000,
       input: expect.objectContaining({
         searchRoute: "global_news",
-        queries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
+        queries: [
+          {
+            id: "q1",
+            text: "Trump tariff announcement",
+            rank: 1,
+            purpose: "current_state",
+          },
+        ],
       }),
       bucket: "verification",
     });
@@ -381,6 +441,7 @@ describe("ReviewsProvidersService", () => {
           rawSnippet: "국내 종합 기사입니다.",
           normalizedHash: "hash-1",
           originQueryIds: ["q1"],
+          originQueryPurposes: ["current_state"],
           sourceCountryCode: "KR",
           retrievalBucket: "familiar",
           domainRegistryId: "kr-familiar",
@@ -393,6 +454,12 @@ describe("ReviewsProvidersService", () => {
       "https://api.openai.com/v1/responses",
       expect.objectContaining({
         body: expect.stringContaining("\"retrievalBucket\\\": \\\"familiar\\\""),
+      }),
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        body: expect.stringContaining("\"originQueryPurposes\\\": ["),
       }),
     );
   });

@@ -106,6 +106,13 @@ export class ReviewEvidenceSnippetDto {
     example: "테슬라의 한국 사업 운영 계획에 변화가 없다고 회사가 설명했습니다.",
   })
   snippetText!: string;
+
+  @ApiProperty({
+    description: "결과 화면에 표시할 근거 요약",
+    example: "공식 업데이트 문서가 공개 일정 확인에 직접적인 근거가 될 수 있습니다.",
+    nullable: true,
+  })
+  evidenceSummary!: string | null;
 }
 
 export class ReviewInterpretationHandoffDto {

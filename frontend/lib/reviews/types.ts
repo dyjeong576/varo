@@ -37,6 +37,7 @@ export interface ReviewPreviewEvidenceSnippetResponse {
   id: string;
   sourceId: string;
   snippetText: string;
+  evidenceSummary: string | null;
 }
 
 export interface ReviewPreviewDetailResponse {
@@ -144,6 +145,7 @@ export interface ReviewPreviewEvidenceSnippet {
   id: string;
   sourceId: string;
   snippetText: string;
+  evidenceSummary: string | null;
   sourceTitle: string;
   sourcePublisherName: string;
   sourceTypeLabel: string;

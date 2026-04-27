@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
-import { SearchCandidate } from "../reviews.types";
+import { QueryPurpose, SearchCandidate } from "../reviews.types";
 import {
   buildCanonicalUrl,
   buildNormalizedHash,
@@ -29,6 +29,7 @@ export class ReviewsNaverClient {
     timeoutMs: number;
     query: string;
     queryId?: string;
+    queryPurpose?: QueryPurpose;
     display?: number;
     start?: number;
     sort?: NaverNewsSearchSort;
@@ -56,7 +57,12 @@ export class ReviewsNaverClient {
 
     return (response.items ?? [])
       .map((item, index) =>
-        this.toCandidate(item, start + index, params.queryId ?? "q1"),
+        this.toCandidate(
+          item,
+          start + index,
+          params.queryId ?? "q1",
+          params.queryPurpose,
+        ),
       )
       .filter((candidate): candidate is SearchCandidate => candidate !== null);
   }
@@ -114,6 +120,7 @@ export class ReviewsNaverClient {
     item: NonNullable<NaverNewsSearchResponse["items"]>[number],
     rank: number,
     queryId: string,
+    queryPurpose?: QueryPurpose,
   ): SearchCandidate | null {
     const rawTitle = this.cleanNaverText(item.title ?? "");
     const rawSnippet = this.cleanNaverText(item.description ?? "");
@@ -140,6 +147,7 @@ export class ReviewsNaverClient {
       rawSnippet: rawSnippet ? rawSnippet.slice(0, MAX_SNIPPET_LENGTH) : null,
       normalizedHash: buildNormalizedHash(canonicalUrl),
       originQueryIds: [queryId],
+      originQueryPurposes: queryPurpose ? [queryPurpose] : [],
       sourceCountryCode: "KR",
       retrievalBucket: "familiar",
       domainRegistryId: null,

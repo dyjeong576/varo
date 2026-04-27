@@ -47,14 +47,20 @@ export function deduplicateCandidates(candidates: SearchCandidate[]): SearchCand
       deduped.set(key, {
         ...candidate,
         originQueryIds: [...candidate.originQueryIds],
+        originQueryPurposes: [...(candidate.originQueryPurposes ?? [])],
       });
       continue;
     }
 
     const mergedQueryIds = new Set([...existing.originQueryIds, ...candidate.originQueryIds]);
+    const mergedQueryPurposes = new Set([
+      ...(existing.originQueryPurposes ?? []),
+      ...(candidate.originQueryPurposes ?? []),
+    ]);
     deduped.set(key, {
       ...existing,
       originQueryIds: [...mergedQueryIds],
+      originQueryPurposes: [...mergedQueryPurposes],
       rawSnippet: existing.rawSnippet ?? candidate.rawSnippet,
       publisherName: existing.publisherName ?? candidate.publisherName,
       publishedAt: existing.publishedAt ?? candidate.publishedAt,
