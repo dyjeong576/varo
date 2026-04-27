@@ -56,6 +56,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
             ...data,
           }),
         ),
+      update: jest
+        .fn()
+        .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve(data),
+        ),
     },
     userProfile: {
       findUnique: jest.fn().mockResolvedValue({
@@ -292,11 +297,26 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           snippetText: "추출 snippet",
         },
       ],
+      evidenceSignals: [
+        {
+          sourceId: "c1",
+          snippetId: null,
+          stanceToClaim: "updates",
+          temporalRole: "latest_update",
+          updateType: "delay",
+          currentAnswerImpact: "overrides",
+          reason: "최근 업데이트 보도입니다.",
+        },
+      ],
       primaryExtractionLimit: 5,
     });
 
     expect(prisma.source.create).toHaveBeenCalledTimes(1);
     expect(prisma.evidenceSnippet.create).toHaveBeenCalledTimes(1);
+    expect(prisma.evidenceSnippet.update).toHaveBeenCalledWith({
+      where: { id: "snippet-trump-tariff-update" },
+      data: { stance: "conflict" },
+    });
     expect(prisma.reviewJob.update).toHaveBeenCalledWith({
       where: { id: "review-1" },
       data: expect.objectContaining({
@@ -323,6 +343,15 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           }),
           searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
         }),
+        handoffPayload: expect.objectContaining({
+          evidenceSignals: [
+            expect.objectContaining({
+              sourceId: "trump-tariff-update",
+              snippetId: "snippet-trump-tariff-update",
+              currentAnswerImpact: "overrides",
+            }),
+          ],
+        }),
         lastErrorCode: null,
       }),
     });
@@ -339,6 +368,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       claim: "트럼프의 관세 발표",
     });
     expect(result.handoffSourceIds).toEqual(["trump-tariff-update"]);
+    expect(result.evidenceSnippets[0]?.stance).toBe("conflict");
+    expect(result.evidenceSignals[0]?.sourceId).toBe("trump-tariff-update");
   });
 
   it("사용자 국가나 주제 국가와 무관하게 KR domain registry만 조회한다", async () => {

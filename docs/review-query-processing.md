@@ -151,9 +151,18 @@ type SearchPlan = {
 - 본문 추출 결과에서 claim 검토에 사용할 수 있는 snippet 후보를 만든다.
 - 이 단계 산출물은 interpretation 단계로 넘길 evidence 입력의 기반이 된다.
 
-### 8. Handoff to Interpretation
+### 8. Evidence Signal Classification
 
-- 정제된 claim, search plan, relevance를 통과한 source, evidence snippet 후보를 interpretation 단계로 전달한다.
+- Content Extraction 이후 OpenAI가 source/evidence별 signal을 구조화한다.
+- 이 단계의 출력은 사실 결론이 아니라 `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`이다.
+- scheduled event에서는 과거 예정 보도와 최신 연기/변경 보도를 구분한다.
+- `EvidenceSnippet.stance`에는 UI/기존 호환용 `support`, `conflict`, `context`, `unknown` 값을 저장한다.
+- 상세 signal은 `review_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
+- `/reviews/:reviewId` 조회 시에는 OpenAI를 다시 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
+
+### 9. Handoff to Interpretation
+
+- 정제된 claim, search plan, relevance를 통과한 source, evidence snippet 후보, evidence signal을 interpretation 단계로 전달한다.
 - 이 문서의 마지막 산출물은 `interpretation_handoff_payload`다.
 - interpretation 생성, 최종 결과 저장, 사용자 응답 생성 자체는 이 문서 범위에 포함하지 않는다.
 
@@ -170,6 +179,7 @@ sequenceDiagram
     participant Tavily as "Tavily Search"
     participant RelevanceFilter as "OpenAI Relevance Filter"
     participant Extractor as "Content Extractor"
+    participant SignalClassifier as "OpenAI Evidence Signal Classifier"
     participant DB as "DB"
 
     User->>Frontend: claim 제출
@@ -199,6 +209,8 @@ sequenceDiagram
             ReviewAPI->>ReviewAPI: evidence 부족 상태 유지
         end
 
+        ReviewAPI->>SignalClassifier: source/evidence 역할 분류 요청
+        SignalClassifier-->>ReviewAPI: evidenceSignals 반환
         ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
     else search_route=global_news
         opt Tavily search
@@ -220,6 +232,8 @@ sequenceDiagram
             ReviewAPI->>ReviewAPI: evidence 부족 상태 유지
         end
 
+        ReviewAPI->>SignalClassifier: source/evidence 역할 분류 요청
+        SignalClassifier-->>ReviewAPI: evidenceSignals 반환
         ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
     end
 ```
@@ -258,6 +272,7 @@ sequenceDiagram
         else searchable route
             QueryPreviewService->>Providers: route별 Naver 또는 Tavily search + relevance filtering
             QueryPreviewService->>Providers: extraction 대상 content 추출
+            QueryPreviewService->>Providers: evidence signal classification
             QueryPreviewService->>DB: source / evidence / handoff payload 저장
         end
         DB-->>QueryPreviewService: persisted artifacts
@@ -278,7 +293,8 @@ sequenceDiagram
 | Relevance Filtering | `core_claim`, title, snippet, candidate metadata, query purpose, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`, origin query purpose |
 | Relevant Source Selection | relevance 판정 결과 | extraction 대상 source 목록 |
 | Content Extraction and Evidence Preparation | extraction 대상 source | content, snippet 후보 |
-| Handoff to Interpretation | `core_claim`, source, snippet 후보, audit 정보 | `interpretation_handoff_payload` |
+| Evidence Signal Classification | `core_claim`, search plan, source, snippet 후보 | source/evidence별 `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason` |
+| Handoff to Interpretation | `core_claim`, source, snippet 후보, evidence signal, audit 정보 | `interpretation_handoff_payload` |
 
 ## 저장할 Audit 정보
 
@@ -307,6 +323,8 @@ sequenceDiagram
 - source별 `source_provider`
 - source별 `retrieval_bucket`
 - source별 `source_country_code`
+- evidence별 `stance`
+- handoff payload의 `evidenceSignals[]`
 
 이 정보는 사용자에게 모두 직접 노출할 필요는 없지만, 아래 목적을 위해 내부적으로 추적 가능해야 한다.
 

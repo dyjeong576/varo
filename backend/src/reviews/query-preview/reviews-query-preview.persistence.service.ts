@@ -12,6 +12,7 @@ import { NotificationsService } from "../../notifications/notifications.service"
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   DomainRegistryEntry,
+  EvidenceSignal,
   ExtractedSource,
   QueryArtifact,
   QueryRefinementResult,
@@ -40,6 +41,7 @@ interface PersistQueryPreviewResultInput {
   relevanceCandidates: SearchCandidate[];
   extractionTargets: SearchCandidate[];
   extractedSources: ExtractedSource[];
+  evidenceSignals?: EvidenceSignal[];
   primaryExtractionLimit: number;
 }
 
@@ -49,6 +51,7 @@ export interface PersistedQueryPreviewArtifacts {
   discardedSourceCount: number;
   handoffSourceIds: string[];
   insufficiencyReason: string | null;
+  evidenceSignals: EvidenceSignal[];
 }
 
 export interface PersistedOutOfScopeReview {
@@ -73,6 +76,30 @@ type ReviewPreviewSummaryRecord = Prisma.ReviewJobGetPayload<{
     };
   };
 }>;
+
+function mapEvidenceSignalStance(signal: EvidenceSignal): string {
+  if (
+    signal.stanceToClaim === "contradicts" ||
+    signal.stanceToClaim === "updates" ||
+    signal.currentAnswerImpact === "weakens" ||
+    signal.currentAnswerImpact === "overrides"
+  ) {
+    return "conflict";
+  }
+
+  if (
+    signal.stanceToClaim === "supports" ||
+    signal.currentAnswerImpact === "strengthens"
+  ) {
+    return "support";
+  }
+
+  if (signal.stanceToClaim === "context") {
+    return "context";
+  }
+
+  return "unknown";
+}
 
 @Injectable()
 export class ReviewsQueryPreviewPersistenceService {
@@ -329,17 +356,59 @@ export class ReviewsQueryPreviewPersistenceService {
         this.prisma.evidenceSnippet.create({ data }),
       ),
     );
+    const createdSourceByCandidateId = new Map(
+      input.relevanceCandidates.map((candidate, index) => [
+        candidate.id,
+        createdSources[index],
+      ]),
+    );
+    const snippetBySourceId = new Map(
+      evidenceSnippets.map((snippet) => [snippet.sourceId, snippet]),
+    );
+    const evidenceSignals = (input.evidenceSignals ?? []).flatMap((signal) => {
+      const source = createdSourceByCandidateId.get(signal.sourceId);
+
+      if (!source) {
+        return [];
+      }
+
+      const snippet = snippetBySourceId.get(source.id) ?? null;
+
+      return [{ ...signal, sourceId: source.id, snippetId: snippet?.id ?? null }];
+    });
+    const stanceBySnippetId = new Map(
+      evidenceSignals.flatMap((signal) =>
+        signal.snippetId
+          ? [[signal.snippetId, mapEvidenceSignalStance(signal)] as const]
+          : [],
+      ),
+    );
+    await Promise.all(
+      Array.from(stanceBySnippetId.entries()).map(([snippetId, stance]) =>
+        this.prisma.evidenceSnippet.update({
+          where: { id: snippetId },
+          data: { stance },
+        }),
+      ),
+    );
+    const updatedEvidenceSnippets = evidenceSnippets.map((snippet) => ({
+      ...snippet,
+      stance: stanceBySnippetId.get(snippet.id) ?? snippet.stance,
+    }));
 
     const discardedSourceCount = createdSources.filter(
       (source) => source.relevanceTier === "discard",
     ).length;
     const insufficiencyReason = buildInsufficiencyReason(
-      evidenceSnippets.length,
+      updatedEvidenceSnippets.length,
       input.extractionTargets.length,
       input.relevanceCandidates,
       input.primaryExtractionLimit,
     );
-    const handoffSourceIds = buildHandoffSourceIds(createdSources, evidenceSnippets);
+    const handoffSourceIds = buildHandoffSourceIds(
+      createdSources,
+      updatedEvidenceSnippets,
+    );
     const queryRefinementPayload = buildQueryRefinementPayload(
       input.refinement,
       input.generatedQueries,
@@ -348,18 +417,19 @@ export class ReviewsQueryPreviewPersistenceService {
     const handoffPayload = buildHandoffPayload(
       input.refinement.coreClaim,
       handoffSourceIds,
-      evidenceSnippets.map((snippet) => snippet.id),
+      updatedEvidenceSnippets.map((snippet) => snippet.id),
       insufficiencyReason,
+      evidenceSignals,
     );
 
     await this.prisma.reviewJob.update(
       buildCompletedReviewJobUpdate(
         input.reviewJob.id,
         createdSources.length,
-        evidenceSnippets.length,
+        updatedEvidenceSnippets.length,
         queryRefinementPayload,
         handoffPayload,
-        evidenceSnippets.length > 0,
+        updatedEvidenceSnippets.length > 0,
       ),
     );
     await this.recordHistoryEntry({
@@ -375,10 +445,11 @@ export class ReviewsQueryPreviewPersistenceService {
 
     return {
       createdSources,
-      evidenceSnippets,
+      evidenceSnippets: updatedEvidenceSnippets,
       discardedSourceCount,
       handoffSourceIds,
       insufficiencyReason,
+      evidenceSignals,
     };
   }
 

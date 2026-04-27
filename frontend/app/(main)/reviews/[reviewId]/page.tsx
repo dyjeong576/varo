@@ -5,7 +5,9 @@ import { Loader2 } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
-import EvidenceGrid from "@/components/reviews/EvidenceGrid";
+import EvidenceGrid, {
+  QueryContextDisclosure,
+} from "@/components/reviews/EvidenceGrid";
 import EvidenceSnippetList from "@/components/reviews/EvidenceSnippetList";
 import SourceCard from "@/components/reviews/SourceCard";
 import UncertaintyCard from "@/components/reviews/UncertaintyCard";
@@ -222,32 +224,28 @@ export default function ReviewResultPage() {
           </section>
         )}
 
-        <EvidenceGrid
-          searchedSourceCount={review.searchedSourceCount}
-          selectedSourceCount={review.selectedSourceCount}
-          discardedSourceCount={review.discardedSourceCount}
-          agreementCount={review.agreementCount}
-          conflictCount={review.conflictCount}
-          contextCount={review.contextCount}
-          coreClaim={review.coreClaim}
-          normalizedClaim={review.normalizedClaim}
-          consensusLabel={review.consensusLabel}
-          topicScopeLabel={review.topicScopeLabel}
-          topicCountryCode={review.topicCountryCode}
-          countryDetectionReason={review.countryDetectionReason}
-          sourceBreakdown={review.sourceBreakdown}
-          generatedQueries={review.generatedQueries}
-        />
-
-        {review.evidenceSnippets.length > 0 ? (
-          <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />
-        ) : null}
-
         {hasReviewResult ? (
           <AnalysisSummary
             interpretation={review.analysisSummary!}
             mode={review.resultMode!}
+            officialSourceCount={review.sourceBreakdown.official}
+            sourceCount={review.sources.length}
+            evidenceSnippetCount={review.evidenceSnippets.length}
           />
+        ) : null}
+
+        <EvidenceGrid
+          searchedSourceCount={review.searchedSourceCount}
+          selectedSourceCount={review.selectedSourceCount}
+          agreementCount={review.agreementCount}
+          conflictCount={review.conflictCount}
+          contextCount={review.contextCount}
+          consensusLabel={review.consensusLabel}
+          sourceBreakdown={review.sourceBreakdown}
+        />
+
+        {review.evidenceSnippets.length > 0 ? (
+          <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />
         ) : null}
 
         <section className="space-y-6">
@@ -288,6 +286,18 @@ export default function ReviewResultPage() {
             )}
           </div>
         </section>
+
+        <QueryContextDisclosure
+          searchedSourceCount={review.searchedSourceCount}
+          selectedSourceCount={review.selectedSourceCount}
+          discardedSourceCount={review.discardedSourceCount}
+          coreClaim={review.coreClaim}
+          normalizedClaim={review.normalizedClaim}
+          topicScopeLabel={review.topicScopeLabel}
+          topicCountryCode={review.topicCountryCode}
+          countryDetectionReason={review.countryDetectionReason}
+          generatedQueries={review.generatedQueries}
+        />
 
         {hasReviewResult ? (
           <UncertaintyCard

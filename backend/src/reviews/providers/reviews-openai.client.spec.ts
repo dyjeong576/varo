@@ -224,4 +224,77 @@ describe("ReviewsOpenAiClient", () => {
     );
   
   });
+
+  it("structured output text를 evidence signal 결과로 변환한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    signals: [
+                      {
+                        sourceId: "candidate-1",
+                        stanceToClaim: "updates",
+                        temporalRole: "latest_update",
+                        updateType: "delay",
+                        currentAnswerImpact: "overrides",
+                        reason: "최근 보도에서 일정이 다음 달로 연기됐다고 설명합니다.",
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new ReviewsOpenAiClient();
+    const result = await client.classifyEvidenceSignals("openai-test-key", {
+      coreClaim: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
+      claimLanguageCode: "ko",
+      searchPlan: {
+        normalizedClaim: "테슬라 로드스터 2026년 4월 공개",
+        claimType: "scheduled_event",
+        verificationGoal: "현재 공개 일정 확인",
+        searchRoute: "global_news",
+        queries: [
+          { id: "q1", purpose: "claim_specific", query: "Tesla Roadster April 2026", priority: 1 },
+          { id: "q2", purpose: "current_state", query: "Tesla Roadster current status", priority: 2 },
+          { id: "q3", purpose: "primary_source", query: "Tesla official Roadster", priority: 3 },
+          { id: "q4", purpose: "contradiction_or_update", query: "Tesla Roadster delayed", priority: 4 },
+        ],
+      },
+      sources: [
+        {
+          sourceId: "candidate-1",
+          sourceType: "news",
+          publisherName: "Reuters",
+          publishedAt: "2026-04-24T00:00:00.000Z",
+          rawTitle: "Tesla Roadster reveal delayed",
+          rawSnippet: "Roadster reveal has been delayed to next month.",
+          originQueryIds: ["q4"],
+          retrievalBucket: "verification",
+          evidenceSnippetText: "Roadster reveal has been delayed to next month.",
+        },
+      ],
+    });
+
+    expect(result).toEqual([
+      {
+        sourceId: "candidate-1",
+        snippetId: null,
+        stanceToClaim: "updates",
+        temporalRole: "latest_update",
+        updateType: "delay",
+        currentAnswerImpact: "overrides",
+        reason: "최근 보도에서 일정이 다음 달로 연기됐다고 설명합니다.",
+      },
+    ]);
+  });
 });

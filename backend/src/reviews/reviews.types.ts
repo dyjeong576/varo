@@ -17,6 +17,29 @@ export type ReviewClaimType =
   | "corporate_action"
   | "incident"
   | "general_fact";
+export type EvidenceSignalStance =
+  | "supports"
+  | "contradicts"
+  | "updates"
+  | "context"
+  | "unknown";
+export type EvidenceSignalTemporalRole =
+  | "past_plan"
+  | "current_status"
+  | "latest_update"
+  | "official_statement"
+  | "background";
+export type EvidenceSignalUpdateType =
+  | "delay"
+  | "cancellation"
+  | "correction"
+  | "confirmation"
+  | "none";
+export type EvidenceSignalImpact =
+  | "strengthens"
+  | "weakens"
+  | "overrides"
+  | "neutral";
 
 export interface DomainRegistryEntry {
   id: string;
@@ -116,4 +139,33 @@ export interface ExtractedSource {
   canonicalUrl: string;
   contentText: string;
   snippetText: string;
+}
+
+export interface EvidenceSignalSourceInput {
+  sourceId: string;
+  sourceType: string;
+  publisherName: string | null;
+  publishedAt: string | null;
+  rawTitle: string;
+  rawSnippet: string | null;
+  originQueryIds: string[];
+  retrievalBucket: RetrievalBucket;
+  evidenceSnippetText: string;
+}
+
+export interface EvidenceSignalClassificationInput {
+  coreClaim: string;
+  claimLanguageCode: string;
+  searchPlan: SearchPlan | null;
+  sources: EvidenceSignalSourceInput[];
+}
+
+export interface EvidenceSignal {
+  sourceId: string;
+  snippetId: string | null;
+  stanceToClaim: EvidenceSignalStance;
+  temporalRole: EvidenceSignalTemporalRole;
+  updateType: EvidenceSignalUpdateType;
+  currentAnswerImpact: EvidenceSignalImpact;
+  reason: string;
 }

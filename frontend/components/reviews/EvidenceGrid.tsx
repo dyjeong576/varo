@@ -1,16 +1,10 @@
 interface EvidenceGridProps {
   searchedSourceCount: number;
   selectedSourceCount: number;
-  discardedSourceCount: number;
   agreementCount: number;
   conflictCount: number;
   contextCount: number;
-  coreClaim: string;
-  normalizedClaim: string;
   consensusLabel: string;
-  topicScopeLabel: string;
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
   sourceBreakdown: {
     official: number;
     press: number;
@@ -18,6 +12,17 @@ interface EvidenceGridProps {
     analysis: number;
     other: number;
   };
+}
+
+interface QueryContextDisclosureProps {
+  searchedSourceCount: number;
+  selectedSourceCount: number;
+  discardedSourceCount: number;
+  coreClaim: string;
+  normalizedClaim: string;
+  topicScopeLabel: string;
+  topicCountryCode: string | null;
+  countryDetectionReason: string;
   generatedQueries: { id: string; text: string; rank: number }[];
 }
 
@@ -27,18 +32,11 @@ interface EvidenceGridProps {
 export default function EvidenceGrid({
   searchedSourceCount,
   selectedSourceCount,
-  discardedSourceCount,
   agreementCount,
   conflictCount,
   contextCount,
-  coreClaim,
-  normalizedClaim,
   consensusLabel,
-  topicScopeLabel,
-  topicCountryCode,
-  countryDetectionReason,
   sourceBreakdown,
-  generatedQueries,
 }: EvidenceGridProps) {
   const coverage =
     searchedSourceCount > 0
@@ -104,14 +102,41 @@ export default function EvidenceGrid({
           </div>
         </div>
       </div>
+    </section>
+  );
+}
 
-      <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)]">
+export function QueryContextDisclosure({
+  searchedSourceCount,
+  selectedSourceCount,
+  discardedSourceCount,
+  coreClaim,
+  normalizedClaim,
+  topicScopeLabel,
+  topicCountryCode,
+  countryDetectionReason,
+  generatedQueries,
+}: QueryContextDisclosureProps) {
+  return (
+    <details className="group rounded-xl border border-[#dfe4f0] bg-white p-5 shadow-[0_18px_38px_rgba(15,23,42,0.06)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#0050cb]">
+            Query Context
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[#556070]">
+            검색에 사용한 내부 맥락 보기
+          </p>
+        </div>
+        <span className="material-symbols-outlined text-[#8a94a6] transition-transform group-open:rotate-180">
+          expand_more
+        </span>
+      </summary>
+
+      <div className="mt-5 border-t border-[#edf1f7] pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#0050cb]">
-              Query Context
-            </p>
-            <h3 className="mt-2 text-xl font-black tracking-[-0.03em] text-[#191b24]">
+            <h3 className="text-xl font-black tracking-[-0.03em] text-[#191b24]">
               {coreClaim}
             </h3>
             <p className="mt-2 text-sm leading-6 text-[#6b7280]">
@@ -161,6 +186,6 @@ export default function EvidenceGrid({
           )}
         </div>
       </div>
-    </section>
+    </details>
   );
 }

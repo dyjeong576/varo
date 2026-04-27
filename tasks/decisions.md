@@ -209,3 +209,17 @@
 - provider 검색은 기존 `generated_queries/search_queries`보다 `search_plan.queries`를 우선 사용한다.
 - preview API 응답 shape는 이번 단계에서 변경하지 않고, `search_plan`은 query refinement artifact와 내부 traceability에만 저장한다.
 - Prisma migration은 도입하지 않고 기존 JSON artifact와 `origin_query_ids` 기반 추적을 유지한다.
+
+## 2026-04-27
+
+### Review Summary Copy
+- `rule_based_preview`의 `analysisSummary`는 신규 LLM 호출 없이 기존 source, evidence snippet, source stance, search plan purpose를 기반으로 생성한다.
+- summary는 지지/충돌/맥락 카운트 나열보다 사용자 질문에 대한 직접 답변, 최신 업데이트 신호, 공식 출처 여부, 남은 불확실성을 우선 설명한다.
+- API 응답 shape, DB schema, Prisma migration은 변경하지 않는다.
+
+### Evidence Signal Consensus
+- 요약 문장은 DB에 저장하지 않는다.
+- OpenAI는 review 생성 시점에 source/evidence별 signal만 structured output으로 분류한다.
+- `EvidenceSnippet.stance`에는 UI/호환용 `support`, `conflict`, `context`, `unknown` 값을 저장하고, 상세 signal은 `review_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
+- `/reviews/:reviewId` 조회 시에는 OpenAI를 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
+- scheduled event에서 최신 `latest_update/current_status` signal이 `weakens` 또는 `overrides`이면 과거 support가 많아도 합의성을 낮게 표시한다.

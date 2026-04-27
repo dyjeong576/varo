@@ -8,6 +8,8 @@ import { ReviewsOpenAiClient } from "./providers/reviews-openai.client";
 import { ReviewsTavilyClient } from "./providers/reviews-tavily.client";
 import {
   ExtractedSource,
+  EvidenceSignal,
+  EvidenceSignalClassificationInput,
   QueryRefinementResult,
   RelevanceFilteringInput,
   SearchCandidate,
@@ -96,6 +98,13 @@ export class ReviewsProvidersService {
   ): Promise<SearchCandidate[]> {
     const apiKey = this.getRequiredOpenAiApiKey();
     return this.openAiClient.applyRelevanceFiltering(apiKey, input);
+  }
+
+  async classifyEvidenceSignals(
+    input: EvidenceSignalClassificationInput,
+  ): Promise<EvidenceSignal[]> {
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.classifyEvidenceSignals(apiKey, input);
   }
 
   async extractContent(

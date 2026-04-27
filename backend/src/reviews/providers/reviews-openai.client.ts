@@ -4,6 +4,12 @@ import { AppException } from "../../common/exceptions/app-exception";
 import {
   QueryPurpose,
   QueryArtifact,
+  EvidenceSignal,
+  EvidenceSignalClassificationInput,
+  EvidenceSignalImpact,
+  EvidenceSignalStance,
+  EvidenceSignalTemporalRole,
+  EvidenceSignalUpdateType,
   QueryRefinementResult,
   ReviewClaimType,
   RelevanceFilteringInput,
@@ -40,6 +46,33 @@ const QUERY_PURPOSES: QueryPurpose[] = [
   "current_state",
   "primary_source",
   "contradiction_or_update",
+];
+const EVIDENCE_SIGNAL_STANCES: EvidenceSignalStance[] = [
+  "supports",
+  "contradicts",
+  "updates",
+  "context",
+  "unknown",
+];
+const EVIDENCE_SIGNAL_TEMPORAL_ROLES: EvidenceSignalTemporalRole[] = [
+  "past_plan",
+  "current_status",
+  "latest_update",
+  "official_statement",
+  "background",
+];
+const EVIDENCE_SIGNAL_UPDATE_TYPES: EvidenceSignalUpdateType[] = [
+  "delay",
+  "cancellation",
+  "correction",
+  "confirmation",
+  "none",
+];
+const EVIDENCE_SIGNAL_IMPACTS: EvidenceSignalImpact[] = [
+  "strengthens",
+  "weakens",
+  "overrides",
+  "neutral",
 ];
 
 interface OpenAiSearchPlanQueryPayload {
@@ -84,6 +117,19 @@ interface OpenAiRelevanceDecision {
 
 interface OpenAiRelevancePayload {
   decisions: OpenAiRelevanceDecision[];
+}
+
+interface OpenAiEvidenceSignalDecision {
+  sourceId: string;
+  stanceToClaim: EvidenceSignalStance;
+  temporalRole: EvidenceSignalTemporalRole;
+  updateType: EvidenceSignalUpdateType;
+  currentAnswerImpact: EvidenceSignalImpact;
+  reason: string;
+}
+
+interface OpenAiEvidenceSignalPayload {
+  signals: OpenAiEvidenceSignalDecision[];
 }
 
 @Injectable()
@@ -405,6 +451,104 @@ isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 
     });
   }
 
+  async classifyEvidenceSignals(
+    apiKey: string,
+    input: EvidenceSignalClassificationInput,
+  ): Promise<EvidenceSignal[]> {
+    if (input.sources.length === 0) {
+      return [];
+    }
+
+    const payload =
+      await this.requestStructuredOutput<OpenAiEvidenceSignalPayload>(
+        apiKey,
+        {
+          name: "review_evidence_signal_classification",
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["signals"],
+            properties: {
+              signals: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: [
+                    "sourceId",
+                    "stanceToClaim",
+                    "temporalRole",
+                    "updateType",
+                    "currentAnswerImpact",
+                    "reason",
+                  ],
+                  properties: {
+                    sourceId: { type: "string" },
+                    stanceToClaim: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_STANCES,
+                    },
+                    temporalRole: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_TEMPORAL_ROLES,
+                    },
+                    updateType: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_UPDATE_TYPES,
+                    },
+                    currentAnswerImpact: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_IMPACTS,
+                    },
+                    reason: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        [
+          {
+            role: "system",
+            content:
+              "당신은 VARO evidence signal classifier입니다. 사실 결론을 내리지 말고, 수집된 출처와 근거 스니펫이 사용자의 핵심 claim에 대해 어떤 역할을 하는지만 구조화하세요. scheduled_event에서는 과거 예정 보도와 현재 상태/최신 변경 보도를 구분하고, 최신 연기/취소/정정 신호가 기존 claim을 약화하거나 대체하는지 표시하세요. 공식 발표 여부는 sourceType과 제목/스니펫에 근거해 official_statement로만 표시하세요.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify(
+              {
+                coreClaim: input.coreClaim,
+                claimLanguageCode: input.claimLanguageCode,
+                searchPlan: input.searchPlan,
+                sources: input.sources,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        "evidence signal 분류 요청에 실패했습니다.",
+      );
+
+    if (!this.isValidEvidenceSignalPayload(payload, input)) {
+      throw new AppException(
+        APP_ERROR_CODES.LLM_SCHEMA_ERROR,
+        "evidence signal 분류 결과가 요구 형식을 충족하지 않습니다.",
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    return payload.signals.map((signal) => ({
+      sourceId: signal.sourceId,
+      snippetId: null,
+      stanceToClaim: signal.stanceToClaim,
+      temporalRole: signal.temporalRole,
+      updateType: signal.updateType,
+      currentAnswerImpact: signal.currentAnswerImpact,
+      reason: this.normalizeText(signal.reason, "signal 분류 이유가 누락되었습니다."),
+    }));
+  }
+
   private normalizeText(value: unknown, fallback: string): string {
     return typeof value === "string" && value.trim() ? value.trim() : fallback.trim();
   }
@@ -724,5 +868,39 @@ isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 
     }
 
     return seenIds.size === candidateIds.size;
+  }
+
+  private isValidEvidenceSignalPayload(
+    payload: OpenAiEvidenceSignalPayload,
+    input: EvidenceSignalClassificationInput,
+  ): payload is OpenAiEvidenceSignalPayload {
+    if (!payload || !Array.isArray(payload.signals)) {
+      return false;
+    }
+
+    const sourceIds = new Set(input.sources.map((source) => source.sourceId));
+    const seenIds = new Set<string>();
+
+    for (const signal of payload.signals) {
+      if (
+        !signal ||
+        typeof signal.sourceId !== "string" ||
+        typeof signal.reason !== "string" ||
+        !EVIDENCE_SIGNAL_STANCES.includes(signal.stanceToClaim) ||
+        !EVIDENCE_SIGNAL_TEMPORAL_ROLES.includes(signal.temporalRole) ||
+        !EVIDENCE_SIGNAL_UPDATE_TYPES.includes(signal.updateType) ||
+        !EVIDENCE_SIGNAL_IMPACTS.includes(signal.currentAnswerImpact)
+      ) {
+        return false;
+      }
+
+      if (!sourceIds.has(signal.sourceId) || seenIds.has(signal.sourceId)) {
+        return false;
+      }
+
+      seenIds.add(signal.sourceId);
+    }
+
+    return seenIds.size === sourceIds.size;
   }
 }

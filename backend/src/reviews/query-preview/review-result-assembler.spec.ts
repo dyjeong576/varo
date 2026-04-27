@@ -103,6 +103,13 @@ describe("assembleReviewResult", () => {
     expect(result.result.sourceBreakdown.official).toBe(1);
     expect(result.result.agreementCount).toBe(2);
     expect(result.result.contextCount).toBe(1);
+    expect(result.result.analysisSummary).toContain(
+      '현재 수집된 출처 기준으로는 "서울시 무제한 교통권 세계 최초"에 부합하는 근거가 더 우세합니다.',
+    );
+    expect(result.result.analysisSummary).toContain(
+      "현재 수집된 자료 안에서는 공식 발표/공식 출처가 확인됐습니다.",
+    );
+    expect(result.result.analysisSummary).not.toContain("지지 근거");
   });
 
   it("conflict 우세인 경우 Likely False를 반환한다", () => {
@@ -139,6 +146,10 @@ describe("assembleReviewResult", () => {
     expect(result.sourceStances["source-2"]).toBe("conflict");
     expect(result.result.verdict).toBe("Likely False");
     expect(result.result.conflictCount).toBe(2);
+    expect(result.result.analysisSummary).toContain(
+      '현재 수집된 출처 기준으로는 "트럼프가 오늘 관세를 철회했다"와 맞지 않는 근거가 더 우세합니다.',
+    );
+    expect(result.result.analysisSummary).not.toContain("충돌 근거");
   });
 
   it("지지와 충돌이 함께 있으면 Mixed Evidence를 반환한다", () => {
@@ -172,6 +183,12 @@ describe("assembleReviewResult", () => {
 
     expect(result.result.verdict).toBe("Mixed Evidence");
     expect(result.result.consensusLevel).toBe("medium");
+    expect(result.result.analysisSummary).toContain(
+      '현재 수집된 출처 기준으로는 "테슬라가 한국에서 철수했다"에 대한 근거가 엇갈립니다.',
+    );
+    expect(result.result.analysisSummary).toContain(
+      "일부 출처는 이 주장을 뒷받침하지만, 다른 출처에서는 반박·정정·업데이트 신호가 함께 확인됩니다.",
+    );
     expect(result.result.uncertaintyItems).toContain(
       "지지와 충돌 근거가 함께 있어 단일 결론으로 보기 어렵습니다.",
     );
@@ -220,10 +237,101 @@ describe("assembleReviewResult", () => {
 
     expect(result.sourceStances["source-3"]).toBe("conflict");
     expect(result.result.verdict).toBe("Mixed Evidence");
-    expect(result.result.consensusLevel).toBe("medium");
+    expect(result.result.consensusLevel).toBe("low");
     expect(result.result.confidenceScore).toBeLessThan(80);
+    expect(result.result.analysisSummary).toContain(
+      '현재 수집된 출처 기준으로는 "테슬라가 2026년 4월에 로드스터 차량을 공개한다"를 그대로 단정하기 어렵습니다.',
+    );
+    expect(result.result.analysisSummary).toContain(
+      "4월 2일 보도는 이 주장을 뒷받침하지만, 4월 22일 보도에서는 일정 연기 또는 변경 신호가 확인됩니다.",
+    );
+    expect(result.result.analysisSummary).toContain(
+      "공식 발표는 아직 확인되지 않았지만",
+    );
+    expect(result.result.analysisSummary).toContain(
+      "최근 연기 보도가 나온 상태로 보는 것이 적절합니다.",
+    );
+    expect(result.result.analysisSummary).not.toContain("지지 근거");
     expect(result.result.uncertaintyItems).toContain(
       "최신 업데이트/연기 신호가 있어 과거 보도 합의만으로 현재 기준 결론을 강화하지 않습니다.",
+    );
+  });
+
+  it("저장된 signal 기준 최신 연기 보도가 있으면 과거 support가 많아도 low consensus를 반환한다", () => {
+    const sources = [
+      createSource({
+        id: "source-1",
+        rawTitle: "테슬라 로드스터 2026년 4월 공개 예정",
+        publishedAt: new Date("2026-03-01T01:00:00.000Z"),
+        originQueryIds: ["q1"],
+      }),
+      createSource({
+        id: "source-2",
+        rawTitle: "로드스터 4월 공개 계획 재확인",
+        publishedAt: new Date("2026-04-01T01:00:00.000Z"),
+        canonicalUrl: "https://example.com/source-2",
+        originalUrl: "https://example.com/source-2",
+        originQueryIds: ["q1"],
+      }),
+      createSource({
+        id: "source-3",
+        rawTitle: "로드스터 공개 일정 한 달 연기",
+        rawSnippet: "최근 보도에서 공개 일정이 다음 달로 미뤄졌다고 전했다.",
+        publishedAt: new Date("2026-04-24T01:00:00.000Z"),
+        canonicalUrl: "https://example.com/source-3",
+        originalUrl: "https://example.com/source-3",
+        originQueryIds: ["q4"],
+      }),
+    ];
+    const evidenceSnippets = [
+      createSnippet({ id: "snippet-1", sourceId: "source-1", snippetText: "4월 공개 예정" }),
+      createSnippet({ id: "snippet-2", sourceId: "source-2", snippetText: "4월 공개 계획" }),
+      createSnippet({ id: "snippet-3", sourceId: "source-3", snippetText: "일정이 다음 달로 연기" }),
+    ];
+
+    const result = assembleReviewResult({
+      coreClaim: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
+      rawClaim: "테슬라가 2026년 4월에 로드스터 차량이 공개되는게 맞나?",
+      sources,
+      evidenceSnippets,
+      insufficiencyReason: null,
+      searchPlan: createSearchPlan(),
+      evidenceSignals: [
+        {
+          sourceId: "source-1",
+          snippetId: "snippet-1",
+          stanceToClaim: "supports",
+          temporalRole: "past_plan",
+          updateType: "none",
+          currentAnswerImpact: "strengthens",
+          reason: "과거 4월 공개 예정 보도입니다.",
+        },
+        {
+          sourceId: "source-2",
+          snippetId: "snippet-2",
+          stanceToClaim: "supports",
+          temporalRole: "past_plan",
+          updateType: "none",
+          currentAnswerImpact: "strengthens",
+          reason: "기존 4월 계획을 언급합니다.",
+        },
+        {
+          sourceId: "source-3",
+          snippetId: "snippet-3",
+          stanceToClaim: "updates",
+          temporalRole: "latest_update",
+          updateType: "delay",
+          currentAnswerImpact: "overrides",
+          reason: "더 최근 보도가 4월 공개 일정을 연기된 상태로 업데이트합니다.",
+        },
+      ],
+    });
+
+    expect(result.sourceStances["source-3"]).toBe("conflict");
+    expect(result.result.verdict).toBe("Mixed Evidence");
+    expect(result.result.consensusLevel).toBe("low");
+    expect(result.result.analysisSummary).toContain(
+      "일정 연기 또는 변경 신호가 확인됩니다.",
     );
   });
 
@@ -287,6 +395,12 @@ describe("assembleReviewResult", () => {
     expect(result.result.verdict).toBe("Unclear");
     expect(result.result.confidenceScore).toBeGreaterThanOrEqual(35);
     expect(result.result.confidenceScore).toBeLessThanOrEqual(98);
+    expect(result.result.analysisSummary).toContain(
+      '현재 수집된 출처만으로는 "검토 대상 주장"에 답하기 어렵습니다.',
+    );
+    expect(result.result.analysisSummary).toContain(
+      "따라서 현재는 결론을 보류하고 추가 출처를 확인하는 것이 적절합니다.",
+    );
     expect(result.result.uncertaintySummary).toContain("임시 결과");
     expect(result.result.uncertaintyItems[0]).toBe(
       "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",

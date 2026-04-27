@@ -209,6 +209,17 @@ describe("ReviewsQueryPreviewService", () => {
           snippetText: "추출 snippet",
         },
       ]),
+      classifyEvidenceSignals: jest.fn().mockResolvedValue([
+        {
+          sourceId: "c2",
+          snippetId: null,
+          stanceToClaim: "supports",
+          temporalRole: "current_status",
+          updateType: "confirmation",
+          currentAnswerImpact: "strengthens",
+          reason: "원문 검증 보도입니다.",
+        },
+      ]),
     } as unknown as ReviewsProvidersService;
     persistence.persistQueryPreviewResult.mockResolvedValue({
       createdSources: [
@@ -255,6 +266,17 @@ describe("ReviewsQueryPreviewService", () => {
       discardedSourceCount: 0,
       handoffSourceIds: ["source-2"],
       insufficiencyReason: "primary source가 충분하지 않아 reference 일부가 제한적으로 승격되었습니다.",
+      evidenceSignals: [
+        {
+          sourceId: "source-2",
+          snippetId: "snippet-source-2",
+          stanceToClaim: "supports",
+          temporalRole: "current_status",
+          updateType: "confirmation",
+          currentAnswerImpact: "strengthens",
+          reason: "원문 검증 보도입니다.",
+        },
+      ],
     });
     const service = new ReviewsQueryPreviewService(
       persistence as never,
@@ -280,6 +302,27 @@ describe("ReviewsQueryPreviewService", () => {
     expect(result.evidenceSnippets).toHaveLength(1);
     expect(result.evidenceSnippets[0]?.evidenceSummary).toBe("원문 검증 source입니다.");
     expect(persistence.resolveUserCountryCode).toHaveBeenCalledWith("user-1");
+    expect(providers.classifyEvidenceSignals).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coreClaim: "트럼프의 관세 발표",
+        sources: [
+          expect.objectContaining({
+            sourceId: "c2",
+            evidenceSnippetText: "추출 snippet",
+          }),
+        ],
+      }),
+    );
+    expect(persistence.persistQueryPreviewResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceSignals: [
+          expect.objectContaining({
+            sourceId: "c2",
+            currentAnswerImpact: "strengthens",
+          }),
+        ],
+      }),
+    );
     expect(providers.searchSources).toHaveBeenCalledWith(
       expect.objectContaining({
         searchRoute: "korean_news",

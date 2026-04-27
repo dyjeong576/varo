@@ -1,5 +1,5 @@
 import { EvidenceSnippet, Source } from "@prisma/client";
-import { QueryPurpose, SearchPlan } from "../reviews.types";
+import { EvidenceSignal, QueryPurpose, SearchPlan } from "../reviews.types";
 
 export type ReviewResultVerdict =
   | "Likely True"
@@ -22,6 +22,7 @@ interface ResultAssemblerInput {
   evidenceSnippets: EvidenceSnippet[];
   insufficiencyReason: string | null;
   searchPlan?: SearchPlan | null;
+  evidenceSignals?: EvidenceSignal[];
 }
 
 interface AssembledSourceBreakdown {
@@ -114,21 +115,6 @@ function categorizeSourceType(sourceType: string): ReviewSourceCategory {
   return "other";
 }
 
-function summarizeSourceCategory(category: ReviewSourceCategory): string {
-  switch (category) {
-    case "official":
-      return "공식 출처";
-    case "press":
-      return "언론 보도";
-    case "social":
-      return "소셜 원문";
-    case "analysis":
-      return "해설형 출처";
-    default:
-      return "기타 출처";
-  }
-}
-
 function buildSourceText(source: Source, evidenceSnippets: EvidenceSnippet[]): string {
   const snippetTexts = evidenceSnippets
     .filter((snippet) => snippet.sourceId === source.id)
@@ -170,6 +156,49 @@ function sourceHasQueryPurpose(
 ): boolean {
   return parseOriginQueryIds(source.originQueryIds).some(
     (queryId) => queryPurposesById.get(queryId) === purpose,
+  );
+}
+
+function buildSignalBySourceId(
+  evidenceSignals?: EvidenceSignal[],
+): Map<string, EvidenceSignal> {
+  return new Map((evidenceSignals ?? []).map((signal) => [signal.sourceId, signal]));
+}
+
+function mapSignalToSourceStance(signal: EvidenceSignal): ReviewSourceStance {
+  if (
+    signal.stanceToClaim === "contradicts" ||
+    signal.stanceToClaim === "updates" ||
+    signal.currentAnswerImpact === "weakens" ||
+    signal.currentAnswerImpact === "overrides"
+  ) {
+    return "conflict";
+  }
+
+  if (
+    signal.stanceToClaim === "supports" ||
+    signal.currentAnswerImpact === "strengthens"
+  ) {
+    return "support";
+  }
+
+  if (signal.stanceToClaim === "context") {
+    return "context";
+  }
+
+  return "unknown";
+}
+
+function signalHasCurrentUpdateConflict(signal?: EvidenceSignal): boolean {
+  return Boolean(
+    signal &&
+      (signal.temporalRole === "latest_update" ||
+        signal.temporalRole === "current_status") &&
+      (signal.currentAnswerImpact === "weakens" ||
+        signal.currentAnswerImpact === "overrides" ||
+        signal.updateType === "delay" ||
+        signal.updateType === "cancellation" ||
+        signal.updateType === "correction"),
   );
 }
 
@@ -356,7 +385,7 @@ function buildConsensusLevel(
   hasCurrentUpdateConflict: boolean,
 ): ReviewConsensusLevel {
   if (hasCurrentUpdateConflict) {
-    return verdict === "Unclear" ? "low" : "medium";
+    return "low";
   }
 
   if (verdict === "Unclear") {
@@ -370,58 +399,120 @@ function buildConsensusLevel(
   return supportCount >= 2 || conflictCount >= 2 ? "high" : "medium";
 }
 
-function pickDominantCategory(sourceBreakdown: AssembledSourceBreakdown): ReviewSourceCategory {
-  const entries = Object.entries(sourceBreakdown) as Array<
-    [ReviewSourceCategory, number]
-  >;
-  const [category] = entries.sort((left, right) => right[1] - left[1])[0] ?? ["other", 0];
-  return category;
+function getPublishedAtTime(source: Source): number {
+  return source.publishedAt?.getTime() ?? 0;
+}
+
+function pickLatestSource(sources: Source[]): Source | null {
+  return [...sources].sort(
+    (left, right) => getPublishedAtTime(right) - getPublishedAtTime(left),
+  )[0] ?? null;
+}
+
+function formatPublishedAt(source: Source | null): string | null {
+  if (!source?.publishedAt) {
+    return null;
+  }
+
+  return `${source.publishedAt.getMonth() + 1}월 ${source.publishedAt.getDate()}일 보도`;
+}
+
+function buildOfficialSourceSentence(params: {
+  officialCount: number;
+  verificationCount: number;
+}): string {
+  if (params.officialCount > 0) {
+    return "현재 수집된 자료 안에서는 공식 발표/공식 출처가 확인됐습니다.";
+  }
+
+  if (params.verificationCount > 0) {
+    return "현재 수집된 자료 안에서는 공식 발표는 아직 확인되지 않았지만, 검증 성격의 출처는 포함되어 있습니다.";
+  }
+
+  return "현재 수집된 자료 안에서는 공식 발표/공식 출처는 아직 확인되지 않았습니다.";
 }
 
 function buildAnalysisSummary(params: {
   coreClaim: string;
   verdict: ReviewResultVerdict;
-  supportCount: number;
-  conflictCount: number;
-  contextCount: number;
+  supportSources: Source[];
+  conflictSources: Source[];
+  contextSources: Source[];
   verificationCount: number;
-  sourceBreakdown: AssembledSourceBreakdown;
+  officialCount: number;
   hasCurrentUpdateConflict: boolean;
+  isScheduledEvent: boolean;
 }): string {
   const {
     coreClaim,
     verdict,
-    supportCount,
-    conflictCount,
-    contextCount,
+    supportSources,
+    conflictSources,
+    contextSources,
     verificationCount,
-    sourceBreakdown,
+    officialCount,
     hasCurrentUpdateConflict,
+    isScheduledEvent,
   } = params;
+  const officialSourceSentence = buildOfficialSourceSentence({
+    officialCount,
+    verificationCount,
+  });
+
+  if (isScheduledEvent && hasCurrentUpdateConflict) {
+    const latestSupportSource = pickLatestSource(supportSources);
+    const latestConflictSource = pickLatestSource(conflictSources);
+    const supportDate = formatPublishedAt(latestSupportSource);
+    const conflictDate = formatPublishedAt(latestConflictSource);
+    const updateSentence =
+      supportSources.length > 0
+        ? `${supportDate ?? "초기/과거 보도"}는 이 주장을 뒷받침하지만, ${conflictDate ?? "더 최근 보도"}에서는 일정 연기 또는 변경 신호가 확인됩니다.`
+        : `${conflictDate ?? "최신 상태를 다룬 보도"}에서 일정 연기 또는 변경 신호가 확인됩니다.`;
+
+    return [
+      `현재 수집된 출처 기준으로는 "${coreClaim}"를 그대로 단정하기 어렵습니다.`,
+      updateSentence,
+      officialSourceSentence,
+      "따라서 현재는 기존 공개 일정 또는 공개 예정 보도가 있었지만 최근 연기 보도가 나온 상태로 보는 것이 적절합니다.",
+      "이 요약은 현재 저장된 출처와 근거 스니펫만 기반으로 한 임시 요약입니다.",
+    ].join(" ");
+  }
 
   const verdictLead: Record<ReviewResultVerdict, string> = {
-    "Likely True": `수집된 출처 기준으로는 "${coreClaim}"를 지지하는 근거가 더 우세합니다.`,
-    "Likely False": `수집된 출처 기준으로는 "${coreClaim}"와 충돌하는 근거가 더 우세합니다.`,
-    "Mixed Evidence": `수집된 출처 기준으로는 "${coreClaim}"에 대해 지지와 충돌 신호가 함께 확인됩니다.`,
-    Unclear: `현재 확보된 출처만으로는 "${coreClaim}"를 한 방향으로 해석하기 어렵습니다.`,
+    "Likely True": `현재 수집된 출처 기준으로는 "${coreClaim}"에 부합하는 근거가 더 우세합니다.`,
+    "Likely False": `현재 수집된 출처 기준으로는 "${coreClaim}"와 맞지 않는 근거가 더 우세합니다.`,
+    "Mixed Evidence": `현재 수집된 출처 기준으로는 "${coreClaim}"에 대한 근거가 엇갈립니다.`,
+    Unclear: `현재 수집된 출처만으로는 "${coreClaim}"에 답하기 어렵습니다.`,
   };
 
-  const dominantCategory = summarizeSourceCategory(
-    pickDominantCategory(sourceBreakdown),
-  );
-  const trustSentence =
-    verificationCount > 0
-      ? "verification 또는 공식 성격의 source가 포함되어 있어 현재 단계 기준 검토 밀도는 비교적 높습니다."
-      : "아직 verification 또는 공식 성격의 source 비중이 높지 않아 해석 강도는 제한적입니다.";
+  const evidenceSentence =
+    supportSources.length > 0 && conflictSources.length > 0
+      ? "일부 출처는 이 주장을 뒷받침하지만, 다른 출처에서는 반박·정정·업데이트 신호가 함께 확인됩니다."
+      : supportSources.length > 0
+        ? "관련 출처들은 대체로 이 주장과 같은 방향의 내용을 담고 있습니다."
+        : conflictSources.length > 0
+          ? "관련 출처들은 대체로 이 주장과 맞지 않는 내용이나 반박 신호를 담고 있습니다."
+          : contextSources.length > 0
+            ? "수집된 출처는 배경 정보에 가깝고, 질문에 직접 답할 근거는 아직 부족합니다."
+            : "질문에 직접 답할 만한 근거가 충분히 수집되지 않았습니다.";
+
+  const conclusion: Record<ReviewResultVerdict, string> = {
+    "Likely True":
+      "따라서 현재는 이 주장을 수집 출처 기준으로는 가능성이 높은 설명으로 볼 수 있습니다.",
+    "Likely False":
+      "따라서 현재는 이 주장을 그대로 받아들이기보다, 수집된 반박 근거를 먼저 확인하는 것이 적절합니다.",
+    "Mixed Evidence":
+      "따라서 현재는 한쪽 결론으로 단정하기보다, 최신 출처와 공식 출처를 함께 확인하는 것이 적절합니다.",
+    Unclear:
+      "따라서 현재는 결론을 보류하고 추가 출처를 확인하는 것이 적절합니다.",
+  };
 
   return [
     verdictLead[verdict],
-    `${dominantCategory} 중심으로 지지 근거 ${supportCount}건, 충돌 근거 ${conflictCount}건, 맥락 보완 근거 ${contextCount}건이 정리됐습니다.`,
-    ...(hasCurrentUpdateConflict
-      ? ["최신 변경 또는 연기 신호가 있어 과거 보도 합의만으로 현재 기준 결론을 강화하지 않습니다."]
-      : []),
-    trustSentence,
-    "이 결과는 interpretation 생성 전, 현재 저장된 source와 evidence snippet만으로 계산한 임시 분석입니다.",
+    evidenceSentence,
+    officialSourceSentence,
+    conclusion[verdict],
+    "이 요약은 현재 저장된 출처와 근거 스니펫만 기반으로 한 임시 요약입니다.",
   ].join(" ");
 }
 
@@ -482,27 +573,38 @@ export function assembleReviewResult(
 ): AssembledReviewResultPayload {
   const queryPurposesById = buildQueryPurposesById(input.searchPlan);
   const isScheduledEvent = input.searchPlan?.claimType === "scheduled_event";
+  const signalBySourceId = buildSignalBySourceId(input.evidenceSignals);
   const sourceStances = input.sources.reduce<Record<string, ReviewSourceStance>>(
     (acc, source) => {
-      acc[source.id] = determineSourceStance(
-        source,
-        input.evidenceSnippets,
-        queryPurposesById,
-        isScheduledEvent,
-      );
+      const signal = signalBySourceId.get(source.id);
+      acc[source.id] = signal
+        ? mapSignalToSourceStance(signal)
+        : determineSourceStance(
+            source,
+            input.evidenceSnippets,
+            queryPurposesById,
+            isScheduledEvent,
+          );
       return acc;
     },
     {},
   );
   const hasCurrentUpdateConflict = input.sources.some(
-    (source) =>
-      sourceStances[source.id] === "conflict" &&
-      hasScheduledEventUpdateSignal({
-        source,
-        evidenceSnippets: input.evidenceSnippets,
-        queryPurposesById,
-        isScheduledEvent,
-      }),
+    (source) => {
+      if (sourceStances[source.id] !== "conflict") {
+        return false;
+      }
+
+      return (
+        signalHasCurrentUpdateConflict(signalBySourceId.get(source.id)) ||
+        hasScheduledEventUpdateSignal({
+          source,
+          evidenceSnippets: input.evidenceSnippets,
+          queryPurposesById,
+          isScheduledEvent,
+        })
+      );
+    },
   );
 
   const supportSources = input.sources.filter(
@@ -579,12 +681,13 @@ export function assembleReviewResult(
       analysisSummary: buildAnalysisSummary({
         coreClaim: input.coreClaim || input.rawClaim,
         verdict,
-        supportCount: supportSources.length,
-        conflictCount: conflictSources.length,
-        contextCount: contextSources.length,
+        supportSources,
+        conflictSources,
+        contextSources,
         verificationCount,
-        sourceBreakdown,
+        officialCount,
         hasCurrentUpdateConflict,
+        isScheduledEvent,
       }),
       uncertaintySummary: buildUncertaintySummary(uncertaintyItems),
       uncertaintyItems,

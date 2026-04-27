@@ -503,6 +503,49 @@ describe("ReviewsProvidersService", () => {
     });
   });
 
+  it("classifyEvidenceSignals는 OpenAI client에 분류를 위임한다", async () => {
+    const classifySpy = jest
+      .spyOn(ReviewsOpenAiClient.prototype, "classifyEvidenceSignals")
+      .mockResolvedValue([
+        {
+          sourceId: "c1",
+          snippetId: null,
+          stanceToClaim: "updates",
+          temporalRole: "latest_update",
+          updateType: "delay",
+          currentAnswerImpact: "overrides",
+          reason: "최근 연기 보도입니다.",
+        },
+      ]);
+    const service = createService({
+      reviewProviderMode: "real",
+      openAiApiKey: "openai-test-key",
+    });
+    const input = {
+      coreClaim: "테슬라 로드스터 4월 공개",
+      claimLanguageCode: "ko",
+      searchPlan: null,
+      sources: [
+        {
+          sourceId: "c1",
+          sourceType: "news",
+          publisherName: "Reuters",
+          publishedAt: "2026-04-24T00:00:00.000Z",
+          rawTitle: "Roadster delayed",
+          rawSnippet: "Delayed to next month",
+          originQueryIds: ["q4"],
+          retrievalBucket: "verification" as const,
+          evidenceSnippetText: "Delayed to next month",
+        },
+      ],
+    };
+
+    const result = await service.classifyEvidenceSignals(input);
+
+    expect(classifySpy).toHaveBeenCalledWith("openai-test-key", input);
+    expect(result[0]?.currentAnswerImpact).toBe("overrides");
+  });
+
   it("global search에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {
     const service = createService({
       reviewProviderMode: "real",

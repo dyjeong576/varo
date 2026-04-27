@@ -89,12 +89,12 @@
 
 - claim
 - provisional verdict / confidence / 수집된 출처 간 일치도
+- 수집 뉴스 종합 요약 / 공식 출처 확인 상태
 - source distribution / agreement / conflict summary
-- normalized claim / country detection reason / search plan
 - evidence snippet list
 - source card 목록
 - source type filter
-- rule-based analysis summary
+- 기본 숨김 query context / search plan
 - uncertainty / insufficiency 안내
 
 현재 결과 화면은 최종 interpretation 저장 결과가 아니라, 저장된 preview artifact를 바탕으로 서버가 계산한 `rule_based_preview` 상세 결과를 보여준다.
@@ -267,10 +267,10 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 
 1. claim
 2. provisional verdict / confidence / 수집된 출처 간 일치도
-3. query context와 search plan
+3. rule-based 수집 뉴스 종합 요약과 공식 출처 확인 상태
 4. evidence snippet
 5. source card 목록
-6. rule-based analysis summary
+6. 기본 숨김 query context와 search plan
 7. uncertainty / insufficiency 안내
 
 표시 원칙:

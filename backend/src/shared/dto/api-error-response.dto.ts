@@ -1,21 +1,21 @@
 import { ApiProperty } from "@nestjs/swagger";
 
 export class ApiErrorResponseDto {
-  @ApiProperty({ description: "HTTP 상태 코드", example: 401 })
+  @ApiProperty({ description: "HTTP 상태 코드", example: 401, type: Number })
   statusCode!: number;
 
-  @ApiProperty({ description: "도메인 에러 코드", example: "AUTH_REQUIRED" })
+  @ApiProperty({ description: "도메인 에러 코드", example: "AUTH_REQUIRED", type: String })
   code!: string;
 
-  @ApiProperty({ description: "사용자 노출 메시지", example: "로그인이 필요합니다." })
+  @ApiProperty({ description: "사용자 노출 메시지", example: "로그인이 필요합니다.", type: String })
   message!: string;
 
-  @ApiProperty({ description: "추적용 trace id", example: "c3f9f22b-2400-4d51-9f4c-111111111111" })
+  @ApiProperty({ description: "추적용 trace id", example: "c3f9f22b-2400-4d51-9f4c-111111111111", type: String })
   traceId!: string;
 
-  @ApiProperty({ description: "에러 발생 시각", example: "2026-03-27T12:00:00.000Z" })
+  @ApiProperty({ description: "에러 발생 시각", example: "2026-03-27T12:00:00.000Z", type: String })
   timestamp!: string;
 
-  @ApiProperty({ description: "요청 경로", example: "/api/v1/users/me" })
+  @ApiProperty({ description: "요청 경로", example: "/api/v1/users/me", type: String })
   path!: string;
 }

@@ -76,10 +76,11 @@
 - `timeout`
 
 ### 5.4 evidence stance
-- `agreement`
+- `support`
 - `conflict`
-- `neutral`
-- `insufficient`
+- `context`
+- `unknown`
+- `neutral` (legacy/fallback)
 
 ### 5.5 verdict
 - `Likely True`
@@ -143,8 +144,12 @@
 | `processed_source_count` | integer | 처리 완료 source 수 |
 | `retry_count` | integer | 재시도 횟수 |
 | `last_error_code` | varchar(64) | 마지막 실패 코드 |
+| `query_refinement` | jsonb nullable | claim understanding, search plan, provider route audit |
+| `handoff_payload` | jsonb nullable | interpretation handoff 및 evidence signal trace |
 | `created_at` | timestamptz | 생성 시각 |
 | `updated_at` | timestamptz | 갱신 시각 |
+
+`handoff_payload.evidenceSignals[]`에는 source/evidence별 `sourceId`, `snippetId`, `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`을 저장한다. 요약 문장은 저장하지 않으며, `/reviews/:reviewId` 조회 시 저장된 source, snippet, evidence signal을 기반으로 `consensusLevel`, `sourceStances`, `analysisSummary`를 계산한다.
 
 ### 6.6 `sources`
 | 컬럼 | 타입 | 설명 |
@@ -181,6 +186,8 @@
 | `stance` | varchar(32) | 근거 방향 |
 | `start_offset` | integer nullable | 본문 내 시작 위치 |
 | `end_offset` | integer nullable | 본문 내 종료 위치 |
+
+`EvidenceSnippet.stance`는 API 호환과 빠른 UI 표시를 위한 값이다. signal classification 이후에는 `support`, `conflict`, `context`, `unknown` 값을 우선 사용하고, 기존 review에는 `neutral` 등 과거 값이 남을 수 있다. 상세 판단 사유는 `handoff_payload.evidenceSignals[]`에서 추적한다.
 
 ### 6.8 `review_results`
 | 컬럼 | 타입 | 설명 |

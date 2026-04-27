@@ -141,6 +141,9 @@
 
 - 결과는 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - verdict는 기사 수나 단순 agreement score가 아니라 evidence 구조와 query purpose별 근거 성격을 바탕으로 계산한다.
+- 결과 화면용 summary는 내부 카운트 나열이 아니라 사용자 질문에 직접 답하는 문장으로 작성하고, 최신 출처, 업데이트/정정 신호, 공식 출처 여부, 남은 불확실성을 함께 설명한다.
+- OpenAI는 review 생성 시점에 evidence signal만 구조화하며, 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source, snippet, signal trace를 기준으로 백엔드가 계산한다.
+- 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`와 `EvidenceSnippet.stance`를 계산 입력으로 유지한다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
@@ -325,8 +328,9 @@
 
 ### 10.4 OpenAI Structured Outputs
 
-- review 도메인의 structured interpretation 생성
+- review 도메인의 query refinement, relevance filtering, evidence signal classification, structured interpretation 생성
 - 입력에 없는 사실을 생성하지 않도록 제한
+- evidence signal classification은 사실 결론을 내리지 않고, source/evidence가 현재 질문에 대해 `support`, `conflict`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 

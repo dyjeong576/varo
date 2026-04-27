@@ -1,6 +1,11 @@
 import type { EvidenceSnippet, Prisma, ReviewJob, Source } from "@prisma/client";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import {
+  EvidenceSignal,
+  EvidenceSignalImpact,
+  EvidenceSignalStance,
+  EvidenceSignalTemporalRole,
+  EvidenceSignalUpdateType,
   ExtractedSource,
   QueryPurpose,
   QueryArtifact,
@@ -71,6 +76,7 @@ interface HandoffPayload {
   sourceIds: string[];
   snippetIds: string[];
   insufficiencyReason: string | null;
+  evidenceSignals: EvidenceSignal[];
 }
 
 const QUERY_PURPOSES: QueryPurpose[] = [
@@ -90,6 +96,33 @@ const REVIEW_CLAIM_TYPES = [
   "general_fact",
 ];
 const SEARCH_ROUTES = ["korean_news", "global_news", "unsupported"];
+const EVIDENCE_SIGNAL_STANCES: EvidenceSignalStance[] = [
+  "supports",
+  "contradicts",
+  "updates",
+  "context",
+  "unknown",
+];
+const EVIDENCE_SIGNAL_TEMPORAL_ROLES: EvidenceSignalTemporalRole[] = [
+  "past_plan",
+  "current_status",
+  "latest_update",
+  "official_statement",
+  "background",
+];
+const EVIDENCE_SIGNAL_UPDATE_TYPES: EvidenceSignalUpdateType[] = [
+  "delay",
+  "cancellation",
+  "correction",
+  "confirmation",
+  "none",
+];
+const EVIDENCE_SIGNAL_IMPACTS: EvidenceSignalImpact[] = [
+  "strengthens",
+  "weakens",
+  "overrides",
+  "neutral",
+];
 
 export function buildSourceCreateInputs(
   reviewJobId: string,
@@ -246,13 +279,15 @@ export function buildHandoffPayload(
   sourceIds: string[],
   snippetIds: string[],
   insufficiencyReason: string | null,
+  evidenceSignals: EvidenceSignal[] = [],
 ): Prisma.InputJsonValue {
   return {
     coreClaim,
     sourceIds,
     snippetIds,
     insufficiencyReason,
-  } as Prisma.InputJsonValue;
+    evidenceSignals,
+  } as unknown as Prisma.InputJsonValue;
 }
 
 export function buildCompletedReviewJobUpdate(
@@ -315,6 +350,7 @@ export function mapPreviewResponse(params: {
   discardedSourceCount: number;
   handoffSourceIds: string[];
   insufficiencyReason: string | null;
+  evidenceSignals?: EvidenceSignal[];
 }): ReviewQueryProcessingPreviewResponseDto {
   const assembledResult = assembleReviewResult({
     coreClaim: params.refinement.coreClaim,
@@ -323,6 +359,7 @@ export function mapPreviewResponse(params: {
     evidenceSnippets: params.evidenceSnippets,
     insufficiencyReason: params.insufficiencyReason,
     searchPlan: params.refinement.searchPlan,
+    evidenceSignals: params.evidenceSignals,
   });
 
   return {
@@ -522,6 +559,47 @@ function parseStringArray(value: unknown): string[] {
     : [];
 }
 
+function parseEvidenceSignals(value: unknown): EvidenceSignal[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const sourceId = parseString(record.sourceId);
+    const stanceToClaim = record.stanceToClaim as EvidenceSignalStance;
+    const temporalRole = record.temporalRole as EvidenceSignalTemporalRole;
+    const updateType = record.updateType as EvidenceSignalUpdateType;
+    const currentAnswerImpact = record.currentAnswerImpact as EvidenceSignalImpact;
+
+    if (
+      !sourceId ||
+      !EVIDENCE_SIGNAL_STANCES.includes(stanceToClaim) ||
+      !EVIDENCE_SIGNAL_TEMPORAL_ROLES.includes(temporalRole) ||
+      !EVIDENCE_SIGNAL_UPDATE_TYPES.includes(updateType) ||
+      !EVIDENCE_SIGNAL_IMPACTS.includes(currentAnswerImpact)
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        sourceId,
+        snippetId: parseNullableString(record.snippetId),
+        stanceToClaim,
+        temporalRole,
+        updateType,
+        currentAnswerImpact,
+        reason: parseString(record.reason, "signal 분류 이유가 기록되지 않았습니다."),
+      },
+    ];
+  });
+}
+
 function parseQueryRefinementPayload(
   value: Prisma.JsonValue | null,
   normalizedClaim: string,
@@ -608,6 +686,7 @@ function parseHandoffPayload(
       sourceIds: evidenceSnippets.map((snippet) => snippet.sourceId),
       snippetIds: evidenceSnippets.map((snippet) => snippet.id),
       insufficiencyReason: null,
+      evidenceSignals: [],
     };
   }
 
@@ -616,6 +695,7 @@ function parseHandoffPayload(
     sourceIds: parseStringArray(payload.sourceIds),
     snippetIds: parseStringArray(payload.snippetIds),
     insufficiencyReason: parseNullableString(payload.insufficiencyReason),
+    evidenceSignals: parseEvidenceSignals(payload.evidenceSignals),
   };
 }
 
@@ -655,6 +735,7 @@ export function mapStoredPreviewResponse(
     evidenceSnippets: reviewJob.evidenceSnippets,
     insufficiencyReason: handoff.insufficiencyReason,
     searchPlan: refinement.searchPlan,
+    evidenceSignals: handoff.evidenceSignals,
   });
   const result =
     reviewJob.status === "out_of_scope" ? null : assembledResult.result;
@@ -710,7 +791,12 @@ export function mapStoredPreviewResponse(
     discardedSourceCount: reviewJob.sources.filter(
       (source) => source.relevanceTier === "discard",
     ).length,
-    handoff,
+    handoff: {
+      coreClaim: handoff.coreClaim,
+      sourceIds: handoff.sourceIds,
+      snippetIds: handoff.snippetIds,
+      insufficiencyReason: handoff.insufficiencyReason,
+    },
     result,
   };
 }

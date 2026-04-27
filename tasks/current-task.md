@@ -1,30 +1,28 @@
 # Current Task
 
-## 임시 전환 작업
-- `/notifications` 점3개 메뉴, 전체 삭제, 개별 삭제 동작을 보완한다.
-- `/community` 피드의 게시글 공감 버튼을 토글 가능하게 맞춘다.
-- `/history`에서 review와 pending draft를 삭제할 수 있게 보완한다.
-
 ## 작업명
-글로벌 검색 provider routing 전환
+Evidence Signal 기반 정보 합의성 고도화
 
 ## 목표
-- MVP 검색 범위를 국가 무관 뉴스성 claim 전체로 정리한다.
-- `search_route`를 `korean_news / global_news / unsupported` 기준으로 실제 review pipeline에 연결한다.
-- 한국 뉴스성 claim은 Naver, 해외/글로벌 뉴스성 claim은 Tavily Search/Extract를 사용한다.
-- 글로벌 route에서는 사용자-facing query는 원문 유지, Tavily 검색 입력만 영어 아티팩트로 사용한다.
+- OpenAI는 review 생성 시점에 evidence signal만 구조화한다.
+- 백엔드는 저장된 signal을 기준으로 `consensusLevel`, `sourceStances`, `analysisSummary`를 조회 시점에 계산한다.
+- 최신 연기/변경 signal이 기존 claim을 약화하거나 대체하면 과거 support 수가 많아도 합의성을 낮게 표시한다.
 
 ## 이번 작업 범위
-- `backend/src/reviews/providers`
+- `backend/src/reviews/providers/reviews-openai.client.ts`
 - `backend/src/reviews/reviews.providers.service.ts`
-- `backend/src/reviews/query-preview`
-- `docs/prd.md`
+- `backend/src/reviews/query-preview/reviews-query-preview.service.ts`
+- `backend/src/reviews/query-preview/reviews-query-preview.persistence.service.ts`
+- `backend/src/reviews/query-preview/reviews-query-preview.mapper.ts`
+- `backend/src/reviews/query-preview/review-result-assembler.ts`
 - `docs/backend-spec.md`
 - `docs/review-query-processing.md`
 - `docs/data-model.md`
 - `tasks/decisions.md`
-- 관련 backend 단위 테스트 및 build 검증
+- `tasks/current-task.md`
 
 ## 제외 범위
-- Prisma migration
-- frontend 화면 구현
+- 백엔드 API 계약 변경
+- 신규 LLM 요약 호출 추가 또는 요약 문장 DB 저장
+- DB schema / Prisma migration 변경
+- 최종 interpretation pipeline 전환

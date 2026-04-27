@@ -141,6 +141,37 @@ export class ReviewsQueryPreviewService {
       const extractedSources = extractionTargets.length
         ? await this.providersService.extractContent(extractionTargets)
         : [];
+      const evidenceSignalSources = extractionTargets.flatMap((target) => {
+        const extracted = extractedSources.find(
+          (source) => source.canonicalUrl === target.canonicalUrl,
+        );
+
+        if (!extracted) {
+          return [];
+        }
+
+        return [
+          {
+            sourceId: target.id,
+            sourceType: target.sourceType,
+            publisherName: target.publisherName,
+            publishedAt: target.publishedAt,
+            rawTitle: target.rawTitle,
+            rawSnippet: target.rawSnippet,
+            originQueryIds: target.originQueryIds,
+            retrievalBucket: target.retrievalBucket,
+            evidenceSnippetText: extracted.snippetText,
+          },
+        ];
+      });
+      const evidenceSignals = evidenceSignalSources.length
+        ? await this.providersService.classifyEvidenceSignals({
+            coreClaim: refinement.coreClaim,
+            claimLanguageCode: refinement.claimLanguageCode,
+            searchPlan: refinement.searchPlan,
+            sources: evidenceSignalSources,
+          })
+        : [];
       const persistedArtifacts =
         await this.persistenceService.persistQueryPreviewResult({
           userId,
@@ -151,6 +182,7 @@ export class ReviewsQueryPreviewService {
           relevanceCandidates,
           extractionTargets,
           extractedSources,
+          evidenceSignals,
           primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
         });
 
@@ -167,6 +199,7 @@ export class ReviewsQueryPreviewService {
         discardedSourceCount: persistedArtifacts.discardedSourceCount,
         handoffSourceIds: persistedArtifacts.handoffSourceIds,
         insufficiencyReason: persistedArtifacts.insufficiencyReason,
+        evidenceSignals: persistedArtifacts.evidenceSignals,
       });
     } catch (error) {
       this.logger.error(
