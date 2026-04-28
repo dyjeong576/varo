@@ -128,7 +128,6 @@ export interface SearchSourcesInput {
   queries: QueryArtifact[];
   coreClaim: string;
   claimLanguageCode: string;
-  userCountryCode: string | null;
   topicCountryCode: string | null;
   topicScope: TopicScope;
   domainRegistry: DomainRegistryEntry[];
@@ -141,6 +140,15 @@ export interface RelevanceFilteringInput {
   topicCountryCode: string | null;
   topicScope: TopicScope;
   candidates: SearchCandidate[];
+}
+
+export interface RelevanceSignalClassificationInput extends RelevanceFilteringInput {
+  searchPlan: SearchPlan | null;
+}
+
+export interface RelevanceSignalClassificationResult {
+  relevanceCandidates: SearchCandidate[];
+  evidenceSignals: EvidenceSignal[];
 }
 
 export interface ExtractedSource {

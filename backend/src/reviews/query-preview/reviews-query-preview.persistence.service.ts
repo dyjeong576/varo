@@ -32,7 +32,6 @@ interface PersistQueryPreviewResultInput {
   reviewJob: Pick<ReviewJob, "id">;
   refinement: QueryRefinementResult;
   generatedQueries: QueryArtifact[];
-  userCountryCode: string | null;
   relevanceCandidates: SearchCandidate[];
   evidenceSignals?: EvidenceSignal[];
   primaryExtractionLimit: number;
@@ -400,7 +399,6 @@ export class ReviewsQueryPreviewPersistenceService {
     const queryRefinementPayload = buildQueryRefinementPayload(
       input.refinement,
       input.generatedQueries,
-      input.userCountryCode,
     );
     const handoffPayload = buildHandoffPayload(
       input.refinement.coreClaim,
@@ -447,14 +445,12 @@ export class ReviewsQueryPreviewPersistenceService {
     reviewJob: Pick<ReviewJob, "id">;
     refinement: QueryRefinementResult;
     generatedQueries: QueryArtifact[];
-    userCountryCode: string | null;
   }): Promise<PersistedOutOfScopeReview> {
     const insufficiencyReason =
       "뉴스성 또는 사실성 검토 지원 범위 밖 claim으로 기록되었습니다.";
     const queryRefinementPayload = buildQueryRefinementPayload(
       params.refinement,
       params.generatedQueries,
-      params.userCountryCode,
     );
     const handoffPayload = buildHandoffPayload(
       params.refinement.coreClaim,
@@ -499,19 +495,6 @@ export class ReviewsQueryPreviewPersistenceService {
           error instanceof AppException ? error.code : APP_ERROR_CODES.INTERNAL_ERROR,
       },
     });
-  }
-
-  async resolveUserCountryCode(userId: string): Promise<string | null> {
-    const profile = await this.prisma.userProfile.findUnique({
-      where: {
-        userId,
-      },
-      select: {
-        country: true,
-      },
-    });
-
-    return normalizeCountryCode(profile?.country);
   }
 
   async ensurePreviewUser(): Promise<{ id: string }> {

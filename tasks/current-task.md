@@ -7,6 +7,7 @@
 - VARO MVP의 검토 범위를 한국 관련 정치·경제 claim으로 고정한다.
 - 해외/글로벌 뉴스 claim은 `unsupported/out_of_scope`로 처리한다.
 - Tavily Search는 제거하지 않고 한국 뉴스 보조 source search provider로 유지한다.
+- review preview 대기 시간을 줄이기 위해 Naver timeout/partial 처리와 OpenAI 분류 호출 수를 조정한다.
 
 ## 이번 작업 범위
 - `docs/prd.md`

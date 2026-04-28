@@ -247,7 +247,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       },
       generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-      userCountryCode: "KR",
       relevanceCandidates: [
         {
           id: "c1",
@@ -270,35 +269,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           relevanceReason: "원문 검증 source입니다.",
         },
       ],
-      extractionTargets: [
-        {
-          id: "c1",
-          searchRoute: "global_news",
-          sourceProvider: "tavily-search",
-          sourceType: "news",
-          publisherName: "Reuters",
-          publishedAt: null,
-          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          rawTitle: "Trump tariff announcement update",
-          rawSnippet: "원문 검증 보도입니다.",
-          normalizedHash: "hash-1",
-          originQueryIds: ["q1"],
-          sourceCountryCode: "US",
-          retrievalBucket: "verification",
-          domainRegistryId: "us-verification",
-          sourcePoliticalLean: "centrist",
-          relevanceTier: "primary",
-          relevanceReason: "원문 검증 source입니다.",
-        },
-      ],
-      extractedSources: [
-        {
-          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          contentText: "추출 본문",
-          snippetText: "추출 snippet",
-        },
-      ],
       evidenceSignals: [
         {
           sourceId: "c1",
@@ -319,18 +289,15 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         sourceProvider: "tavily-search",
       }),
     });
-    expect(prisma.evidenceSnippet.create).toHaveBeenCalledTimes(1);
-    expect(prisma.evidenceSnippet.update).toHaveBeenCalledWith({
-      where: { id: "snippet-trump-tariff-update" },
-      data: { stance: "conflict" },
-    });
+    expect(prisma.evidenceSnippet.create).not.toHaveBeenCalled();
+    expect(prisma.evidenceSnippet.update).not.toHaveBeenCalled();
     expect(prisma.reviewJob.update).toHaveBeenCalledWith({
       where: { id: "review-1" },
       data: expect.objectContaining({
         status: "partial",
         currentStage: "handoff_ready",
         searchedSourceCount: 1,
-        processedSourceCount: 1,
+        processedSourceCount: 0,
         queryRefinement: expect.objectContaining({
           searchRoute: "global_news",
           searchProvider: "tavily-search",
@@ -357,7 +324,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           evidenceSignals: [
             expect.objectContaining({
               sourceId: "trump-tariff-update",
-              snippetId: "snippet-trump-tariff-update",
+              snippetId: null,
               currentAnswerImpact: "overrides",
             }),
           ],
@@ -378,7 +345,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       claim: "트럼프의 관세 발표",
     });
     expect(result.handoffSourceIds).toEqual(["trump-tariff-update"]);
-    expect(result.evidenceSnippets[0]?.stance).toBe("conflict");
+    expect(result.evidenceSnippets).toEqual([]);
     expect(result.evidenceSignals[0]?.sourceId).toBe("trump-tariff-update");
   });
 
@@ -471,7 +438,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
       },
       generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-      userCountryCode: "KR",
     });
 
     expect(prisma.reviewJob.update).toHaveBeenCalledWith({

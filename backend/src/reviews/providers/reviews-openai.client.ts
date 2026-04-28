@@ -13,6 +13,8 @@ import {
   QueryRefinementResult,
   ReviewClaimType,
   RelevanceFilteringInput,
+  RelevanceSignalClassificationInput,
+  RelevanceSignalClassificationResult,
   ReviewRelevanceTier,
   SearchCandidate,
   SearchPlan,
@@ -123,6 +125,17 @@ interface OpenAiEvidenceSignalDecision {
 
 interface OpenAiEvidenceSignalPayload {
   signals: OpenAiEvidenceSignalDecision[];
+}
+
+interface OpenAiRelevanceSignalDecision extends OpenAiRelevanceDecision {
+  stanceToClaim: EvidenceSignalStance;
+  temporalRole: EvidenceSignalTemporalRole;
+  updateType: EvidenceSignalUpdateType;
+  currentAnswerImpact: EvidenceSignalImpact;
+}
+
+interface OpenAiRelevanceSignalPayload {
+  decisions: OpenAiRelevanceSignalDecision[];
 }
 
 @Injectable()
@@ -441,6 +454,144 @@ korean_news인 경우에만 queries를 정확히 4개 작성하세요. unsupport
           decision?.relevanceReason ?? "관련성 판정 결과가 누락되었습니다.",
       };
     });
+  }
+
+  async classifyRelevanceAndEvidenceSignals(
+    apiKey: string,
+    input: RelevanceSignalClassificationInput,
+  ): Promise<RelevanceSignalClassificationResult> {
+    if (input.candidates.length === 0) {
+      return { relevanceCandidates: [], evidenceSignals: [] };
+    }
+
+    const payload =
+      await this.requestStructuredOutput<OpenAiRelevanceSignalPayload>(
+        apiKey,
+        {
+          name: "review_relevance_and_evidence_signal",
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["decisions"],
+            properties: {
+              decisions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: [
+                    "candidateId",
+                    "relevanceTier",
+                    "relevanceReason",
+                    "stanceToClaim",
+                    "temporalRole",
+                    "updateType",
+                    "currentAnswerImpact",
+                  ],
+                  properties: {
+                    candidateId: { type: "string" },
+                    relevanceTier: {
+                      type: "string",
+                      enum: ["primary", "reference", "discard"],
+                    },
+                    relevanceReason: { type: "string" },
+                    stanceToClaim: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_STANCES,
+                    },
+                    temporalRole: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_TEMPORAL_ROLES,
+                    },
+                    updateType: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_UPDATE_TYPES,
+                    },
+                    currentAnswerImpact: {
+                      type: "string",
+                      enum: EVIDENCE_SIGNAL_IMPACTS,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        [
+          {
+            role: "system",
+            content:
+              "당신은 VARO 뉴스 근거 수집 relevance 및 evidence signal classifier입니다. 각 후보 source의 제목, snippet, 발행시각, 매체, sourceType, query purpose를 보고 relevanceTier를 primary/reference/discard로 분류하고, 동시에 해당 source가 core claim에 대해 어떤 역할을 하는지 stanceToClaim, temporalRole, updateType, currentAnswerImpact로 구조화하세요. 사실 결론을 내리지 말고 수집된 source가 현재 질문에 대해 수행하는 역할만 표시하세요. discard 후보는 stanceToClaim=unknown, temporalRole=background, updateType=none, currentAnswerImpact=neutral을 사용하세요. scheduled_event에서는 과거 예정 보도와 현재 상태/최신 변경 보도를 구분하고, 최신 연기/취소/정정 신호가 기존 claim을 약화하거나 대체하는지 표시하세요. relevanceReason은 40자 이내로 짧게 작성하세요.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              coreClaim: input.coreClaim,
+              claimLanguageCode: input.claimLanguageCode,
+              candidates: input.candidates.map((candidate) => ({
+                candidateId: candidate.id,
+                title: candidate.rawTitle,
+                snippet: candidate.rawSnippet,
+                publishedAt: candidate.publishedAt,
+                queryPurposes: candidate.originQueryPurposes ?? [],
+                publisherName: candidate.publisherName,
+                sourceType: candidate.sourceType,
+              })),
+            }),
+          },
+        ],
+        "관련성 및 evidence signal 분류 요청에 실패했습니다.",
+      );
+
+    if (!this.isValidRelevanceSignalPayload(payload, input.candidates)) {
+      throw new AppException(
+        APP_ERROR_CODES.LLM_SCHEMA_ERROR,
+        "관련성 및 evidence signal 분류 결과가 요구 형식을 충족하지 않습니다.",
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    const decisions = new Map(
+      payload.decisions.map((decision) => [decision.candidateId, decision]),
+    );
+    const relevanceCandidates = input.candidates.map((candidate) => {
+      const decision = decisions.get(candidate.id);
+
+      return {
+        ...candidate,
+        relevanceTier: decision?.relevanceTier ?? "discard",
+        relevanceReason:
+          decision?.relevanceReason ?? "관련성 판정 결과가 누락되었습니다.",
+      };
+    });
+    const evidenceSignals = relevanceCandidates.flatMap((candidate) => {
+      const decision = decisions.get(candidate.id);
+
+      if (
+        !decision ||
+        candidate.relevanceTier === "discard" ||
+        !candidate.rawSnippet
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          sourceId: candidate.id,
+          snippetId: null,
+          stanceToClaim: decision.stanceToClaim,
+          temporalRole: decision.temporalRole,
+          updateType: decision.updateType,
+          currentAnswerImpact: decision.currentAnswerImpact,
+          reason: this.normalizeText(
+            decision.relevanceReason,
+            "signal 분류 이유가 누락되었습니다.",
+          ),
+        },
+      ];
+    });
+
+    return { relevanceCandidates, evidenceSignals };
   }
 
   async classifyEvidenceSignals(
@@ -829,6 +980,44 @@ korean_news인 경우에만 queries를 정확히 4개 작성하세요. unsupport
         typeof decision.candidateId !== "string" ||
         typeof decision.relevanceReason !== "string" ||
         !["primary", "reference", "discard"].includes(decision.relevanceTier)
+      ) {
+        return false;
+      }
+
+      if (
+        !candidateIds.has(decision.candidateId) ||
+        seenIds.has(decision.candidateId)
+      ) {
+        return false;
+      }
+
+      seenIds.add(decision.candidateId);
+    }
+
+    return true;
+  }
+
+  private isValidRelevanceSignalPayload(
+    payload: OpenAiRelevanceSignalPayload,
+    candidates: SearchCandidate[],
+  ): payload is OpenAiRelevanceSignalPayload {
+    if (!payload || !Array.isArray(payload.decisions)) {
+      return false;
+    }
+
+    const candidateIds = new Set(candidates.map((candidate) => candidate.id));
+    const seenIds = new Set<string>();
+
+    for (const decision of payload.decisions) {
+      if (
+        !decision ||
+        typeof decision.candidateId !== "string" ||
+        typeof decision.relevanceReason !== "string" ||
+        !["primary", "reference", "discard"].includes(decision.relevanceTier) ||
+        !EVIDENCE_SIGNAL_STANCES.includes(decision.stanceToClaim) ||
+        !EVIDENCE_SIGNAL_TEMPORAL_ROLES.includes(decision.temporalRole) ||
+        !EVIDENCE_SIGNAL_UPDATE_TYPES.includes(decision.updateType) ||
+        !EVIDENCE_SIGNAL_IMPACTS.includes(decision.currentAnswerImpact)
       ) {
         return false;
       }

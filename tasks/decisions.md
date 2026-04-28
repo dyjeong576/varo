@@ -64,7 +64,6 @@
 - 당시에는 국내 맥락이 없는 순수 해외 이슈를 검토하지 않고 `out_of_scope` review job으로 기록하기로 했다.
 - `out_of_scope`는 시스템 실패가 아니므로 `lastErrorCode`를 남기지 않고 verdict/result를 생성하지 않는 원칙은 유지한다.
 - 당시 source search는 KR `source_domain_registry`만 사용하며, 국가별 해외 verification routing과 domainless fallback search는 MVP 범위에서 제거하기로 했다.
-- `userCountryCode`는 사용자 프로필/audit 목적으로 조회하고 query refinement artifact에 보존하지만, domain routing에는 사용하지 않는다.
 - `topicCountryCode`는 사용자 국가가 아니라 claim/context 기준의 주제 국가로 유지하며, domain routing에는 사용하지 않는다.
 - retrieval bucket은 기존 저장/표시 호환성을 위해 `familiar / verification`을 유지하되, 신규 MVP 검색에서는 `fallback` bucket을 생성하지 않는다.
 - KR social registry는 공식 인증 계정/원문 확인에 쓰이는 주요 플랫폼 도메인만 `familiar_social`로 등록하고, 익명 커뮤니티/개인 블로그/게시판 도메인은 registry에 넣지 않는다.
@@ -242,13 +241,19 @@
 - `topic_domain`은 제품 지원 도메인 판정, `search_route`는 검색 가능 여부 판정으로 별도 유지한다.
 - DB schema, Prisma migration, 공개 API 응답 shape는 이번 결정으로 변경하지 않는다.
 
+### Review Preview Latency Reduction
+- Naver News Search는 query별 상위 10개를 병렬로 요청하되, timeout은 코드에서 최대 8초로 제한한다.
+- 일부 Naver query가 실패해도 성공한 query 결과가 있으면 전체 review를 실패시키지 않고 partial source pool로 계속 진행한다.
+- Tavily Search는 Naver 후보가 15건 미만일 때만 fallback으로 호출하며, timeout은 최대 8초로 제한한다.
+- relevance filtering과 evidence signal classification은 별도 OpenAI 호출로 나누지 않고 단일 structured output 호출로 처리한다.
+
 ### Korea News Only With Tavily Search Fallback
 - 2026-04-21 Search Provider Routing의 해외/글로벌 뉴스 route는 신규 생성 기준에서 사용하지 않는다.
 - MVP 검토 범위는 한국 관련 정치·경제 claim으로 고정한다.
 - 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
 - 신규 review 생성 기준 `search_route`는 `korean_news / unsupported`만 사용한다.
 - OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 한국 관련 정치·경제 뉴스성 claim이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
-- Tavily Search는 제거하지 않고 `korean_news`에서 Naver News Search와 항상 병행하는 한국 뉴스 보조 source search provider로 사용한다.
+- Tavily Search는 제거하지 않고 `korean_news`에서 Naver 후보가 부족할 때만 실행되는 한국 뉴스 보조 source search provider로 사용한다.
 - Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
 - source별 수집 API는 `sources.source_provider`에 저장하고, DB 기반 `source_domain_registry` 테이블과 `sources.domain_registry_id`는 코드 고정 registry 전환에 따라 제거한다.
 - `TAVILY_API_KEY`, `TAVILY_SEARCH_TIMEOUT_MS`, `TAVILY_EXTRACT_TIMEOUT_MS` 설정을 유지한다.

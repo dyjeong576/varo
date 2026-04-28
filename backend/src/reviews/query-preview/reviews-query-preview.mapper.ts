@@ -223,7 +223,6 @@ export function buildHandoffSourceIds(sources: Source[]): string[] {
 export function buildQueryRefinementPayload(
   refinement: QueryRefinementResult,
   generatedQueries: QueryArtifact[],
-  userCountryCode: string | null,
 ): Prisma.InputJsonValue {
   const searchRoute =
     refinement.searchRoute ??
@@ -262,7 +261,6 @@ export function buildQueryRefinementPayload(
     searchClaim: refinement.searchClaim ?? refinement.coreClaim,
     searchQueries: searchQueries.map(serializeQueryArtifact),
     searchProvider,
-    userCountryCode,
   } as Prisma.InputJsonValue;
 }
 

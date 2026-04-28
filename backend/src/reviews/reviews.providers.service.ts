@@ -12,6 +12,8 @@ import {
   EvidenceSignalClassificationInput,
   QueryRefinementResult,
   RelevanceFilteringInput,
+  RelevanceSignalClassificationInput,
+  RelevanceSignalClassificationResult,
   SearchCandidate,
   SearchSourcesInput,
 } from "./reviews.types";
@@ -19,6 +21,7 @@ import { selectDomainsForBucket } from "./reviews.utils";
 
 const NAVER_SEARCH_DISPLAY = 10;
 const NAVER_SUFFICIENT_SOURCE_COUNT = 15;
+const NAVER_SEARCH_TIMEOUT_CAP_MS = 8000;
 const TAVILY_FALLBACK_SOFT_TIMEOUT_MS = 8000;
 
 @Injectable()
@@ -43,9 +46,9 @@ export class ReviewsProvidersService {
     if (searchRoute === "korean_news") {
       const clientId = this.getRequiredNaverClientId();
       const clientSecret = this.getRequiredNaverClientSecret();
-      const timeoutMs = this.getNaverSearchTimeoutMs();
+      const timeoutMs = Math.min(this.getNaverSearchTimeoutMs(), NAVER_SEARCH_TIMEOUT_CAP_MS);
       const startedAt = Date.now();
-      const naverResults = await Promise.all(
+      const naverSettledResults = await Promise.allSettled(
         input.queries.map((query) =>
           this.naverClient.searchNews({
             clientId,
@@ -59,7 +62,19 @@ export class ReviewsProvidersService {
             sort: "sim",
           }),
         ),
-      ).then((results) => results.flat());
+      );
+      const naverResults = naverSettledResults.flatMap((result) =>
+        result.status === "fulfilled" ? result.value : [],
+      );
+      const failedNaverQueryCount = naverSettledResults.filter(
+        (result) => result.status === "rejected",
+      ).length;
+
+      if (failedNaverQueryCount > 0) {
+        this.logger.warn(
+          `review source search naver partial failure; failedQueries=${failedNaverQueryCount}`,
+        );
+      }
 
       this.logger.log(
         `review source search naver completed in ${Date.now() - startedAt}ms; candidates=${naverResults.length}`,
@@ -120,6 +135,13 @@ export class ReviewsProvidersService {
   ): Promise<EvidenceSignal[]> {
     const apiKey = this.getRequiredOpenAiApiKey();
     return this.openAiClient.classifyEvidenceSignals(apiKey, input);
+  }
+
+  async classifyRelevanceAndEvidenceSignals(
+    input: RelevanceSignalClassificationInput,
+  ): Promise<RelevanceSignalClassificationResult> {
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.classifyRelevanceAndEvidenceSignals(apiKey, input);
   }
 
   async extractContent(

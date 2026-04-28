@@ -72,7 +72,6 @@ describe("ReviewsProvidersService", () => {
         queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
         coreClaim: "테슬라 한국 철수",
         claimLanguageCode: "ko",
-        userCountryCode: "KR",
         topicCountryCode: "KR",
         topicScope: "domestic",
         domainRegistry: [],
@@ -251,7 +250,6 @@ describe("ReviewsProvidersService", () => {
       ],
       coreClaim: "테슬라 한국 철수",
       claimLanguageCode: "ko",
-      userCountryCode: "US",
       topicCountryCode: "US",
       topicScope: "foreign",
       domainRegistry: [
@@ -318,7 +316,7 @@ describe("ReviewsProvidersService", () => {
     expect(searchNewsSpy).toHaveBeenCalledWith({
       clientId: "naver-client-id",
       clientSecret: "naver-secret",
-      timeoutMs: 40000,
+      timeoutMs: 8000,
       query: "테슬라 한국 철수",
       queryId: "q2",
       queryPurpose: "claim_specific",
@@ -382,7 +380,6 @@ describe("ReviewsProvidersService", () => {
       ],
       coreClaim: "한국 경제 정책",
       claimLanguageCode: "ko",
-      userCountryCode: "KR",
       topicCountryCode: "KR",
       topicScope: "domestic",
       domainRegistry: [],
@@ -390,6 +387,63 @@ describe("ReviewsProvidersService", () => {
 
     expect(result).toHaveLength(15);
     expect(searchNewsSpy).toHaveBeenCalledTimes(1);
+    expect(searchSourcesSpy).not.toHaveBeenCalled();
+  });
+
+  it("real mode에서 일부 Naver 질의가 실패해도 성공한 결과로 계속 진행한다", async () => {
+    const searchNewsSpy = jest
+      .spyOn(ReviewsNaverClient.prototype, "searchNews")
+      .mockImplementation((input) => {
+        if (input.queryId === "q2") {
+          return Promise.reject(new Error("naver timeout"));
+        }
+
+        return Promise.resolve(
+          Array.from({ length: 15 }, (_, index) => ({
+            id: `naver-q1-c${index + 1}`,
+            searchRoute: "korean_news" as const,
+            sourceProvider: "naver-search" as const,
+            sourceType: "news",
+            publisherName: "yna.co.kr",
+            publishedAt: "2026-04-01T00:00:00.000Z",
+            canonicalUrl: `https://www.yna.co.kr/view/AKR2026040100${index}`,
+            originalUrl: `https://n.news.naver.com/mnews/article/001/00100000${index}`,
+            rawTitle: `한국 경제 정책 보도 ${index + 1}`,
+            rawSnippet: "한국 경제 정책 관련 핵심 내용이 담긴 기사입니다.",
+            normalizedHash: `hash-${index + 1}`,
+            originQueryIds: ["q1"],
+            sourceCountryCode: "KR",
+            retrievalBucket: "familiar" as const,
+            domainRegistryId: null,
+          })),
+        );
+      });
+    const searchSourcesSpy = jest
+      .spyOn(ReviewsTavilyClient.prototype, "searchSources")
+      .mockResolvedValue([]);
+    const service = createService({
+      reviewProviderMode: "real",
+      naverClientId: "naver-client-id",
+      naverClientSecret: "naver-secret",
+      naverSearchTimeoutMs: 40000,
+      tavilyApiKey: null,
+    });
+
+    const result = await service.searchSources({
+      searchRoute: "korean_news",
+      queries: [
+        { id: "q1", text: "한국 경제 정책", rank: 1 },
+        { id: "q2", text: "한국 경제 정책 최신", rank: 2 },
+      ],
+      coreClaim: "한국 경제 정책",
+      claimLanguageCode: "ko",
+      topicCountryCode: "KR",
+      topicScope: "domestic",
+      domainRegistry: [],
+    });
+
+    expect(result).toHaveLength(15);
+    expect(searchNewsSpy).toHaveBeenCalledTimes(2);
     expect(searchSourcesSpy).not.toHaveBeenCalled();
   });
 
@@ -416,7 +470,6 @@ describe("ReviewsProvidersService", () => {
         ],
         coreClaim: "트럼프의 관세 발표",
         claimLanguageCode: "ko",
-        userCountryCode: "KR",
         topicCountryCode: "US",
         topicScope: "foreign",
         domainRegistry: [],
@@ -681,7 +734,6 @@ describe("ReviewsProvidersService", () => {
         queries: [{ id: "q1", text: "한국은행 기준금리", rank: 1 }],
         coreClaim: "한국은행 기준금리",
         claimLanguageCode: "ko",
-        userCountryCode: "KR",
         topicCountryCode: "KR",
         topicScope: "domestic",
         domainRegistry: [],

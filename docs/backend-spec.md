@@ -37,7 +37,7 @@
 
 - claim 접수
 - source 검색과 수집
-- evidence signal classification
+- relevance와 evidence signal 통합 분류
 - preview detail 생성
 - preview artifact 기반 `rule_based_preview` 결과 계산
 - review 상태 조회
@@ -120,8 +120,8 @@
 3. `unsupported`이면 `out_of_scope` 저장 후 종료
 4. `korean_news`이면 Naver News Search 우선 검색
 5. Naver 후보가 15건 미만이면 Tavily Search fallback 호출
-6. canonical URL 기준 dedup 후 relevance filtering
-7. `discard`가 아니고 raw snippet이 있는 source를 evidence signal classification 입력으로 사용
+6. canonical URL 기준 dedup 후 relevance와 evidence signal을 단일 OpenAI 호출로 분류
+7. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
 8. source와 `handoff_payload.evidenceSignals[]` 저장
 9. preview artifact 기반 `rule_based_preview` 결과 계산
 10. 완료 알림 생성
@@ -146,7 +146,7 @@
 - 결과는 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - verdict는 기사 수나 단순 agreement score가 아니라 evidence 구조와 query purpose별 근거 성격을 바탕으로 계산한다.
 - 결과 화면용 summary는 내부 카운트 나열이 아니라 사용자 질문에 직접 답하는 문장으로 작성하고, 최신 출처, 업데이트/정정 신호, 공식 출처 여부, 남은 불확실성을 함께 설명한다.
-- OpenAI는 review 생성 시점에 relevance filtering과 evidence signal만 구조화하며, 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source와 signal trace를 기준으로 백엔드가 계산한다.
+- OpenAI는 review 생성 시점에 relevance와 evidence signal을 단일 structured output 호출로 구조화하며, 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source와 signal trace를 기준으로 백엔드가 계산한다.
 - 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
@@ -161,7 +161,7 @@
 ### 6.4 현재 API 책임
 
 - `POST /api/v1/reviews/query-processing-preview` 요청 안에서 동기적으로 preview 파이프라인을 실행한다.
-- search provider 호출, relevance filtering, evidence signal classification, source/handoff 저장을 처리한다.
+- search provider 호출, relevance와 evidence signal 통합 분류, source/handoff 저장을 처리한다.
 - source fetch / 본문 추출과 OpenAI structured final interpretation 저장은 현재 preview 경로에서 수행하지 않는다.
 - 단계별 소요시간은 backend logger에 남긴다.
 
@@ -329,6 +329,7 @@
 - 한국 정치·경제 뉴스성 claim의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
 - search plan query별 상위 10개를 요청한다.
+- Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
 - Naver 후보가 15건 이상이면 Tavily Search fallback을 호출하지 않는다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
@@ -345,9 +346,9 @@
 
 ### 10.4 OpenAI Structured Outputs
 
-- review 도메인의 query refinement, relevance filtering, evidence signal classification
+- review 도메인의 query refinement, relevance와 evidence signal 통합 분류
 - 입력에 없는 사실을 생성하지 않도록 제한
-- evidence signal classification은 사실 결론을 내리지 않고, source/raw snippet이 현재 질문에 대해 `supports`, `contradicts`, `updates`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
+- relevance/evidence signal 통합 분류는 사실 결론을 내리지 않고, source/raw snippet이 현재 질문에 대해 `supports`, `contradicts`, `updates`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
 - structured final interpretation 생성은 현재 preview 경로가 아니라 후속 확장 범위다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
@@ -435,7 +436,7 @@
 - trace id 발급
 - `environment=dev|prod` 태그 유지
 - review 완료율 / partial 비율 / 외부 provider 실패율 관측
-- review preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `resolve_user_country`, `query_refinement`, `source_search`, `relevance_filtering`, `evidence_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
+- review preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `resolve_user_country`, `query_refinement`, `source_search`, `relevance_and_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
 - 알림 생성 성공률, ranking 집계 지연, community mutation 실패율 관측
 
 ## 13. review 도메인 특별 원칙

@@ -245,4 +245,126 @@ describe("ReviewsOpenAiClient", () => {
       },
     ]);
   });
+
+  it("structured output text를 relevance와 evidence signal 결과로 함께 변환한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    decisions: [
+                      {
+                        candidateId: "candidate-1",
+                        relevanceTier: "primary",
+                        relevanceReason: "최신 연기 보도입니다.",
+                        stanceToClaim: "updates",
+                        temporalRole: "latest_update",
+                        updateType: "delay",
+                        currentAnswerImpact: "overrides",
+                      },
+                      {
+                        candidateId: "candidate-2",
+                        relevanceTier: "discard",
+                        relevanceReason: "claim 검토와 직접 관련이 낮습니다.",
+                        stanceToClaim: "unknown",
+                        temporalRole: "background",
+                        updateType: "none",
+                        currentAnswerImpact: "neutral",
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new ReviewsOpenAiClient();
+    const result = await client.classifyRelevanceAndEvidenceSignals(
+      "openai-test-key",
+      {
+        coreClaim: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
+        claimLanguageCode: "ko",
+        searchRoute: "korean_news",
+        topicCountryCode: "KR",
+        topicScope: "domestic",
+        searchPlan: null,
+        candidates: [
+          {
+            id: "candidate-1",
+            searchRoute: "korean_news",
+            sourceProvider: "naver-search",
+            sourceType: "news",
+            publisherName: "Reuters",
+            publishedAt: "2026-04-24T00:00:00.000Z",
+            canonicalUrl: "https://www.reuters.com/technology/tesla-roadster",
+            originalUrl: "https://www.reuters.com/technology/tesla-roadster",
+            rawTitle: "Tesla Roadster reveal delayed",
+            rawSnippet: "Roadster reveal has been delayed to next month.",
+            normalizedHash: "hash-1",
+            originQueryIds: ["q4"],
+            retrievalBucket: "verification",
+            sourceCountryCode: "KR",
+            domainRegistryId: "kr-verification",
+          },
+          {
+            id: "candidate-2",
+            searchRoute: "korean_news",
+            sourceProvider: "naver-search",
+            sourceType: "news",
+            publisherName: "한국경제",
+            publishedAt: null,
+            canonicalUrl: "https://www.hankyung.com/article/202604010001",
+            originalUrl: "https://www.hankyung.com/article/202604010001",
+            rawTitle: "전기차 시장 반응",
+            rawSnippet: "시장 반응을 전했습니다.",
+            normalizedHash: "hash-2",
+            originQueryIds: ["q1"],
+            retrievalBucket: "familiar",
+            sourceCountryCode: "KR",
+            domainRegistryId: "kr-familiar",
+          },
+        ],
+      },
+    );
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0]?.[1]?.body as string,
+    ) as { input: Array<{ role: string; content: string }> };
+    const userPayload = JSON.parse(
+      requestBody.input.find((item) => item.role === "user")?.content ?? "{}",
+    ) as { candidates: Array<Record<string, unknown>>; searchPlan?: unknown };
+
+    expect(result.relevanceCandidates[0]?.relevanceTier).toBe("primary");
+    expect(result.relevanceCandidates[1]?.relevanceTier).toBe("discard");
+    expect(userPayload.searchPlan).toBeUndefined();
+    expect(userPayload.candidates[0]).toEqual({
+      candidateId: "candidate-1",
+      title: "Tesla Roadster reveal delayed",
+      snippet: "Roadster reveal has been delayed to next month.",
+      publishedAt: "2026-04-24T00:00:00.000Z",
+      queryPurposes: [],
+      publisherName: "Reuters",
+      sourceType: "news",
+    });
+    expect(userPayload.candidates[0]).not.toHaveProperty("canonicalUrl");
+    expect(userPayload.candidates[0]).not.toHaveProperty("retrievalBucket");
+    expect(userPayload.candidates[0]).not.toHaveProperty("sourceCountryCode");
+    expect(result.evidenceSignals).toEqual([
+      {
+        sourceId: "candidate-1",
+        snippetId: null,
+        stanceToClaim: "updates",
+        temporalRole: "latest_update",
+        updateType: "delay",
+        currentAnswerImpact: "overrides",
+        reason: "최신 연기 보도입니다.",
+      },
+    ]);
+  });
 });

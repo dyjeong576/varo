@@ -30,7 +30,6 @@ describe("ReviewsQueryPreviewService", () => {
           },
         }),
     ),
-    resolveUserCountryCode: jest.fn().mockResolvedValue("KR"),
     resetQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
     persistQueryPreviewResult: jest.fn(),
     persistOutOfScopeReview: jest.fn().mockResolvedValue({
@@ -72,7 +71,6 @@ describe("ReviewsQueryPreviewService", () => {
 
   it("사용자 국가와 무관하게 주제 국가를 유지하고 Naver 검색 경로로 source를 수집한다", async () => {
     const persistence = createPersistenceMock();
-    persistence.resolveUserCountryCode.mockResolvedValue("US");
     const providers = {
       refineQuery: jest.fn().mockResolvedValue({
         claimLanguageCode: "ko",
@@ -167,18 +165,31 @@ describe("ReviewsQueryPreviewService", () => {
         },
       ]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
-      applyRelevanceFiltering: jest
+      classifyRelevanceAndEvidenceSignals: jest
         .fn()
         .mockImplementation(async ({ candidates }) =>
-          candidates.map((candidate: Record<string, unknown>) => ({
-            ...candidate,
-            relevanceTier:
-              candidate.retrievalBucket === "verification" ? "primary" : "reference",
-            relevanceReason:
-              candidate.retrievalBucket === "verification"
-                ? "원문 검증 source입니다."
-                : "국내 친숙형 보도로 보조 근거입니다.",
-          })),
+          ({
+            relevanceCandidates: candidates.map((candidate: Record<string, unknown>) => ({
+              ...candidate,
+              relevanceTier:
+                candidate.retrievalBucket === "verification" ? "primary" : "reference",
+              relevanceReason:
+                candidate.retrievalBucket === "verification"
+                  ? "원문 검증 source입니다."
+                  : "국내 친숙형 보도로 보조 근거입니다.",
+            })),
+            evidenceSignals: [
+              {
+                sourceId: "c2",
+                snippetId: null,
+                stanceToClaim: "supports",
+                temporalRole: "current_status",
+                updateType: "confirmation",
+                currentAnswerImpact: "strengthens",
+                reason: "원문 검증 보도입니다.",
+              },
+            ],
+          }),
         ),
       extractContent: jest.fn().mockResolvedValue([
         {
@@ -187,17 +198,8 @@ describe("ReviewsQueryPreviewService", () => {
           snippetText: "추출 snippet",
         },
       ]),
-      classifyEvidenceSignals: jest.fn().mockResolvedValue([
-        {
-          sourceId: "c2",
-          snippetId: null,
-          stanceToClaim: "supports",
-          temporalRole: "current_status",
-          updateType: "confirmation",
-          currentAnswerImpact: "strengthens",
-          reason: "원문 검증 보도입니다.",
-        },
-      ]),
+      applyRelevanceFiltering: jest.fn(),
+      classifyEvidenceSignals: jest.fn(),
     } as unknown as ReviewsProvidersService;
     persistence.persistQueryPreviewResult.mockResolvedValue({
       createdSources: [
@@ -279,18 +281,19 @@ describe("ReviewsQueryPreviewService", () => {
     expect(result.sources[1]?.domainRegistryMatched).toBe(false);
     expect(result.evidenceSnippets).toHaveLength(1);
     expect(result.evidenceSnippets[0]?.evidenceSummary).toBe("원문 검증 source입니다.");
-    expect(persistence.resolveUserCountryCode).toHaveBeenCalledWith("user-1");
-    expect(providers.classifyEvidenceSignals).toHaveBeenCalledWith(
+    expect(providers.classifyRelevanceAndEvidenceSignals).toHaveBeenCalledWith(
       expect.objectContaining({
         coreClaim: "트럼프의 관세 발표",
-        sources: expect.arrayContaining([
+        candidates: expect.arrayContaining([
           expect.objectContaining({
-            sourceId: "c2",
-            evidenceSnippetText: "원문 검증 보도입니다.",
+            id: "c2",
+            rawSnippet: "원문 검증 보도입니다.",
           }),
         ]),
       }),
     );
+    expect(providers.applyRelevanceFiltering).not.toHaveBeenCalled();
+    expect(providers.classifyEvidenceSignals).not.toHaveBeenCalled();
     expect(persistence.persistQueryPreviewResult).toHaveBeenCalledWith(
       expect.objectContaining({
         evidenceSignals: [
@@ -330,7 +333,6 @@ describe("ReviewsQueryPreviewService", () => {
             purpose: "contradiction_or_update",
           },
         ],
-        userCountryCode: "US",
         topicCountryCode: "US",
         domainRegistry: expect.arrayContaining([
           expect.objectContaining({
@@ -492,7 +494,11 @@ describe("ReviewsQueryPreviewService", () => {
       }),
       searchSources: jest.fn().mockResolvedValue([]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
-      applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
+      classifyRelevanceAndEvidenceSignals: jest.fn().mockResolvedValue({
+        relevanceCandidates: [],
+        evidenceSignals: [],
+      }),
+      applyRelevanceFiltering: jest.fn(),
       extractContent: jest.fn().mockResolvedValue([]),
     } as unknown as ReviewsProvidersService;
     const service = new ReviewsQueryPreviewService(
@@ -557,7 +563,11 @@ describe("ReviewsQueryPreviewService", () => {
       }),
       searchSources: jest.fn().mockResolvedValue([]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
-      applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
+      classifyRelevanceAndEvidenceSignals: jest.fn().mockResolvedValue({
+        relevanceCandidates: [],
+        evidenceSignals: [],
+      }),
+      applyRelevanceFiltering: jest.fn(),
       extractContent: jest.fn().mockResolvedValue([]),
     } as unknown as ReviewsProvidersService;
     const service = new ReviewsQueryPreviewService(
@@ -616,7 +626,11 @@ describe("ReviewsQueryPreviewService", () => {
       }),
       searchSources: jest.fn().mockResolvedValue([]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
-      applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
+      classifyRelevanceAndEvidenceSignals: jest.fn().mockResolvedValue({
+        relevanceCandidates: [],
+        evidenceSignals: [],
+      }),
+      applyRelevanceFiltering: jest.fn(),
       extractContent: jest.fn().mockResolvedValue([]),
     } as unknown as ReviewsProvidersService;
     const service = new ReviewsQueryPreviewService(
@@ -820,7 +834,6 @@ describe("ReviewsQueryPreviewService", () => {
         { id: "q2", text: "미국 관세 정책", rank: 2 },
         { id: "q3", text: "Trump tariff", rank: 3 },
       ],
-      userCountryCode: "KR",
     });
     expect(providers.searchSources).not.toHaveBeenCalled();
     expect(
@@ -865,27 +878,31 @@ describe("ReviewsQueryPreviewService", () => {
         },
       ]),
       searchFallbackSources: jest.fn().mockResolvedValue([]),
-      applyRelevanceFiltering: jest
+      classifyRelevanceAndEvidenceSignals: jest
         .fn()
-        .mockResolvedValueOnce([
-          {
-            id: "c1",
-            sourceType: "news",
-            publisherName: "연합뉴스",
-            publishedAt: null,
-            canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
-            originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
-            rawTitle: "트럼프 관세 발표 관련 한국 보도",
-            rawSnippet: "국내 종합 기사입니다.",
-            normalizedHash: "hash-1",
-            originQueryIds: ["q1"],
-            sourceCountryCode: "KR",
-            retrievalBucket: "familiar",
-            domainRegistryId: "kr-familiar",
-            relevanceTier: "reference",
-            relevanceReason: "보조 근거입니다.",
-          },
-        ]),
+        .mockResolvedValueOnce({
+          relevanceCandidates: [
+            {
+              id: "c1",
+              sourceType: "news",
+              publisherName: "연합뉴스",
+              publishedAt: null,
+              canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+              originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+              rawTitle: "트럼프 관세 발표 관련 한국 보도",
+              rawSnippet: "국내 종합 기사입니다.",
+              normalizedHash: "hash-1",
+              originQueryIds: ["q1"],
+              sourceCountryCode: "KR",
+              retrievalBucket: "familiar",
+              domainRegistryId: "kr-familiar",
+              relevanceTier: "reference",
+              relevanceReason: "보조 근거입니다.",
+            },
+          ],
+          evidenceSignals: [],
+        }),
+      applyRelevanceFiltering: jest.fn(),
       extractContent: jest.fn().mockResolvedValue([]),
     } as unknown as ReviewsProvidersService;
     persistence.persistQueryPreviewResult.mockResolvedValue({
