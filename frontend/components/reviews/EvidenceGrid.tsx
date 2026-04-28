@@ -1,3 +1,5 @@
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+
 interface EvidenceGridProps {
   searchedSourceCount: number;
   selectedSourceCount: number;
@@ -30,18 +32,17 @@ interface QueryContextDisclosureProps {
  * review preview 요약 카드 컴포넌트
  */
 export default function EvidenceGrid({
-  searchedSourceCount,
-  selectedSourceCount,
   agreementCount,
   conflictCount,
   contextCount,
   consensusLabel,
   sourceBreakdown,
 }: EvidenceGridProps) {
-  const coverage =
-    searchedSourceCount > 0
-      ? Math.max(6, Math.round((selectedSourceCount / searchedSourceCount) * 100))
-      : 0;
+  const stanceCount = agreementCount + conflictCount;
+  const agreementPosition =
+    stanceCount > 0
+      ? Math.max(4, Math.min(96, Math.round((agreementCount / stanceCount) * 100)))
+      : 50;
   const sourceEntries = [
     { label: "공식", value: sourceBreakdown.official, tone: "bg-[#0050cb]" },
     { label: "언론", value: sourceBreakdown.press, tone: "bg-[#d6e3fb]" },
@@ -55,11 +56,12 @@ export default function EvidenceGrid({
         <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-[#556070]">
           <span className="material-symbols-outlined text-sm">analytics</span>
           교차 검증 일치도
+          <InfoTooltip content="수집된 뉴스 기사들이 이 주장에 얼마나 동의하는지를 보여줍니다. 지지 기사가 많을수록 오른쪽(사실), 반박 기사가 많을수록 왼쪽(거짓)에 가깝게 표시됩니다." />
         </h3>
         <div className="mb-2 h-3 w-full rounded-full bg-[linear-gradient(90deg,#cc4204_0%,#0066ff_100%)]">
           <div
             className="relative h-full"
-            style={{ width: `${coverage}%` }}
+            style={{ width: `${agreementPosition}%` }}
           >
             <div className="absolute right-0 top-1/2 h-5 w-3 -translate-y-1/2 rounded-full border-2 border-[#0050cb] bg-white shadow-sm" />
           </div>
@@ -93,7 +95,10 @@ export default function EvidenceGrid({
         </div>
 
         <div className="flex h-40 flex-col justify-between rounded-xl border border-[#dfe4f0] bg-white p-5">
-          <p className="text-xs font-bold text-[#6b7280]">정보 합의성</p>
+          <p className="flex items-center gap-1 text-xs font-bold text-[#6b7280]">
+            정보 합의성
+            <InfoTooltip content="수집된 기사들이 얼마나 일관되게 같은 결론을 가리키는지를 나타냅니다. '높음'은 2건 이상의 기사가 주장을 뒷받침할 때만 표시되며, '거짓' 판정 시에는 항상 '낮음'으로 표시됩니다." />
+          </p>
           <div className="flex flex-1 flex-col items-center justify-center">
             <span className="text-3xl font-black text-[#0050cb]">{consensusLabel}</span>
             <span className="mt-1 text-center text-[10px] text-[#6b7280]">

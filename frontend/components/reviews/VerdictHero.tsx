@@ -40,7 +40,7 @@ export default function VerdictHero({
           </div>
           <div>
             <p className="text-xl font-bold text-[#0050cb]">{verdictLabel}</p>
-            <p className="text-sm text-[#6b7280]">VARO 임시 신뢰도 {confidenceScore}%</p>
+            <p className="text-sm text-[#6b7280]">VARO 검토 안정도 {confidenceScore}%</p>
           </div>
         </div>
       </div>

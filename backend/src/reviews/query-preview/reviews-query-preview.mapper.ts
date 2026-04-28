@@ -191,36 +191,32 @@ export function buildEvidenceSnippetCreateInputs(
 }
 
 export function buildInsufficiencyReason(
-  evidenceSnippetCount: number,
-  extractionTargetCount: number,
   candidates: SearchCandidate[],
   primaryExtractionLimit: number,
 ): string | null {
-  if (evidenceSnippetCount === 0) {
-    return "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.";
+  const primaryCount = candidates.filter((c) => c.relevanceTier === "primary").length;
+
+  if (primaryCount === 0) {
+    return "관련 출처를 충분히 수집하지 못했습니다.";
   }
 
   if (!hasVerificationSource(candidates)) {
     return "공식/검증 성격 source가 부족해 뉴스 검색 결과 중심으로 handoff 됩니다.";
   }
 
-  if (extractionTargetCount < primaryExtractionLimit) {
+  if (primaryCount < primaryExtractionLimit) {
     return "primary source가 충분하지 않아 reference 일부가 제한적으로 승격되었습니다.";
   }
 
   return null;
 }
 
-export function buildHandoffSourceIds(
-  sources: Source[],
-  evidenceSnippets: EvidenceSnippet[],
-): string[] {
-  const snippetSourceIds = new Set(
-    evidenceSnippets.map((snippet) => snippet.sourceId),
-  );
-
+export function buildHandoffSourceIds(sources: Source[]): string[] {
   return sources
-    .filter((source) => snippetSourceIds.has(source.id))
+    .filter(
+      (source) =>
+        source.relevanceTier === "primary" || source.relevanceTier === "reference",
+    )
     .map((source) => source.id);
 }
 

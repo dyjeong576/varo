@@ -15,7 +15,7 @@
 
 ## 문서 목적
 
-이 문서는 VARO의 정치·경제 뉴스 질의 처리 방식을 설명한다. 사용자의 자연어 입력을 바로 검색하지 않고, LLM으로 검증 가능한 claim과 목적별 search plan, 지원 도메인, 검색 provider route로 정제한 뒤 Naver News Search 또는 Tavily Search와 relevance 필터를 거쳐 evidence 후보를 만드는 흐름을 정의한다.
+이 문서는 VARO의 정치·경제 뉴스 질의 처리 방식을 설명한다. 사용자의 자연어 입력을 바로 검색하지 않고, LLM으로 검증 가능한 claim과 목적별 search plan, 지원 범위, 검색 provider route로 정제한 뒤 Naver News Search 우선 검색과 필요 시 Tavily Search 보조검색, relevance 필터, evidence signal 분류를 거쳐 preview 결과를 만드는 흐름을 정의한다.
 
 적용 범위는 MVP review pipeline의 claim intake부터 interpretation handoff 직전까지다.
 
@@ -32,18 +32,18 @@
 핵심 목표는 아래와 같다.
 
 - 사용자 발화에서 검토 대상이 되는 핵심 claim을 분리한다.
-- 사용자 발화 키워드가 아니라 검증 목적별 search plan, `topic_domain`, `search_route`를 생성해 지원 범위와 provider별 검색 품질을 높인다.
+- 사용자 발화 키워드가 아니라 검증 목적별 search plan, `search_route`, 한국 관련성/주제 국가 메타데이터를 생성해 지원 범위와 provider별 검색 품질을 높인다.
 - 제목과 snippet만 비슷하지만 실제 claim 검토와 무관한 결과를 relevance filtering으로 제거한다.
-- 관련 있는 source만 본문 추출과 evidence 생성 단계로 전달한다.
+- 관련 있는 source만 evidence signal classification 입력으로 전달한다.
 - interpretation 단계가 더 적은 노이즈와 더 높은 traceability를 가진 입력 패키지를 받게 한다.
 
 Provider 전략은 아래로 고정한다.
 
 - 한국 뉴스 검색 provider: Naver News Search
-- 한국 뉴스 보조 검색 provider: Tavily Search
-- 본문 추출 provider: Tavily Extract 또는 Source Fetch 계층
+- 한국 뉴스 보조 검색 provider: Tavily Search. Naver 후보가 부족할 때만 fallback으로 호출한다.
+- 본문 추출 provider: Tavily Extract 또는 Source Fetch 계층은 후속 확장용이며, 현재 query-processing preview 생성 경로에서는 호출하지 않는다.
 - LLM provider: OpenAI
-- 구조 원칙: 한국 관련 정치·경제 뉴스성 claim은 Naver News Search와 Tavily Search 보조검색을 병행하고, 해외/글로벌 뉴스 claim은 `unsupported`로 처리한다.
+- 구조 원칙: 한국 관련 정치·경제 뉴스성 claim은 Naver News Search를 먼저 사용하고, Naver 후보가 충분하지 않을 때만 Tavily Search 보조검색을 사용한다. 해외/글로벌 뉴스 claim은 `unsupported`로 처리한다.
 
 ## 단계별 처리 흐름
 
@@ -57,7 +57,7 @@ Provider 전략은 아래로 고정한다.
 
 - OpenAI가 단일 호출로 claim 이해, 지원 범위 판정, 검색 계획 생성을 동시에 수행한다.
 - 판정 결과 `search_route=unsupported`이면 검색하지 않고 `out_of_scope`로 종료한다.
-- OpenAI가 생성하는 아티팩트는 `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `topic_domain`, 목적별 `search_plan`, `search_route`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`이다.
+- OpenAI가 생성하는 아티팩트는 `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, 목적별 `search_plan`, `search_route`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`, `is_korea_related`, `korea_relevance_reason`이다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
@@ -70,14 +70,11 @@ Provider 전략은 아래로 고정한다.
   - `contradiction_or_update`: 반박, 정정, 변경, 취소, 업데이트 신호를 찾는다.
 - `korean_news` route의 쿼리 작성 원칙: 기사 제목에 실제로 등장할 법한 핵심 키워드 조합을 사용한다. 인물명·직책·기관명은 한국어 전체 이름으로 정확히 작성하고, 10~20자 이내 단문 키워드 조합으로 조사와 접속어를 최소화한다. 4개 쿼리 간 핵심 키워드 중복을 최소화해 서로 다른 각도를 커버한다.
 - `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
-- `topic_domain`은 아래 3개 중 하나로 고정한다.
-  - `politics`: 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산 등 검증 가능한 정치 claim이다.
-  - `economy`: 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표 등 검증 가능한 경제 claim이다.
-  - `unsupported`: 의료, 연예, 스포츠, 개인 상담, 창작 요청, 순수 의견, 미래 예측, 투자 매수/매도 추천 등 MVP 지원 범위 밖이거나 사실성 검토가 어려운 claim이다.
+- 정치·경제 지원 범위 판정은 현재 공개 API 필드로 별도 `topic_domain`을 내보내지 않고, `search_route`, `is_korea_related`, `topic_scope`, `search_route_reason`에 반영한다.
 - `search_route`는 신규 생성 기준 아래 2개 중 하나로 고정한다.
-  - `korean_news`: 한국 정치·경제 뉴스성 claim이며 Naver News Search와 Tavily Search 보조검색을 병행한다.
+  - `korean_news`: 한국 정치·경제 뉴스성 claim이며 Naver News Search를 기본 검색으로 사용한다.
   - `unsupported`: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim이다.
-- `topic_domain`은 제품 지원 도메인 판정이고, `search_route`는 provider routing 판정이다.
+- 지원 범위 판정과 provider routing은 `search_route`가 authoritative field로 담당하고, 사용자-facing 설명은 `korea_relevance_reason`, `country_detection_reason`, `search_route_reason`에 남긴다.
 - 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 기록하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
 - `generated_queries`, `search_claim`, `search_queries`는 compat 필드로 코드에서 `search_plan.queries`로부터 파생되며, 실제 검색은 `search_plan.queries`를 사용한다.
 - 이 단계의 출력은 이후 search와 relevance filtering의 기준 입력이 된다.
@@ -97,7 +94,6 @@ type SearchPlan = {
     | "incident"
     | "general_fact";
   verificationGoal: string;
-  topicDomain: "politics" | "economy" | "unsupported";
   searchRoute: "korean_news" | "unsupported";
   queries: {
     id: string;
@@ -115,11 +111,13 @@ type SearchPlan = {
 ### 4. Source Search
 
 - Review API는 `search_route`에 따라 검색 provider를 선택한다.
-  - `korean_news`: Naver News Search API와 코드에 고정된 KR trusted news domain registry 기반 Tavily Search 보조검색을 병행한다.
+  - `korean_news`: Naver News Search API를 먼저 호출한다. Naver 후보가 15건 이상이면 Tavily Search를 호출하지 않는다.
+  - Naver 후보가 15건 미만이면 코드에 고정된 KR trusted news domain registry 기반 Tavily Search를 fallback으로 호출한다.
   - `unsupported`: 검색하지 않고 `out_of_scope`로 종료한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화한다.
 - Tavily 검색 결과는 기존처럼 title, content/snippet, URL, publisher metadata를 source candidate로 정규화한다.
-- Tavily Search에는 코드에 고정된 KR trusted news domain을 `include_domains`로 전달하고, KR trusted news registry 또는 `sourceCountryCode=KR`로 확인되는 후보만 유지한다.
+- Tavily Search에는 코드에 고정된 KR trusted news domain을 `include_domains`로 전달하고, `sourceCountryCode=KR`로 확인되는 후보만 유지한다.
+- Tavily fallback 검색 timeout은 최대 8초로 제한하며, Tavily 실패 또는 timeout은 전체 review 실패가 아니라 Naver 후보만 사용하는 partial 흐름으로 처리한다.
 - 이 단계에서는 결과를 최대한 넓게 받되, 후속 relevance filtering이 가능하도록 title, snippet, canonical URL, publisher metadata를 유지한다.
 - 각 source candidate에는 어떤 query에서 수집되었는지 추적할 수 있도록 `origin_query_ids[]`를 연결하고, 해당 query의 `purpose`도 audit metadata로 유지한다.
 - 각 source candidate에는 `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`를 함께 유지한다.
@@ -135,41 +133,40 @@ type SearchPlan = {
 - OpenAI는 각 candidate의 제목, snippet, `core_claim`, query purpose를 입력으로 받아 해당 source가 검토 대상 주장과 관련 있는지 판정한다.
 - relevance 입력에는 `topic_scope`, `topic_country_code`, `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`도 포함한다.
 - relevance 출력은 아래 3단계 모델로 고정한다.
-  - `primary`: 즉시 extraction 대상으로 사용
-  - `reference`: 1차 대상은 아니지만 primary 부족 시 승격 가능
-  - `discard`: extraction 대상에서 제외
+  - `primary`: claim 검토에 직접적인 source
+  - `reference`: 보조 가치가 있는 source
+  - `discard`: signal 입력과 사용자-facing source 목록에서 제외
 - 각 source candidate에는 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`, origin query purpose를 유지한다.
 - `reference` 단계는 official statement, correction article, low-signal title처럼 제목 신호는 약하지만 claim 검토에는 의미가 있는 source를 조기에 버리지 않기 위해 둔다.
 - 이 단계는 검색 recall을 유지하면서 downstream 노이즈를 줄이는 핵심 필터 역할을 한다.
 - `unsupported` route는 relevance filtering 이전에 `out_of_scope`로 종료한다.
 
-### 7. Relevant Source Selection
+### 7. Signal Input Source Selection
 
-- 1차 extraction 대상은 `primary` source만 사용한다.
-- 가능하면 extraction 대상에 공식 발표, 원문 링크, verification 성격 source를 최소 1개 포함한다.
-- `primary` source가 부족하면 `reference` source를 제한적으로 승격할 수 있다.
-- `reference` 승격 이후에도 관련 source가 충분하지 않으면 근거 부족 상태를 유지한 채 다음 단계로 전달한다.
+- 현재 query-processing preview 생성 경로는 본문 extraction 대상 선정 대신, relevance 결과 중 `discard`가 아니고 `rawSnippet`이 있는 source를 evidence signal classification 입력으로 사용한다.
+- signal 입력은 `PRIMARY_EXTRACTION_LIMIT + REFERENCE_PROMOTION_LIMIT` 기준으로 최대 8개까지 사용한다.
+- 관련 source가 충분하지 않으면 근거 부족 상태를 유지한 채 다음 단계로 전달한다.
 
-### 8. Content Extraction and Evidence Preparation
+### 8. Evidence Snippet Preparation
 
-- `primary`와 승격된 `reference` source만 Content Extractor로 전달한다.
-- 본문 추출 결과에서 claim 검토에 사용할 수 있는 snippet 후보를 만든다.
-- 이 단계 산출물은 interpretation 단계로 넘길 evidence 입력의 기반이 된다.
+- 현재 query-processing preview 생성 경로에서는 Tavily Extract 또는 직접 HTML fetch를 호출하지 않는다.
+- source의 `rawSnippet`을 evidence signal classification 입력의 `evidenceSnippetText`로 사용한다.
+- `evidence_snippets` 테이블과 content extraction helper는 남아 있지만, 현재 preview 생성 결과에서는 보통 snippet row를 생성하지 않는다.
+- 결과 화면의 source card는 source의 `rawSnippet`과 relevance reason, evidence signal을 기반으로 근거 맥락을 보여준다.
 
 ### 9. Evidence Signal Classification
 
-- Content Extraction 이후 OpenAI가 source/evidence별 signal을 구조화한다.
+- OpenAI가 source/raw snippet별 signal을 구조화한다.
 - 이 단계의 출력은 사실 결론이 아니라 `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`이다.
 - scheduled event에서는 과거 예정 보도와 최신 연기/변경 보도를 구분한다.
-- `EvidenceSnippet.stance`에는 UI/기존 호환용 `support`, `conflict`, `context`, `unknown` 값을 저장한다.
+- `EvidenceSnippet.stance`에는 UI/기존 호환용 `support`, `conflict`, `context`, `unknown` 값을 저장할 수 있다. 현재 snippet row가 없으면 source-level signal만 `handoff_payload`에 저장한다.
 - 상세 signal은 `review_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
 - `/reviews/:reviewId` 조회 시에는 OpenAI를 다시 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
 
 ### 10. Handoff to Interpretation
 
-- 정제된 claim, search plan, relevance를 통과한 source, evidence snippet 후보, evidence signal을 interpretation 단계로 전달한다.
-- 이 문서의 마지막 산출물은 `interpretation_handoff_payload`다.
-- interpretation 생성, 최종 결과 저장, 사용자 응답 생성 자체는 이 문서 범위에 포함하지 않는다.
+- 정제된 claim, search plan, relevance를 통과한 source, raw snippet 기반 evidence signal을 `handoff_payload`로 저장한다.
+- 현재 API는 별도 final interpretation 저장 없이 저장된 preview artifact로 `rule_based_preview` 결과를 즉시 계산해 응답한다.
 
 ## 시퀀스 다이어그램
 
@@ -183,16 +180,15 @@ sequenceDiagram
     participant Naver as "Naver News Search"
     participant Tavily as "Tavily Search"
     participant RelevanceFilter as "OpenAI Relevance Filter"
-    participant Extractor as "Content Extractor"
     participant SignalClassifier as "OpenAI Evidence Signal Classifier"
     participant DB as "DB"
 
     User->>Frontend: claim 제출
     Frontend->>ReviewAPI: review 생성 요청
     ReviewAPI->>DB: claim / review job 저장
-    ReviewAPI->>QueryPlanner: raw claim 기반 scope 판정 + normalized claim + search plan + topic domain + topic country + search_route 단일 호출
+    ReviewAPI->>QueryPlanner: raw claim 기반 scope 판정 + normalized claim + search plan + topic country + search_route 단일 호출
     QueryPlanner-->>ReviewAPI: structured JSON 반환
-    ReviewAPI->>DB: core_claim / search_plan / topic domain / topic country / search_route 저장
+    ReviewAPI->>DB: core_claim / search_plan / topic country / search_route 저장
 
     alt search_route=unsupported
         ReviewAPI->>DB: status=out_of_scope / result=null 저장
@@ -201,7 +197,9 @@ sequenceDiagram
         loop search_plan query
             ReviewAPI->>Naver: news.json 검색
             Naver-->>ReviewAPI: title / description / originallink / link / pubDate 반환
-            ReviewAPI->>Tavily: KR include_domains 기반 보조 search
+        end
+        alt Naver 후보가 15건 미만
+            ReviewAPI->>Tavily: KR include_domains 기반 fallback search
             Tavily-->>ReviewAPI: 한국 source 후보 반환
         end
         ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / provider metadata 부여
@@ -209,16 +207,10 @@ sequenceDiagram
         RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
         ReviewAPI->>DB: relevance / origin_query_ids / query purpose / searchRoute / sourceProvider 저장
 
-        alt extract 대상이 있는 경우
-            ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
-            Extractor-->>ReviewAPI: content / snippet 후보 반환
-        else extract 대상이 부족한 경우
-            ReviewAPI->>ReviewAPI: evidence 부족 상태 유지
-        end
-
-        ReviewAPI->>SignalClassifier: source/evidence 역할 분류 요청
+        ReviewAPI->>SignalClassifier: source/raw snippet 역할 분류 요청
         SignalClassifier-->>ReviewAPI: evidenceSignals 반환
-        ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
+        ReviewAPI->>DB: sources / handoff_payload / audit 저장
+        ReviewAPI-->>Frontend: rule_based_preview 응답
     end
 ```
 
@@ -250,14 +242,13 @@ sequenceDiagram
         QueryPreviewService->>DB: claim / review job 생성
         QueryPreviewService->>DB: preview user country 조회
         QueryPreviewService->>Providers: claim understanding + search planning
-        Providers-->>QueryPreviewService: core_claim + search_plan + topic domain + topic country + search_route
+        Providers-->>QueryPreviewService: core_claim + search_plan + topic country + search_route
         alt search_route=unsupported
             QueryPreviewService->>DB: out_of_scope 상태 저장
         else searchable route
-            QueryPreviewService->>Providers: route별 Naver 또는 Tavily search + relevance filtering
-            QueryPreviewService->>Providers: extraction 대상 content 추출
+            QueryPreviewService->>Providers: Naver 우선 search + 필요 시 Tavily fallback + relevance filtering
             QueryPreviewService->>Providers: evidence signal classification
-            QueryPreviewService->>DB: source / evidence / handoff payload 저장
+            QueryPreviewService->>DB: source / handoff payload 저장
         end
         DB-->>QueryPreviewService: persisted artifacts
         QueryPreviewService-->>ReviewsService: preview response
@@ -271,14 +262,14 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Claim Understanding, Scope Gate, and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `topic_domain`, `search_plan` (4개 purpose별 쿼리 포함), `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
+| Claim Understanding, Scope Gate, and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `search_plan` (4개 purpose별 쿼리 포함), `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason`, `is_korea_related`, `korea_relevance_reason` |
 | Source Search | `search_plan.queries[]`, `search_route` | title, snippet, canonical URL, publisher metadata, provider metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]`, origin query purpose |
 | Relevance Filtering | `core_claim`, title, snippet, candidate metadata, query purpose, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`, origin query purpose |
-| Relevant Source Selection | relevance 판정 결과 | extraction 대상 source 목록 |
-| Content Extraction and Evidence Preparation | extraction 대상 source | content, snippet 후보 |
-| Evidence Signal Classification | `core_claim`, search plan, source, snippet 후보 | source/evidence별 `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason` |
-| Handoff to Interpretation | `core_claim`, source, snippet 후보, evidence signal, audit 정보 | `interpretation_handoff_payload` |
+| Signal Input Source Selection | relevance 판정 결과 | `discard`가 아니고 `rawSnippet`이 있는 source 최대 8개 |
+| Evidence Snippet Preparation | source raw snippet | signal classification 입력용 `evidenceSnippetText` |
+| Evidence Signal Classification | `core_claim`, search plan, source, raw snippet | source별 `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason` |
+| Handoff and Preview Result | `core_claim`, source, evidence signal, audit 정보 | `handoff_payload`, `rule_based_preview` 응답 |
 
 ## 저장할 Audit 정보
 
@@ -292,7 +283,6 @@ sequenceDiagram
 - `claim_language_code`
 - `generated_queries`
 - `search_plan`
-- `topic_domain`
 - `topic_scope`
 - `topic_country_code`
 - `country_detection_reason`
@@ -322,17 +312,19 @@ sequenceDiagram
 이 설계는 구현 variance와 latency, cost 폭주를 막기 위해 아래 상한을 전제로 한다.
 
 - query 수: 기본 4개 purpose를 포함하되 provider별 상한은 구현에서 제한
-- query당 검색 결과: 상위 5개
+- Naver query당 검색 결과: 상위 10개
+- Tavily fallback query당 검색 결과: 상위 5개
+- Tavily fallback 호출 조건: Naver 후보 15건 미만
+- Tavily fallback timeout: 최대 8초
 - relevance 판정 대상: 최대 15개
-- 1차 extraction 대상: `primary` 최대 5개
-- `reference` 승격 대상: 최대 3개
+- evidence signal classification 입력: `discard`가 아니고 raw snippet이 있는 source 최대 8개
 
 ## 실패/예외 처리 원칙
 
 - claim understanding/search planning 실패 시에는 원문 claim 그대로 검색하는 임시 fallback을 둘 수 있지만, 결과 해석에서 search planning 실패 사실을 내부적으로 식별 가능해야 한다.
-- Naver 또는 Tavily 검색 결과가 적거나 `primary` source가 부족하면 무리하게 결론을 강화하지 않는다.
-- `primary` source가 부족한 경우에는 `reference`를 제한적으로 승격한다.
-- `reference` 승격 이후에도 부족하면 근거 부족 상태를 유지한 채 interpretation 단계로 handoff 한다.
-- extract 대상이 없거나 본문 추출이 실패하면, evidence 부족 상태를 유지한 채 uncertainty-heavy input으로 interpretation 단계에 handoff 한다.
+- Naver 검색 결과가 충분하면 Tavily를 호출하지 않는다.
+- Naver 검색 결과가 부족한 경우에만 Tavily fallback을 호출하고, Tavily 실패 또는 timeout은 전체 실패로 승격하지 않는다.
+- `primary` source가 부족하거나 signal 입력 source가 부족하면 근거 부족 상태를 유지한 채 preview 결과를 계산한다.
+- 본문 추출은 현재 preview 생성 경로에 포함하지 않는다.
 - 동일 보도의 재인용이나 제목만 유사한 기사 다수를 근거 수로 과대 해석하지 않는다.
 - 모든 단계는 최종 verdict보다 근거 수집과 필터링 품질을 우선해야 한다.

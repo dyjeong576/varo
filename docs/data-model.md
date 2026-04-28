@@ -47,7 +47,6 @@
 
 ### 4.6 Client-side Persisted State
 - `review_task_records`
-- `client_notifications`
 
 ## 5. 공통 상태값 / enum
 
@@ -60,6 +59,8 @@
 - `partial`
 - `out_of_scope`
 - `failed`
+
+현재 query-processing preview 생성 경로에서 주로 쓰는 terminal 상태는 `partial`, `out_of_scope`, `failed`다. `queued`, `extracting`, `analyzing`, `completed`는 장기 pipeline 확장용 상태로 남아 있다.
 
 ### 5.2 source 타입
 - `news`
@@ -149,7 +150,7 @@
 | `created_at` | timestamptz | 생성 시각 |
 | `updated_at` | timestamptz | 갱신 시각 |
 
-`handoff_payload.evidenceSignals[]`에는 source/evidence별 `sourceId`, `snippetId`, `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`을 저장한다. 요약 문장은 저장하지 않으며, `/reviews/:reviewId` 조회 시 저장된 source, snippet, evidence signal을 기반으로 `consensusLevel`, `sourceStances`, `analysisSummary`를 계산한다.
+`handoff_payload.evidenceSignals[]`에는 source별 `sourceId`, 선택적 `snippetId`, `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`을 저장한다. 현재 preview 생성 경로는 본문 추출을 호출하지 않으므로 `snippetId`는 보통 `null`이다. 요약 문장은 저장하지 않으며, 생성 응답과 `/reviews/:reviewId` 조회 시 저장된 source와 evidence signal을 기반으로 `consensusLevel`, `sourceStances`, `analysisSummary`를 계산한다.
 
 ### 6.6 `sources`
 | 컬럼 | 타입 | 설명 |
@@ -164,8 +165,8 @@
 | `original_url` | text | 수집 당시 URL |
 | `raw_title` | text | 원문 제목 |
 | `normalized_hash` | varchar(128) | 중복 감지용 해시 |
-| `fetch_status` | varchar(32) | fetch 상태 |
-| `content_text` | text nullable | 정제된 본문 |
+| `fetch_status` | varchar(32) | fetch 상태. 현재 preview 생성 경로에서는 보통 `pending` |
+| `content_text` | text nullable | 정제된 본문. 현재 preview 생성 경로에서는 보통 `null` |
 | `is_duplicate` | boolean | 중복 여부 |
 | `duplicate_group_key` | varchar(128) nullable | 중복 묶음 키 |
 | `origin_query_ids` | jsonb nullable | source를 찾은 query id 목록과 query purpose 추적 정보 |
@@ -174,7 +175,7 @@
 | `source_country_code` | varchar(16) nullable | source 국가 코드 |
 | `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
 
-`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. 한국 정치·경제 뉴스는 `naver-search`와 `tavily-search` 보조검색 provider를 기록한다. search planning artifact에는 사용자-facing `generated_queries`, claim 이해 기반 `normalized_claim`, `claim_type`, `verification_goal`, 지원 도메인 판정용 `topic_domain`, 목적별 `search_plan`을 함께 보존한다.
+`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. 한국 정치·경제 뉴스는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, claim 이해 기반 `normalized_claim`, `claim_type`, `verification_goal`, 목적별 `search_plan`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason`을 함께 보존한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |
@@ -187,9 +188,11 @@
 | `start_offset` | integer nullable | 본문 내 시작 위치 |
 | `end_offset` | integer nullable | 본문 내 종료 위치 |
 
-`EvidenceSnippet.stance`는 API 호환과 빠른 UI 표시를 위한 값이다. signal classification 이후에는 `support`, `conflict`, `context`, `unknown` 값을 우선 사용하고, 기존 review에는 `neutral` 등 과거 값이 남을 수 있다. 상세 판단 사유는 `handoff_payload.evidenceSignals[]`에서 추적한다.
+`EvidenceSnippet.stance`는 API 호환과 빠른 UI 표시를 위한 값이다. signal classification 이후에는 `support`, `conflict`, `context`, `unknown` 값을 우선 사용할 수 있고, 기존 review에는 `neutral` 등 과거 값이 남을 수 있다. 현재 preview 생성 경로는 `evidence_snippets` row를 생성하지 않을 수 있으므로, 상세 판단 사유와 source stance는 `handoff_payload.evidenceSignals[]`에서 우선 추적한다.
 
 ### 6.8 `review_results`
+
+현재 query-processing preview 경로는 `review_results` row를 저장하지 않고, `review_jobs.query_refinement`, `review_jobs.handoff_payload`, `sources`를 기반으로 `rule_based_preview` 결과를 생성 응답과 조회 응답에서 파생한다. 아래 테이블은 final interpretation 저장 단계 확장용 모델이다.
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | result 식별자 |
@@ -315,13 +318,13 @@
 
 ## 7. traceability 기준
 - 어떤 review가 어떤 claim에서 시작했는지 연결되어야 한다.
-- 어떤 result가 어떤 source와 snippet에 근거했는지 추적 가능해야 한다.
+- 어떤 result가 어떤 source와 evidence signal에 근거했는지 추적 가능해야 한다. snippet row가 있는 경우에는 snippet까지 연결한다.
 - 어떤 알림이 어떤 review 또는 community 이벤트에서 생성되었는지 추적 가능해야 한다.
 - history는 사용자와 review 연결을 보존해야 한다.
 
 ## 8. 데이터 모델 요약
 - `users`는 서비스 전체의 계정 기준점이다.
-- `review_jobs`는 review 도메인의 중심 엔티티다.
+- `review_jobs`는 review 도메인의 중심 엔티티이며, 현재 preview 결과 파생에 필요한 `query_refinement`와 `handoff_payload`를 보관한다.
 - `community_posts`는 review 결과와 느슨하게 연결될 수 있다.
 - `notifications`는 review와 community 도메인을 사용자 액션으로 연결한다.
 - 현재 프론트는 `review_task_records`만 보조 상태 저장으로 사용한다.

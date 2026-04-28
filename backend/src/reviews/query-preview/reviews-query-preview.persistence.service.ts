@@ -12,7 +12,6 @@ import { NotificationsService } from "../../notifications/notifications.service"
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   EvidenceSignal,
-  ExtractedSource,
   QueryArtifact,
   QueryRefinementResult,
   SearchCandidate,
@@ -35,8 +34,6 @@ interface PersistQueryPreviewResultInput {
   generatedQueries: QueryArtifact[];
   userCountryCode: string | null;
   relevanceCandidates: SearchCandidate[];
-  extractionTargets: SearchCandidate[];
-  extractedSources: ExtractedSource[];
   evidenceSignals?: EvidenceSignal[];
   primaryExtractionLimit: number;
 }
@@ -336,22 +333,13 @@ export class ReviewsQueryPreviewPersistenceService {
     const sourceCreateInputs = buildSourceCreateInputs(
       input.reviewJob.id,
       input.relevanceCandidates,
-      input.extractedSources,
+      [],
     );
     const createdSources = await Promise.all(
       sourceCreateInputs.map((data) => this.prisma.source.create({ data })),
     );
 
-    const evidenceSnippetCreateInputs = buildEvidenceSnippetCreateInputs(
-      input.reviewJob.id,
-      createdSources,
-      input.extractedSources,
-    );
-    const evidenceSnippets = await Promise.all(
-      evidenceSnippetCreateInputs.map((data) =>
-        this.prisma.evidenceSnippet.create({ data }),
-      ),
-    );
+    const evidenceSnippets: EvidenceSnippet[] = [];
     const createdSourceByCandidateId = new Map(
       input.relevanceCandidates.map((candidate, index) => [
         candidate.id,
@@ -396,15 +384,10 @@ export class ReviewsQueryPreviewPersistenceService {
       (source) => source.relevanceTier === "discard",
     ).length;
     const insufficiencyReason = buildInsufficiencyReason(
-      updatedEvidenceSnippets.length,
-      input.extractionTargets.length,
       input.relevanceCandidates,
       input.primaryExtractionLimit,
     );
-    const handoffSourceIds = buildHandoffSourceIds(
-      createdSources,
-      updatedEvidenceSnippets,
-    );
+    const handoffSourceIds = buildHandoffSourceIds(createdSources);
     const sourcePoliticalLeans = Object.fromEntries(
       input.relevanceCandidates.flatMap((candidate) => {
         const source = createdSourceByCandidateId.get(candidate.id);
@@ -435,7 +418,7 @@ export class ReviewsQueryPreviewPersistenceService {
         updatedEvidenceSnippets.length,
         queryRefinementPayload,
         handoffPayload,
-        updatedEvidenceSnippets.length > 0,
+        evidenceSignals.length > 0,
       ),
     );
     await this.recordHistoryEntry({

@@ -27,12 +27,12 @@
 ## 3. 기술 스택
 - Frontend: Next.js 16, React 19, TypeScript, App Router, Tailwind CSS 4
 - Backend API: NestJS, TypeScript, REST API
-- Worker / Async Processing: Node.js worker + Redis queue
+- Worker / Async Processing: Node.js worker + Redis queue는 후속 확장 축이다. 현재 review preview 생성은 API 요청 안에서 동기 처리한다.
 - Primary Database: PostgreSQL
 - Infra / Runtime: Amazon Linux EC2, Docker Compose, nginx container, certbot container, GHCR, GitHub Actions self-hosted runner
 - External Auth: Google login
 - External Search / AI:
-  - Provider router for Naver News Search, Tavily Search fallback, and Tavily Extract
+  - Provider router for Naver News Search and Tavily Search fallback
   - OpenAI structured outputs
 
 ## 4. 서비스 도메인 구조
@@ -47,9 +47,9 @@ VARO는 아래 도메인으로 구성한다.
 ### 4.2 Review & Evidence Pipeline
 - claim 입력
 - source 검색 및 수집
-- evidence snippet 생성
+- evidence signal classification
 - preview detail 생성
-- verdict / interpretation / uncertainty 생성
+- preview artifact 기반 verdict / interpretation / uncertainty 계산
 - 결과 페이지 렌더링
 
 ### 4.3 Community & Participation
@@ -95,12 +95,13 @@ VARO는 아래 도메인으로 구성한다.
 [NestJS API]
     |-- auth/session ----------> [Google Auth]
     |-- read/write ------------> [PostgreSQL]
-    |-- enqueue events/jobs ---> [Redis]
+    |-- review preview pipeline -> [Naver News Search / Tavily Search fallback / OpenAI]
+    |-- enqueue future jobs ----> [Redis]
     |
     +--> [Workers]
-           |-- review pipeline --> [Provider router: Naver News Search / Tavily Search fallback / Tavily Extract]
-           |-- structured analysis -> [OpenAI]
-           |-- notification jobs
+           |-- planned long-running review jobs
+           |-- planned source extraction / structured final interpretation
+           |-- planned notification fan-out
            +-- persist ----------> [PostgreSQL]
 ```
 
@@ -110,7 +111,8 @@ VARO는 아래 도메인으로 구성한다.
 - 프론트엔드는 review preview, 인기, 커뮤니티, 히스토리, 알림 UI를 담당한다.
 - 프론트엔드는 일부 UI 상태를 localStorage에 유지한다.
 - 백엔드는 도메인 API와 공통 비즈니스 규칙을 담당한다.
-- worker는 review 분석과 장기적 알림 생성 같은 비동기 작업을 담당한다.
+- 현재 review preview 생성은 NestJS API가 동기 처리한다.
+- worker는 장기적 review job, source extraction, 알림 fan-out 같은 후속 확장 책임으로 둔다.
 - PostgreSQL은 서비스 전반의 기준 데이터 저장소다.
 - Redis는 queue와 일시적 비동기 제어를 담당한다.
 
@@ -172,13 +174,15 @@ VARO는 아래 도메인으로 구성한다.
 - 도메인별 REST API 제공
 - 권한 검사
 - 동기 요청 처리
-- job enqueue 및 상태 관리
+- 현재 review preview 파이프라인 실행
+- 후속 job enqueue 및 상태 관리
 
 ### 6.3 Workers
-- review 분석 파이프라인 실행
-- provider router 기반 외부 provider 호출과 retry
-- interpretation / verdict 생성
+- 장시간 review 분석 파이프라인 실행
+- source extraction과 retry
+- interpretation / verdict 저장
 - 장기적인 알림 fan-out
+- 현재 MVP preview 생성 경로에서는 worker를 거치지 않는다.
 
 ### 6.4 Data Layer
 - 사용자 / 세션 / 프로필
@@ -219,6 +223,7 @@ VARO는 아래 도메인으로 구성한다.
 - 모든 요청과 job에 trace id를 남긴다.
 - `environment=dev|prod` 태그를 로그와 메트릭에 포함한다.
 - 외부 API 실패율, review 완료율, 알림 생성 성공률, 인기 집계 지연을 관측한다.
+- review preview 단계별 소요시간 로그를 관측한다.
 - queue 적체와 외부 provider 장애는 서비스 품질에 직접 연결되는 운영 지표로 본다.
 
 ## 9. 문서 역할

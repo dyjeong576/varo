@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
@@ -17,8 +17,14 @@ import {
 } from "./reviews.types";
 import { selectDomainsForBucket } from "./reviews.utils";
 
+const NAVER_SEARCH_DISPLAY = 10;
+const NAVER_SUFFICIENT_SOURCE_COUNT = 15;
+const TAVILY_FALLBACK_SOFT_TIMEOUT_MS = 8000;
+
 @Injectable()
 export class ReviewsProvidersService {
+  private readonly logger = new Logger(ReviewsProvidersService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly openAiClient: ReviewsOpenAiClient,
@@ -38,36 +44,41 @@ export class ReviewsProvidersService {
       const clientId = this.getRequiredNaverClientId();
       const clientSecret = this.getRequiredNaverClientSecret();
       const timeoutMs = this.getNaverSearchTimeoutMs();
-      const tavilyApiKey = this.getRequiredTavilyApiKey();
-      const tavilyTimeoutMs = this.getTavilySearchTimeoutMs();
-      const [naverResults, tavilyResults] = await Promise.all([
-        Promise.all(
-          input.queries.map((query) =>
-            this.naverClient.searchNews({
-              clientId,
-              clientSecret,
-              timeoutMs,
-              query: query.text,
-              queryId: query.id,
-              queryPurpose: query.purpose,
-              display: 20,
-              start: 1,
-              sort: "sim",
-            }),
-          ),
-        ).then((results) => results.flat()),
-        this.tavilyClient
-          .searchSources({
-            apiKey: tavilyApiKey,
-            timeoutMs: tavilyTimeoutMs,
-            input,
-            bucket: "fallback",
-            includeDomains: this.buildKoreanTavilyIncludeDomains(input),
-          })
-          .then((candidates) =>
-            candidates.filter((candidate) => this.isKoreanTavilyCandidate(candidate)),
-          ),
-      ]);
+      const startedAt = Date.now();
+      const naverResults = await Promise.all(
+        input.queries.map((query) =>
+          this.naverClient.searchNews({
+            clientId,
+            clientSecret,
+            timeoutMs,
+            query: query.text,
+            queryId: query.id,
+            queryPurpose: query.purpose,
+            display: NAVER_SEARCH_DISPLAY,
+            start: 1,
+            sort: "sim",
+          }),
+        ),
+      ).then((results) => results.flat());
+
+      this.logger.log(
+        `review source search naver completed in ${Date.now() - startedAt}ms; candidates=${naverResults.length}`,
+      );
+
+      if (naverResults.length >= NAVER_SUFFICIENT_SOURCE_COUNT) {
+        return naverResults;
+      }
+
+      const tavilyStartedAt = Date.now();
+      const tavilyResults = await this.searchTavilyFallbackSources({
+        apiKey: this.getRequiredTavilyApiKey(),
+        timeoutMs: this.getTavilySearchTimeoutMs(),
+        input,
+      });
+
+      this.logger.log(
+        `review source search tavily fallback completed in ${Date.now() - tavilyStartedAt}ms; candidates=${tavilyResults.length}`,
+      );
 
       return [...naverResults, ...tavilyResults];
     }
@@ -203,5 +214,31 @@ export class ReviewsProvidersService {
 
   private isKoreanTavilyCandidate(candidate: SearchCandidate): boolean {
     return candidate.sourceCountryCode === "KR";
+  }
+
+  private async searchTavilyFallbackSources(params: {
+    apiKey: string;
+    timeoutMs: number;
+    input: SearchSourcesInput;
+  }): Promise<SearchCandidate[]> {
+    try {
+      const candidates = await this.tavilyClient.searchSources({
+        apiKey: params.apiKey,
+        timeoutMs: Math.min(params.timeoutMs, TAVILY_FALLBACK_SOFT_TIMEOUT_MS),
+        input: params.input,
+        bucket: "fallback",
+        includeDomains: this.buildKoreanTavilyIncludeDomains(params.input),
+      });
+
+      return candidates.filter((candidate) => this.isKoreanTavilyCandidate(candidate));
+    } catch (error) {
+      this.logger.warn(
+        `Tavily fallback source search skipped: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      );
+
+      return [];
+    }
   }
 }

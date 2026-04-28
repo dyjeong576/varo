@@ -6,7 +6,6 @@ import {
   deduplicateCandidates,
   getKoreanSearchDomainRegistry,
   normalizeClaimText,
-  selectExtractionCandidates,
 } from "../reviews.utils";
 import { mapPreviewResponse } from "./reviews-query-preview.mapper";
 import {
@@ -77,9 +76,13 @@ export class ReviewsQueryPreviewService {
     }
 
     try {
+      const startedAt = Date.now();
       const userCountryCode =
         await this.persistenceService.resolveUserCountryCode(userId);
+      this.logStageDuration("resolve_user_country", startedAt, reviewJob.id);
+      const refinementStartedAt = Date.now();
       const refinement = await this.providersService.refineQuery(normalizedClaim);
+      this.logStageDuration("query_refinement", refinementStartedAt, reviewJob.id);
       const generatedQueries = refinement.generatedQueries;
       const searchRoute =
         refinement.searchRoute === "korean_news" ? "korean_news" : "unsupported";
@@ -114,6 +117,7 @@ export class ReviewsQueryPreviewService {
         });
       }
 
+      const sourceSearchStartedAt = Date.now();
       const initialCandidates = await this.providersService.searchSources({
         searchRoute,
         queries: searchQueries,
@@ -124,6 +128,8 @@ export class ReviewsQueryPreviewService {
         topicScope: refinement.topicScope,
         domainRegistry: getKoreanSearchDomainRegistry(),
       });
+      this.logStageDuration("source_search", sourceSearchStartedAt, reviewJob.id);
+      const relevanceStartedAt = Date.now();
       const relevanceCandidates = await this.providersService.applyRelevanceFiltering({
         coreClaim: refinement.coreClaim,
         claimLanguageCode: refinement.claimLanguageCode,
@@ -132,58 +138,23 @@ export class ReviewsQueryPreviewService {
         topicScope: refinement.topicScope,
         candidates: deduplicateCandidates(initialCandidates).slice(0, RELEVANCE_LIMIT),
       });
+      this.logStageDuration("relevance_filtering", relevanceStartedAt, reviewJob.id);
 
-      const extractionTargets = selectExtractionCandidates(
-        relevanceCandidates,
-        PRIMARY_EXTRACTION_LIMIT,
-        REFERENCE_PROMOTION_LIMIT,
-      );
-      const extractedSources = extractionTargets.length
-        ? await this.providersService.extractContent(extractionTargets)
-        : [];
-      const extractedSourceByCanonicalUrl = new Map(
-        extractedSources.map((source) => [source.canonicalUrl, source]),
-      );
-      const evidenceSignalSources = extractionTargets.flatMap((target) => {
-        const extracted = extractedSourceByCanonicalUrl.get(target.canonicalUrl);
-
-        if (!extracted) {
-          return [];
-        }
-
-        return [
-          {
-            sourceId: target.id,
-            sourceType: target.sourceType,
-            publisherName: target.publisherName,
-            publishedAt: target.publishedAt,
-            rawTitle: target.rawTitle,
-            rawSnippet: target.rawSnippet,
-            originQueryIds: target.originQueryIds,
-            retrievalBucket: target.retrievalBucket,
-            evidenceSnippetText: extracted.snippetText,
-          },
-        ];
-      });
-      const snippetFallbackSources = evidenceSignalSources.length === 0
-        ? relevanceCandidates
-            .filter((c) => c.relevanceTier !== "discard" && c.rawSnippet)
-            .slice(0, PRIMARY_EXTRACTION_LIMIT + REFERENCE_PROMOTION_LIMIT)
-            .map((c) => ({
-              sourceId: c.id,
-              sourceType: c.sourceType,
-              publisherName: c.publisherName ?? null,
-              publishedAt: c.publishedAt ?? null,
-              rawTitle: c.rawTitle,
-              rawSnippet: c.rawSnippet,
-              originQueryIds: c.originQueryIds,
-              retrievalBucket: c.retrievalBucket,
-              evidenceSnippetText: c.rawSnippet ?? "",
-            }))
-        : [];
-      const signalInputSources = evidenceSignalSources.length
-        ? evidenceSignalSources
-        : snippetFallbackSources;
+      const signalInputSources = relevanceCandidates
+        .filter((c) => c.relevanceTier !== "discard" && c.rawSnippet)
+        .slice(0, PRIMARY_EXTRACTION_LIMIT + REFERENCE_PROMOTION_LIMIT)
+        .map((c) => ({
+          sourceId: c.id,
+          sourceType: c.sourceType,
+          publisherName: c.publisherName ?? null,
+          publishedAt: c.publishedAt ?? null,
+          rawTitle: c.rawTitle,
+          rawSnippet: c.rawSnippet,
+          originQueryIds: c.originQueryIds,
+          retrievalBucket: c.retrievalBucket,
+          evidenceSnippetText: c.rawSnippet ?? "",
+        }));
+      const signalStartedAt = Date.now();
       const evidenceSignals = signalInputSources.length
         ? await this.providersService.classifyEvidenceSignals({
             coreClaim: refinement.coreClaim,
@@ -192,6 +163,8 @@ export class ReviewsQueryPreviewService {
             sources: signalInputSources,
           })
         : [];
+      this.logStageDuration("evidence_signal_classification", signalStartedAt, reviewJob.id);
+      const persistStartedAt = Date.now();
       const persistedArtifacts =
         await this.persistenceService.persistQueryPreviewResult({
           userId,
@@ -200,11 +173,11 @@ export class ReviewsQueryPreviewService {
           generatedQueries,
           userCountryCode,
           relevanceCandidates,
-          extractionTargets,
-          extractedSources,
           evidenceSignals,
           primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
         });
+      this.logStageDuration("persist_preview_result", persistStartedAt, reviewJob.id);
+      this.logStageDuration("total_preview_generation", startedAt, reviewJob.id);
 
       return mapPreviewResponse({
         reviewJob,
@@ -215,7 +188,7 @@ export class ReviewsQueryPreviewService {
         generatedQueries,
         sources: persistedArtifacts.createdSources,
         evidenceSnippets: persistedArtifacts.evidenceSnippets,
-        selectedSourceCount: extractionTargets.length,
+        selectedSourceCount: signalInputSources.length,
         discardedSourceCount: persistedArtifacts.discardedSourceCount,
         handoffSourceIds: persistedArtifacts.handoffSourceIds,
         insufficiencyReason: persistedArtifacts.insufficiencyReason,
@@ -311,5 +284,15 @@ export class ReviewsQueryPreviewService {
       `errorCode=${errorCode}`,
       `errorMessage=${errorMessage}`,
     ].join(" ");
+  }
+
+  private logStageDuration(
+    stage: string,
+    startedAt: number,
+    reviewJobId: string,
+  ): void {
+    this.logger.log(
+      `review preview stage ${stage} completed in ${Date.now() - startedAt}ms; reviewJobId=${reviewJobId}`,
+    );
   }
 }

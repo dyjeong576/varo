@@ -8,7 +8,7 @@ VARO(Verified Analysis, Reasoned Opinion)는 사용자가 뉴스, 기사, 온라
 
 MVP의 목적은 "진실을 판정"하는 것이 아니라, 사용자가 직접 판단할 수 있도록 근거와 맥락을 정리해 제공하는 것이다. 따라서 결과는 항상 수집된 출처 기준의 해석이어야 하며, 불확실성이 남아 있으면 이를 숨기지 않는다.
 
-이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하되, 검토 범위는 한국 관련 정치·경제 도메인의 사실성 claim으로 좁힌다. 한국 관련 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, Tavily Search는 한국 뉴스 보조 검색 provider로 병행한다. Tavily Extract는 수집된 원문 본문 추출에도 사용한다. 해외/글로벌 뉴스 claim은 지원 범위 밖으로 안내한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
+이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하되, 검토 범위는 한국 관련 정치·경제 도메인의 사실성 claim으로 좁힌다. 한국 관련 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, 네이버 후보가 충분하지 않을 때만 Tavily Search를 한국 뉴스 보조 검색 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 해외/글로벌 뉴스 claim은 지원 범위 밖으로 안내한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
 
 ## 2. Product Vision
 
@@ -82,8 +82,8 @@ MVP에서 포함하는 범위는 아래와 같다.
 - claim 이해 기반 search plan 생성
 - 관련 출처 수집
 - 출처 메타데이터 표시
-- 핵심 `evidence snippet` 표시
-- 수집된 출처만 기반으로 한 AI 요약 및 verdict 생성
+- 검색 결과 스니펫과 evidence signal 기반 근거 표시
+- 수집된 출처만 기반으로 한 rule-based preview 요약 및 verdict 표시
 - 출처 간 일치, 충돌, 불확실성 표시
 - 결과 페이지 중심 UX
 
@@ -92,11 +92,11 @@ MVP 기준 검토 가능 claim:
 - 한국 관련 정치·경제 뉴스성 claim
 - 정치인 발언, 정당/정부 입장, 정책, 공약, 법안, 예산, 세금, 물가, 금리, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 사실성 검토가 가능한 claim
 
-MVP 기준 출처 범위:
+MVP 기준 현재 출처 범위:
 
 - 한국 뉴스 기사
-- 정부, 기관, 기업, 단체의 공식 발표
-- 필요 시 주요 소셜 일부의 원문 게시물
+- 뉴스 검색 결과에서 확인되는 정부, 기관, 기업, 단체의 발표/보도
+- 주요 소셜 원문과 직접 공식 문서 수집은 후속 확장 범위다.
 
 ## 8. Out of Scope
 
@@ -134,18 +134,20 @@ MVP 기준 출처 범위:
 ### 10.2 Source Collection
 
 - 시스템이 관련 `source`를 수집한다.
-- 수집 범위는 뉴스 기사, 공식 발표, 주요 소셜 일부다.
+- 현재 수집 범위는 Naver News Search와 필요 시 Tavily Search fallback으로 확인되는 한국 뉴스 source다.
 - 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, claim 검증 목적에 맞는 search plan을 생성한다.
 - 기본 검색 목적은 `claim_specific`, `current_state`, `primary_source`, `contradiction_or_update`로 구분한다.
+- 시스템은 한국 뉴스 검색에서 Naver News Search를 먼저 사용하고, 후보가 부족할 때만 Tavily Search fallback을 사용한다.
 
-### 10.3 Evidence Extraction
+### 10.3 Evidence Preparation
 
-- 각 출처에서 핵심 문장 또는 문단을 `evidence snippet`으로 표시한다.
-- 사용자에게 어떤 근거가 실제 표시 근거인지 추적 가능하게 제공한다.
+- 각 출처의 제목, 검색 결과 스니펫, relevance reason, evidence signal을 근거 맥락으로 표시한다.
+- 본문 추출 기반 `evidence snippet`은 후속 확장 대상으로 두되, 현재 preview에서는 source-level signal을 우선 사용한다.
+- 사용자에게 어떤 source와 어떤 signal이 결과에 쓰였는지 추적 가능하게 제공한다.
 
 ### 10.4 Structured Review Result
 
-- 수집된 출처만 기반으로 `review result`를 생성한다.
+- 수집된 출처와 evidence signal만 기반으로 `rule_based_preview` result를 생성한다.
 - 결과에는 verdict, 핵심 해석, 불확실성이 포함된다.
 
 ### 10.5 Source Comparison
@@ -160,10 +162,11 @@ MVP 기준 출처 범위:
 
 - 사용자는 하나의 `claim`을 입력할 수 있어야 한다.
 - 시스템은 입력 후 검토 진행 상태를 보여줄 수 있어야 한다.
-- 시스템은 claim의 `topic_domain`을 `politics / economy / unsupported` 중 하나로 자동 판정해야 한다.
+- 시스템은 한국 관련 정치·경제 뉴스성 claim인지 자동 판정해야 한다.
 - 시스템은 claim의 `search_route`를 판정하고, `unsupported`이면 verdict를 만들지 않고 지원 범위 밖 상태로 기록해야 한다.
-- `topic_domain`과 `search_route`는 별도 개념이며, 전자는 제품 지원 도메인 판정, 후자는 검색 provider route를 담당해야 한다.
+- 현재 구현에서 공개 API 기준 authoritative field는 `search_route`이며, 판정 이유는 `korea_relevance_reason`, `country_detection_reason`, `search_route_reason`으로 설명해야 한다.
 - 시스템은 `search_route`와 별도로 검증 목적별 `search_plan`을 생성해야 한다.
+- 시스템은 Naver 후보가 충분하면 Tavily를 호출하지 않아야 한다.
 - 사용자는 검토가 끝난 뒤 결과 페이지로 이동할 수 있어야 한다.
 
 ### 11.2 Source Display
@@ -196,7 +199,7 @@ MVP 기준 출처 범위:
 ### 11.5 Traceability
 
 - 각 결과는 어떤 `claim`에 대한 것인지 연결되어야 한다.
-- 각 해석은 어떤 `source`와 `evidence snippet`을 기반으로 했는지 추적 가능해야 한다.
+- 각 해석은 어떤 `source`와 evidence signal을 기반으로 했는지 추적 가능해야 한다. snippet row가 있는 경우에는 snippet까지 연결해야 한다.
 
 ## 12. Non-Functional Requirements
 
@@ -221,8 +224,8 @@ MVP 기준 출처 범위:
 | 단위               | 설명                                                    |
 | ------------------ | ------------------------------------------------------- |
 | `claim`            | 사용자가 검토하고 싶은 문장 또는 주장                   |
-| `source`           | 수집된 기사, 공식 발표, 소셜 원문 등 출처               |
-| `evidence snippet` | 각 출처에서 검토에 직접 사용된 핵심 텍스트              |
+| `source`           | 수집된 기사 또는 뉴스 검색 결과에서 확인된 출처         |
+| `evidence signal`  | 각 source가 claim에 대해 수행하는 지지/충돌/맥락 역할   |
 | `review result`    | verdict, interpretation, uncertainty를 포함한 결과 단위 |
 
 페이지 구조는 아래와 같다.
@@ -343,7 +346,7 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 
 - 언론 기사
 - 공식 발표
-- 소셜 원문
+- 소셜 원문 (후속 확장)
 - 해설/분석
 - 재인용 가능
 
@@ -354,7 +357,7 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 - VARO는 절대적 진실을 선언하지 않는다.
 - 결과는 수집된 출처 기준의 해석으로 표현한다.
 - 출처가 적거나 상충되면 불확실성을 명시한다.
-- 공식 발표, 기사, 해설, 소셜 원문을 같은 성격으로 취급하지 않는다.
+- 공식 발표, 기사, 해설, 소셜 원문을 같은 성격으로 취급하지 않는다. 현재 preview 경로는 주로 뉴스 source를 다룬다.
 - 기사 수가 많다고 사실성이 높다고 단정하지 않는다.
 - 동일 오보 재인용 가능성을 리스크로 다룬다.
 - 속보와 정정 기사 차이를 고려해야 한다.
@@ -381,7 +384,7 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 - 같은 오보가 여러 기사에서 반복 재인용될 수 있다.
 - 공식 발표와 언론 기사 해석이 충돌할 수 있다.
 - 속보 이후 정정이 나와도 초기 기사만 많이 노출될 수 있다.
-- 소셜 원문은 확산 속도가 빠르지만 진위와 맥락이 불안정할 수 있다.
+- 소셜 원문은 확산 속도가 빠르지만 진위와 맥락이 불안정하므로 후속 확장 시 별도 검증 정책이 필요하다.
 - 사용자가 verdict만 보고 근거를 충분히 읽지 않을 수 있다.
 
 ### Open Questions
@@ -395,15 +398,15 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 
 - 초기 타깃은 정치·경제 뉴스를 소비하는 한국어 사용자로 둔다.
 - 한국 관련 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 provider로 사용한다.
-- Tavily Search는 한국 뉴스 보조 검색 provider로 병행한다.
-- Tavily Extract는 수집된 source의 본문 추출 provider로 사용한다.
+- Tavily Search는 Naver 후보가 부족할 때만 한국 뉴스 보조 검색 provider로 사용한다.
+- Tavily Extract는 후속 본문 추출 확장용으로 유지하되, 현재 preview 생성 경로에서는 사용하지 않는다.
 - 핵심 경험은 결과 페이지 중심으로 설계한다.
 - 입력은 단일 claim 중심으로 단순하게 시작한다.
 - verdict는 4단계 모델을 유지한다.
 - source card에는 출처명, 발행 시각, URL, 핵심 스니펫, 출처 유형을 기본 포함한다.
 - 근거 부족 시 `Unclear`를 우선 선택한다.
 - 기사 수를 신뢰도의 대리값으로 사용하지 않는다.
-- 소셜 출처는 MVP에 포함하되, 플랫폼 확대는 후속 단계에서 결정한다.
+- 소셜 출처 직접 수집은 후속 단계에서 결정한다.
 
 ## 21. Roadmap
 

@@ -15,7 +15,7 @@ erDiagram
     REVIEW_JOBS ||--o{ SOURCES : collects
     REVIEW_JOBS ||--o{ EVIDENCE_SNIPPETS : generates
     SOURCES ||--o{ EVIDENCE_SNIPPETS : provides
-    REVIEW_JOBS ||--|| REVIEW_RESULTS : produces
+    REVIEW_JOBS ||--o| REVIEW_RESULTS : may_produce
     REVIEW_JOBS ||--o{ EXTERNAL_REQUEST_LOGS : logs
 
     USERS ||--o{ COMMUNITY_POSTS : writes
@@ -192,7 +192,7 @@ erDiagram
 - `review_jobs 1 : N sources`
 - `review_jobs 1 : N evidence_snippets`
 - `sources 1 : N evidence_snippets`
-- `review_jobs 1 : 1 review_results`
+- `review_jobs 1 : 0..1 review_results`
 - `review_jobs 1 : N external_request_logs`
 
 ### 3.3 community 축
@@ -211,11 +211,12 @@ erDiagram
 ## 4. 서비스 데이터 흐름
 1. 사용자가 로그인하면 `users`, `user_profiles`, `sessions`가 서비스 계정 축을 구성한다.
 2. 사용자가 질문을 제출하면 `claims`와 `review_jobs`가 생성된다.
-3. 분석 과정에서 `search_route`에 따라 Naver 또는 Tavily provider가 호출되고, `sources`, `evidence_snippets`, `external_request_logs`가 쌓인다.
-4. 현재 프론트는 `handoff_ready` 전후의 review preview detail을 우선 소비한다.
-5. 완료되면 `review_results`가 생성되고, `user_history`와 장기적으로는 `notifications`가 갱신된다.
-6. review 결과는 `popular_topics` 또는 `user_history` 기반 read model 집계의 입력이 될 수 있다.
-7. 사용자는 `community_posts`, `community_comments`, `community_reactions`로 서비스 참여 활동을 남긴다.
+3. 분석 과정에서 `search_route=korean_news`이면 Naver provider가 먼저 호출되고, Naver 후보가 부족할 때만 Tavily fallback provider가 호출된다.
+4. relevance filtering 이후 `sources`와 `handoff_payload.evidenceSignals[]`가 저장된다. 현재 preview 생성 경로에서는 본문 추출을 호출하지 않으므로 `evidence_snippets`는 비어 있을 수 있다.
+5. 현재 프론트는 `handoff_ready` 상태의 review preview detail과 `rule_based_preview` 파생 결과를 우선 소비한다.
+6. preview가 준비되면 `user_history`와 `notifications`가 갱신된다. `review_results` 저장은 final interpretation 단계 확장용이다.
+7. review 결과는 `popular_topics` 또는 `user_history` 기반 read model 집계의 입력이 될 수 있다.
+8. 사용자는 `community_posts`, `community_comments`, `community_reactions`로 서비스 참여 활동을 남긴다.
 
 ## 5. 현재 프론트 보조 저장
 
@@ -234,6 +235,6 @@ erDiagram
 ## 6. 설계 포인트
 - `users`를 중심으로 review, history, notifications, community가 연결된다.
 - review 도메인은 여전히 VARO의 핵심 차별화 축이며, source와 evidence를 별도 엔티티로 유지한다.
-- review source audit은 `search_route`, `source_provider`, `retrieval_bucket`을 함께 추적하고, external provider 로그는 `naver-search`, `tavily-search`, `tavily-extract`, `source-fetch`, `openai` 단위로 남긴다.
+- review source audit은 `search_route`, `source_provider`, `retrieval_bucket`을 함께 추적한다. 현재 preview 경로는 `naver-search`, 필요 시 `tavily-search`, `openai` 호출을 사용하며 `tavily-extract`와 `source-fetch`는 후속 extraction 확장용이다.
 - `notifications`, `popular_topics`, `user_history`는 서비스 경험을 연결하는 보조 도메인이다.
 - community는 별도 도메인이지만 실명 기반 사용자 모델과 연결된다.

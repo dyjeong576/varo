@@ -283,12 +283,12 @@ describe("ReviewsQueryPreviewService", () => {
     expect(providers.classifyEvidenceSignals).toHaveBeenCalledWith(
       expect.objectContaining({
         coreClaim: "트럼프의 관세 발표",
-        sources: [
+        sources: expect.arrayContaining([
           expect.objectContaining({
             sourceId: "c2",
-            evidenceSnippetText: "추출 snippet",
+            evidenceSnippetText: "원문 검증 보도입니다.",
           }),
-        ],
+        ]),
       }),
     );
     expect(persistence.persistQueryPreviewResult).toHaveBeenCalledWith(

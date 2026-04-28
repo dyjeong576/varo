@@ -170,7 +170,7 @@ describe("ReviewsProvidersService", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("real mode에서 한국 관련 검색을 Naver 뉴스 검색 client에 위임한다", async () => {
+  it("real mode에서 Naver 검색 결과가 부족하면 Tavily 보조검색을 수행한다", async () => {
     const searchNewsSpy = jest
       .spyOn(ReviewsNaverClient.prototype, "searchNews")
       .mockResolvedValue([
@@ -322,19 +322,75 @@ describe("ReviewsProvidersService", () => {
       query: "테슬라 한국 철수",
       queryId: "q2",
       queryPurpose: "claim_specific",
-      display: 5,
+      display: 10,
       start: 1,
       sort: "sim",
     });
     expect(searchSourcesSpy).toHaveBeenCalledWith({
       apiKey: "tvly-test-key",
-      timeoutMs: 41000,
+      timeoutMs: 8000,
       input: expect.objectContaining({
         searchRoute: "korean_news",
       }),
       bucket: "fallback",
       includeDomains: ["yna.co.kr"],
     });
+  });
+
+  it("real mode에서 Naver 검색 결과가 충분하면 Tavily 보조검색을 건너뛴다", async () => {
+    const searchNewsSpy = jest
+      .spyOn(ReviewsNaverClient.prototype, "searchNews")
+      .mockResolvedValue(
+        Array.from({ length: 15 }, (_, index) => ({
+          id: `naver-q1-c${index + 1}`,
+          searchRoute: "korean_news" as const,
+          sourceProvider: "naver-search" as const,
+          sourceType: "news",
+          publisherName: "yna.co.kr",
+          publishedAt: "2026-04-01T00:00:00.000Z",
+          canonicalUrl: `https://www.yna.co.kr/view/AKR2026040100${index}`,
+          originalUrl: `https://n.news.naver.com/mnews/article/001/00100000${index}`,
+          rawTitle: `한국 경제 정책 보도 ${index + 1}`,
+          rawSnippet: "한국 경제 정책 관련 핵심 내용이 담긴 기사입니다.",
+          normalizedHash: `hash-${index + 1}`,
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar" as const,
+          domainRegistryId: null,
+        })),
+      );
+    const searchSourcesSpy = jest
+      .spyOn(ReviewsTavilyClient.prototype, "searchSources")
+      .mockResolvedValue([]);
+    const service = createService({
+      reviewProviderMode: "real",
+      naverClientId: "naver-client-id",
+      naverClientSecret: "naver-secret",
+      naverSearchTimeoutMs: 40000,
+      tavilyApiKey: null,
+    });
+
+    const result = await service.searchSources({
+      searchRoute: "korean_news",
+      queries: [
+        {
+          id: "q1",
+          text: "한국 경제 정책",
+          rank: 1,
+          purpose: "claim_specific",
+        },
+      ],
+      coreClaim: "한국 경제 정책",
+      claimLanguageCode: "ko",
+      userCountryCode: "KR",
+      topicCountryCode: "KR",
+      topicScope: "domestic",
+      domainRegistry: [],
+    });
+
+    expect(result).toHaveLength(15);
+    expect(searchNewsSpy).toHaveBeenCalledTimes(1);
+    expect(searchSourcesSpy).not.toHaveBeenCalled();
   });
 
   it("global_news route는 source search를 수행하지 않는다", async () => {
@@ -609,6 +665,9 @@ describe("ReviewsProvidersService", () => {
   });
 
   it("한국 뉴스 보조검색에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {
+    jest
+      .spyOn(ReviewsNaverClient.prototype, "searchNews")
+      .mockResolvedValue([]);
     const service = createService({
       reviewProviderMode: "real",
       naverClientId: "naver-client-id",

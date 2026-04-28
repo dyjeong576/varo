@@ -91,7 +91,7 @@
 - provisional verdict / confidence / 수집된 출처 간 일치도
 - 수집 뉴스 종합 요약 / 공식 출처 확인 상태
 - source distribution / agreement / conflict summary
-- evidence snippet list
+- evidence snippet list. 현재 preview 경로에서는 snippet row가 없을 수 있으므로 source raw snippet과 evidence signal을 중심으로 표시한다.
 - source card 목록
 - source type filter
 - 기본 숨김 query context / search plan
@@ -242,6 +242,8 @@
 - `GET /api/v1/reviews/{reviewId}`
 - `POST /api/v1/reviews/{reviewId}/reopen`
 
+`POST /api/v1/reviews/query-processing-preview`는 현재 최종 완료까지 오래 걸리는 비동기 job id만 반환하지 않고, 백엔드가 동기적으로 preview pipeline을 실행한 뒤 detail을 반환한다. 프론트의 loading 단계 메시지는 실제 backend stage polling이 아니라 local task store 기반 안내용 진행 상태다.
+
 ### 8.4 서비스 기능 관련
 
 - `GET /api/v1/popular/topics`
@@ -268,7 +270,7 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 1. claim
 2. provisional verdict / confidence / 수집된 출처 간 일치도
 3. rule-based 수집 뉴스 종합 요약과 공식 출처 확인 상태
-4. evidence snippet
+4. evidence snippet 또는 source raw snippet 기반 근거
 5. source card 목록
 6. 기본 숨김 query context와 search plan
 7. uncertainty / insufficiency 안내

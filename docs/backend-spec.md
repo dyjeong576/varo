@@ -16,7 +16,8 @@
 - External Auth: Google login
 - External Providers:
   - Naver News Search
-  - Tavily Search / Extract
+  - Tavily Search fallback
+  - Tavily Extract (후속 확장용, 현재 query-processing preview 생성 경로에서는 미사용)
   - OpenAI structured outputs
 
 ## 3. 서비스 모듈 구조
@@ -36,9 +37,9 @@
 
 - claim 접수
 - source 검색과 수집
-- evidence snippet 생성
+- evidence signal classification
 - preview detail 생성
-- verdict / interpretation / uncertainty 생성
+- preview artifact 기반 `rule_based_preview` 결과 계산
 - review 상태 조회
 
 ### 3.4 Community
@@ -114,15 +115,15 @@
 
 ### 6.1 단계
 
-1. claim 접수
-2. scope gate
-3. claim understanding / search planning
-4. source 검색
-5. 본문 추출
-6. evidence 정리
-7. preview detail 제공 가능 상태로 저장
-8. interpretation 생성
-9. 결과 저장
+1. claim 접수와 `review_jobs` 생성
+2. claim understanding / scope gate / search planning
+3. `unsupported`이면 `out_of_scope` 저장 후 종료
+4. `korean_news`이면 Naver News Search 우선 검색
+5. Naver 후보가 15건 미만이면 Tavily Search fallback 호출
+6. canonical URL 기준 dedup 후 relevance filtering
+7. `discard`가 아니고 raw snippet이 있는 source를 evidence signal classification 입력으로 사용
+8. source와 `handoff_payload.evidenceSignals[]` 저장
+9. preview artifact 기반 `rule_based_preview` 결과 계산
 10. 완료 알림 생성
 11. history 반영
 12. 인기 집계 입력 반영
@@ -138,31 +139,38 @@
 - `out_of_scope`
 - `failed`
 
+현재 query-processing preview 생성 경로에서 주로 쓰는 terminal 상태는 `partial`, `out_of_scope`, `failed`다. `queued`, `extracting`, `analyzing`, `completed`는 장기 pipeline 확장용 상태로 남아 있다.
+
 ### 6.3 review 원칙
 
 - 결과는 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - verdict는 기사 수나 단순 agreement score가 아니라 evidence 구조와 query purpose별 근거 성격을 바탕으로 계산한다.
 - 결과 화면용 summary는 내부 카운트 나열이 아니라 사용자 질문에 직접 답하는 문장으로 작성하고, 최신 출처, 업데이트/정정 신호, 공식 출처 여부, 남은 불확실성을 함께 설명한다.
-- OpenAI는 review 생성 시점에 evidence signal만 구조화하며, 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source, snippet, signal trace를 기준으로 백엔드가 계산한다.
-- 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`와 `EvidenceSnippet.stance`를 계산 입력으로 유지한다.
+- OpenAI는 review 생성 시점에 relevance filtering과 evidence signal만 구조화하며, 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source와 signal trace를 기준으로 백엔드가 계산한다.
+- 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
-- 지원 도메인 판정은 `topic_domain`, provider 선택은 `search_route`가 담당하며 두 값은 별도 책임으로 유지한다.
-- OpenAI는 먼저 scope gate에서 한국 관련 정치·경제 뉴스성 claim인지 판정하고, `unsupported`이면 search plan과 query refinement를 생성하지 않는다.
+- 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 한국 관련성 및 주제 범위 설명은 `is_korea_related`, `topic_scope`, `topic_country_code`, `korea_relevance_reason`, `search_route_reason`에 남긴다.
+- OpenAI는 먼저 scope gate에서 한국 관련 정치·경제 뉴스성 claim인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
-- 한국 관련 정치·경제 뉴스성 claim은 Naver News Search와 Tavily Search 보조검색을 병행한다.
+- 한국 관련 정치·경제 뉴스성 claim은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
 - 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
 - Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
 
-### 6.4 worker 책임
+### 6.4 현재 API 책임
 
-- search provider 호출
+- `POST /api/v1/reviews/query-processing-preview` 요청 안에서 동기적으로 preview 파이프라인을 실행한다.
+- search provider 호출, relevance filtering, evidence signal classification, source/handoff 저장을 처리한다.
+- source fetch / 본문 추출과 OpenAI structured final interpretation 저장은 현재 preview 경로에서 수행하지 않는다.
+- 단계별 소요시간은 backend logger에 남긴다.
+
+### 6.5 worker 책임 (후속 확장)
+
+- 장시간 분석 job 분리
 - source fetch / 추출
-- evidence 생성
-- OpenAI structured interpretation 호출
-- retry / timeout 처리
-- result 저장
+- structured interpretation 저장
+- retry / timeout 정책 고도화
 
 ## 7. 서비스 이벤트와 비동기 처리
 
@@ -320,21 +328,27 @@
 
 - 한국 정치·경제 뉴스성 claim의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
+- search plan query별 상위 10개를 요청한다.
+- Naver 후보가 15건 이상이면 Tavily Search fallback을 호출하지 않는다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
 ### 10.3 Tavily Search / Extract
 
-- 한국 뉴스 보조 source 후보 수집
-- source 본문 추출
+- Tavily Search는 Naver 후보가 15건 미만일 때만 한국 뉴스 보조 source 후보 수집에 사용한다.
+- Tavily Search는 코드 고정 KR trusted news domain registry를 `include_domains`로 사용하고, `sourceCountryCode=KR` 후보만 유지한다.
+- Tavily Search fallback timeout은 최대 8초로 제한한다.
+- Tavily Search 실패 또는 timeout은 전체 review 실패로 처리하지 않고, Naver 결과만으로 partial preview를 계속 만든다.
+- Tavily Extract는 env와 client가 남아 있지만 현재 query-processing preview 생성 경로에서는 호출하지 않는다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
 ### 10.4 OpenAI Structured Outputs
 
-- review 도메인의 query refinement, relevance filtering, evidence signal classification, structured interpretation 생성
+- review 도메인의 query refinement, relevance filtering, evidence signal classification
 - 입력에 없는 사실을 생성하지 않도록 제한
-- evidence signal classification은 사실 결론을 내리지 않고, source/evidence가 현재 질문에 대해 `support`, `conflict`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
+- evidence signal classification은 사실 결론을 내리지 않고, source/raw snippet이 현재 질문에 대해 `supports`, `contradicts`, `updates`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
+- structured final interpretation 생성은 현재 preview 경로가 아니라 후속 확장 범위다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
@@ -343,6 +357,7 @@
 - source 원문 HTML 수집
 - timeout / redirect / extraction 처리
 - provider API가 아닌 직접 URL fetch 계층
+- 현재 query-processing preview 생성 경로에서는 사용하지 않는다.
 
 ## 11. 에러 처리
 
@@ -370,6 +385,7 @@
 - `partial`은 정상 응답 본문 내 상태값으로 표현한다.
 - 근거 부족은 결과 내부의 `uncertainty`와 도메인 상태로 드러낸다.
 - `SOURCE_SEARCH_FAILED`는 사용자 노출 문구에서는 일반 검색 실패로 표현하되, 내부 로그와 provider error detail에는 `naver-search` 또는 `tavily-search` 원인을 구분해 남긴다.
+- Tavily fallback 실패/timeout은 warning log만 남기고 Naver 결과가 있으면 계속 진행한다.
 
 ## 12. 보안 / env / 운영
 
@@ -419,6 +435,7 @@
 - trace id 발급
 - `environment=dev|prod` 태그 유지
 - review 완료율 / partial 비율 / 외부 provider 실패율 관측
+- review preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `resolve_user_country`, `query_refinement`, `source_search`, `relevance_filtering`, `evidence_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
 - 알림 생성 성공률, ranking 집계 지연, community mutation 실패율 관측
 
 ## 13. review 도메인 특별 원칙
