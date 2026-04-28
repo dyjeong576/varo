@@ -24,7 +24,7 @@ import { normalizeCountryCode } from "../reviews.utils";
 import { postJson } from "./reviews-provider-http";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const OPENAI_MODEL = "gpt-5-nano";
+const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
 const SEARCH_ROUTES: SearchRoute[] = ["korean_news", "unsupported"];
 const CLAIM_TYPES: ReviewClaimType[] = [
@@ -86,21 +86,6 @@ interface OpenAiSearchPlanPayload {
   queries: OpenAiSearchPlanQueryPayload[];
 }
 
-interface OpenAiReviewScopePayload {
-  languageCode: string;
-  coreClaim: string;
-  normalizedClaim: string;
-  claimType: ReviewClaimType;
-  verificationGoal: string;
-  searchRoute: SearchRoute;
-  searchRouteReason: string;
-  topicScope: TopicScope;
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
-  isKoreaRelated: boolean;
-  koreaRelevanceReason: string;
-}
-
 interface OpenAiQueryRefinementPayload {
   languageCode: string;
   coreClaim: string;
@@ -108,11 +93,8 @@ interface OpenAiQueryRefinementPayload {
   claimType: ReviewClaimType;
   verificationGoal: string;
   searchPlan: OpenAiSearchPlanPayload;
-  generatedQueries: string[];
   searchRoute: SearchRoute;
   searchRouteReason: string;
-  searchClaim: string;
-  searchQueries: string[];
   topicScope: TopicScope;
   topicCountryCode: string | null;
   countryDetectionReason: string;
@@ -151,15 +133,6 @@ export class ReviewsOpenAiClient {
     apiKey: string,
     rawClaim: string,
   ): Promise<QueryRefinementResult> {
-    const scope = await this.classifyReviewScope(apiKey, rawClaim);
-
-    if (scope.searchRoute !== "korean_news") {
-      const result = this.buildUnsupportedRefinementResult(scope, rawClaim);
-      this.logGeneratedSearchQueries(result);
-
-      return result;
-    }
-
     const payload =
       await this.requestStructuredOutput<OpenAiQueryRefinementPayload>(
         apiKey,
@@ -174,12 +147,9 @@ export class ReviewsOpenAiClient {
               "normalizedClaim",
               "claimType",
               "verificationGoal",
-              "searchPlan",
-              "generatedQueries",
               "searchRoute",
               "searchRouteReason",
-              "searchClaim",
-              "searchQueries",
+              "searchPlan",
               "topicScope",
               "topicCountryCode",
               "countryDetectionReason",
@@ -195,6 +165,11 @@ export class ReviewsOpenAiClient {
                 enum: CLAIM_TYPES,
               },
               verificationGoal: { type: "string" },
+              searchRoute: {
+                type: "string",
+                enum: SEARCH_ROUTES,
+              },
+              searchRouteReason: { type: "string" },
               searchPlan: {
                 type: "object",
                 additionalProperties: false,
@@ -218,8 +193,6 @@ export class ReviewsOpenAiClient {
                   },
                   queries: {
                     type: "array",
-                    minItems: 4,
-                    maxItems: 4,
                     items: {
                       type: "object",
                       additionalProperties: false,
@@ -237,24 +210,6 @@ export class ReviewsOpenAiClient {
                   },
                 },
               },
-              generatedQueries: {
-                type: "array",
-                items: { type: "string" },
-                minItems: 3,
-                maxItems: 3,
-              },
-              searchRoute: {
-                type: "string",
-                enum: SEARCH_ROUTES,
-              },
-              searchRouteReason: { type: "string" },
-              searchClaim: { type: "string" },
-              searchQueries: {
-                type: "array",
-                items: { type: "string" },
-                minItems: 3,
-                maxItems: 3,
-              },
               topicScope: {
                 type: "string",
                 enum: ["domestic", "foreign", "multi_country", "unknown"],
@@ -271,39 +226,52 @@ export class ReviewsOpenAiClient {
         [
           {
             role: "system",
-            content: `사용자 발화에서 팩트체크가 필요한 핵심 주장을 추출하고, 검증 목적별 search plan을 JSON으로 반환하세요. 사용자의 발화에 포함된 키워드를 그대로 뽑지 말고, 현재 기준 검증에 필요한 검색 관점을 설계하세요.
+            content: `사용자 발화에서 팩트체크가 필요한 핵심 주장을 분석하고, 분석 가능 여부와 검색 계획을 한 번에 판정해 JSON으로 반환하세요.
 
-claim 이해 규칙:
-- coreClaim은 검토 대상 핵심 주장입니다.
-- normalizedClaim은 검증 가능한 형태로 정규화한 claim입니다.
-- claimType은 scheduled_event, current_status, statistic, quote, policy, corporate_action, incident, general_fact 중 하나입니다.
-- verificationGoal은 "현재 수집 가능한 출처 기준으로 무엇을 확인해야 하는지"를 짧게 씁니다.
+[1단계] 핵심 주장 이해
+- coreClaim: 검토 대상 핵심 주장
+- normalizedClaim: 검증 가능한 형태로 정규화한 주장
+- claimType: scheduled_event | current_status | statistic | quote | policy | corporate_action | incident | general_fact
+- verificationGoal: 현재 수집 가능한 출처로 무엇을 확인해야 하는지를 짧게
 
-searchPlan 작성 규칙:
-- searchPlan은 normalizedClaim, claimType, verificationGoal, searchRoute, queries를 포함합니다.
-- searchPlan.queries는 정확히 4개이며 purpose가 각각 claim_specific, current_state, primary_source, contradiction_or_update여야 합니다.
-- claim_specific은 사용자가 말한 claim 자체가 어떤 출처에서 나왔는지 확인하는 query입니다.
-- current_state는 현재 기준 상태 또는 최신 보도를 확인하는 query입니다.
-- primary_source는 공식 발표, 원문, 공시, 기관 문서 등 1차 출처를 찾는 query입니다.
-- contradiction_or_update는 반박, 정정, 변경, 취소, 업데이트 신호를 찾는 query입니다.
-- query는 검색 provider에 바로 전달할 자연스러운 검색어입니다. 단어별 따옴표나 불필요한 메타 표현을 붙이지 마세요.
-- 고유명사, 날짜, 수치는 claim 구조화에는 보존하되, 검색 질의가 사용자 표현에만 갇히지 않도록 작성하세요.
+[2단계] 분석 가능 여부 판정 (searchRoute)
+korean_news 조건: 한국 관련 정치·경제 뉴스성 claim
+- 한국 장소, 정부/기관, 기업/법인, 시장, 국민/이용자, 정책, 국내 서비스 영향이 claim 자체에 직접 포함
+- 출처로 검증 가능한 사실성 주장 (정치인 발언, 정당 입장, 정책, 공약, 법안, 기업 공시, 경제 지표 등)
 
-호환 필드 작성 규칙:
-- generatedQueries 3개는 사용자-facing trace용이므로 원문 언어를 유지하세요.
-- searchClaim과 searchQueries는 기존 호환용 검색 입력입니다.
-- korean_news: searchClaim/searchQueries를 원문 언어 맥락으로 작성하세요.
-- unsupported: searchClaim/searchQueries는 generatedQueries와 같은 맥락으로 채우되 실제 검색에는 사용되지 않습니다.
+unsupported 조건: 아래 중 하나라도 해당
+- 한국 관련성 없음, 해외/글로벌 뉴스
+- 의료, 연예, 스포츠, 개인 상담, 투자 추천, 순수 의견, 미래 예측
+- 정치·경제 도메인 밖이거나 provider로 근거 수집이 어려움
+해외뉴스 요청은 searchRouteReason에 "VARO가 현재 한국 뉴스만 분석한다"고 설명하세요.
 
-languageCode는 원문 언어를 유지하세요. topicCountryCode는 사용자 프로필 국가가 아니라 claim/context 의미 기준의 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요. topicScope는 domestic, foreign, multi_country, unknown 중 하나만 선택하세요. countryDetectionReason에는 왜 그렇게 판정했는지 짧게 설명하세요.
+[3단계] 검색 계획 (searchPlan)
+korean_news인 경우에만 queries를 정확히 4개 작성하세요. unsupported면 queries는 빈 배열입니다.
 
-searchRoute는 korean_news, unsupported 중 하나만 반환하세요.
-- korean_news: 한국 관련 정치·경제 뉴스성 claim. Naver News Search를 사용합니다.
-- unsupported: 한국 관련성이 없거나, 해외/글로벌 뉴스이거나, 정치·경제 도메인 밖이거나, 뉴스성 또는 사실성 검토 대상이 아니거나, provider로 근거 수집이 어렵습니다. 의료, 연예, 스포츠, 개인 상담, 투자 추천, 순수 의견, 미래 예측은 unsupported입니다. 해외뉴스 요청은 VARO가 현재 한국뉴스만 분석한다고 설명하세요.
+네이버 뉴스 검색 쿼리 작성 원칙:
+- 각 query는 기사 제목에 실제로 등장할 법한 핵심 키워드 조합을 사용하세요.
+- 인물명·직책·기관명·기업명은 한국어로 정확히 작성하세요. (예: "이재명 대표", "삼성전자", "기획재정부")
+- 쿼리 한 개는 10~20자 이내의 단문 키워드 조합으로, 조사와 접속어를 최소화하세요.
+- 4개 쿼리 간 핵심 키워드 중복을 최소화해서 서로 다른 각도를 커버하세요.
+- purpose별 작성 방법:
+  - claim_specific: 사용자가 말한 주장이 어느 출처에서 나왔는지 찾는 쿼리. 고유명사 + 핵심 행위.
+  - current_state: 현재 기준 최신 상태/보도를 확인하는 쿼리. 현재 시점 키워드 포함.
+  - primary_source: 공식 발표, 공시, 기관 문서를 찾는 쿼리. "공식", "발표", "공시" 등의 키워드 포함.
+  - contradiction_or_update: 반박, 정정, 변경, 취소 신호를 찾는 쿼리. "취소", "번복", "정정", "부인" 등의 키워드 포함.
 
-searchRouteReason에는 route 선택 이유를 짧게 설명하세요.
+예시 — "하정우 수석이 국회의원 출마하는 게 사실이야?":
+  claim_specific: "하정우 수석 국회의원 출마"
+  current_state: "하정우 수석 총선 출마 여부 최신"
+  primary_source: "하정우 수석 출마 공식 발표"
+  contradiction_or_update: "하정우 수석 출마 부인 취소"
 
-isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 장소, 한국 정부/기관, 한국 기업/법인, 한국 시장, 한국 국민/이용자, 한국 정책, 국내 서비스 영향이 직접 포함되면 true입니다. 단순히 해외 이슈가 한국어로 보도됐다는 이유만으로 true로 두지 마세요. koreaRelevanceReason에는 한국 관련성을 인정하거나 제외한 이유를 짧게 설명하세요.`,
+[4단계] 메타데이터
+- languageCode: 원문 언어 코드
+- topicCountryCode: claim 의미 기준 중심 국가 ISO 3166-1 alpha-2 대문자 코드 (식별 불가면 null)
+- topicScope: domestic | foreign | multi_country | unknown
+- countryDetectionReason: 판정 이유 짧게
+- isKoreaRelated: claim 자체에 한국 관련 요소가 직접 포함되면 true (단순 한국어 보도는 false)
+- koreaRelevanceReason: 한국 관련성 인정/제외 이유 짧게`,
           },
           {
             role: "user",
@@ -322,40 +290,46 @@ isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 
       payload.verificationGoal,
       "현재 수집 가능한 출처 기준으로 claim을 검토합니다.",
     );
-    const searchRoute = SEARCH_ROUTES.includes(payload.searchRoute)
-      ? payload.searchRoute
-      : "unsupported";
-    const queries = this.normalizeQueries(payload.generatedQueries, [
-      normalizedClaim,
-      coreClaim,
-      rawClaim,
-    ]);
-    const searchQueries = this.normalizeQueries(payload.searchQueries, queries);
-    const searchPlan = this.normalizeSearchPlan(payload, {
-      normalizedClaim,
-      claimType,
-      verificationGoal,
-      searchRoute,
-      fallbackQueries: searchQueries,
-    });
+    const searchRoute = payload.searchRoute === "korean_news" ? "korean_news" : "unsupported";
     const topicCountryCode = normalizeCountryCode(payload.topicCountryCode);
+    const topicScope = this.normalizeTopicScope(payload.topicScope);
 
-    const result = {
+    let searchPlan: SearchPlan;
+    let generatedQueries: QueryArtifact[];
+    let searchQueries: QueryArtifact[];
+
+    if (searchRoute === "unsupported") {
+      searchPlan = { normalizedClaim, claimType, verificationGoal, searchRoute: "unsupported", queries: [] };
+      generatedQueries = [{ id: "q1", text: coreClaim, rank: 1 }];
+      searchQueries = [];
+    } else {
+      searchPlan = this.normalizeSearchPlan(payload, {
+        normalizedClaim,
+        claimType,
+        verificationGoal,
+        searchRoute,
+        fallbackQueries: [normalizedClaim, coreClaim, rawClaim],
+      });
+      searchQueries = this.toSearchQueryArtifacts(searchPlan.queries);
+      generatedQueries = searchQueries.slice(0, 3);
+    }
+
+    const result: QueryRefinementResult = {
       claimLanguageCode: this.normalizeText(payload.languageCode, "unknown"),
       coreClaim,
       normalizedClaim,
       claimType,
       verificationGoal,
       searchPlan,
-      generatedQueries: this.toQueryArtifacts(queries),
+      generatedQueries,
       searchRoute,
       searchRouteReason: this.normalizeText(
         payload.searchRouteReason,
         "검색 route 판정 이유가 기록되지 않았습니다.",
       ),
-      searchClaim: this.normalizeText(payload.searchClaim, normalizedClaim),
-      searchQueries: this.toQueryArtifacts(searchQueries),
-      topicScope: this.normalizeTopicScope(payload.topicScope),
+      searchClaim: normalizedClaim,
+      searchQueries,
+      topicScope,
       topicCountryCode,
       countryDetectionReason: this.normalizeText(
         payload.countryDetectionReason,
@@ -372,155 +346,6 @@ isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 
     this.logGeneratedSearchQueries(result);
 
     return result;
-  }
-
-  private async classifyReviewScope(
-    apiKey: string,
-    rawClaim: string,
-  ): Promise<OpenAiReviewScopePayload> {
-    const payload =
-      await this.requestStructuredOutput<OpenAiReviewScopePayload>(
-        apiKey,
-        {
-          name: "review_scope_gate",
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            required: [
-              "languageCode",
-              "coreClaim",
-              "normalizedClaim",
-              "claimType",
-              "verificationGoal",
-              "searchRoute",
-              "searchRouteReason",
-              "topicScope",
-              "topicCountryCode",
-              "countryDetectionReason",
-              "isKoreaRelated",
-              "koreaRelevanceReason",
-            ],
-            properties: {
-              languageCode: { type: "string" },
-              coreClaim: { type: "string" },
-              normalizedClaim: { type: "string" },
-              claimType: {
-                type: "string",
-                enum: CLAIM_TYPES,
-              },
-              verificationGoal: { type: "string" },
-              searchRoute: {
-                type: "string",
-                enum: SEARCH_ROUTES,
-              },
-              searchRouteReason: { type: "string" },
-              topicScope: {
-                type: "string",
-                enum: ["domestic", "foreign", "multi_country", "unknown"],
-              },
-              topicCountryCode: {
-                anyOf: [{ type: "string" }, { type: "null" }],
-              },
-              countryDetectionReason: { type: "string" },
-              isKoreaRelated: { type: "boolean" },
-              koreaRelevanceReason: { type: "string" },
-            },
-          },
-        },
-        [
-          {
-            role: "system",
-            content: `사용자의 claim이 VARO MVP 분석 범위인지 먼저 판정하세요. 이 단계에서는 검색어, search plan, source 수집 전략을 만들지 마세요.
-
-분석 가능 범위:
-- 한국 관련 정치·경제 뉴스성 claim만 korean_news입니다.
-- 한국 장소, 한국 정부/기관, 한국 기업/법인, 한국 시장, 한국 국민/이용자, 한국 정책, 국내 서비스 영향이 claim 자체에 직접 포함되어야 합니다.
-- 정치는 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산처럼 출처로 검증 가능한 claim입니다.
-- 경제는 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 출처로 검증 가능한 claim입니다.
-
-unsupported 기준:
-- 한국 관련성이 없거나 해외/글로벌 뉴스인 경우
-- 정치·경제 도메인 밖인 경우
-- 뉴스성 또는 사실성 검토 대상이 아닌 경우
-- 의료, 연예, 스포츠, 개인 상담, 투자 추천, 순수 의견, 미래 예측인 경우
-- provider로 근거 수집이 어렵다고 판단되는 경우
-
-searchRoute는 korean_news 또는 unsupported 중 하나만 반환하세요. 해외뉴스 요청은 VARO가 현재 한국뉴스만 분석한다고 searchRouteReason에 설명하세요. topicCountryCode는 claim 의미 기준 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요.`,
-          },
-          {
-            role: "user",
-            content: rawClaim,
-          },
-        ],
-        "검토 범위 판정 요청에 실패했습니다.",
-      );
-
-    return {
-      languageCode: this.normalizeText(payload.languageCode, "unknown"),
-      coreClaim: this.normalizeText(payload.coreClaim, rawClaim),
-      normalizedClaim: this.normalizeText(payload.normalizedClaim, rawClaim),
-      claimType: CLAIM_TYPES.includes(payload.claimType)
-        ? payload.claimType
-        : "general_fact",
-      verificationGoal: this.normalizeText(
-        payload.verificationGoal,
-        "현재 수집 가능한 출처 기준으로 claim을 검토합니다.",
-      ),
-      searchRoute: payload.searchRoute === "korean_news" ? "korean_news" : "unsupported",
-      searchRouteReason: this.normalizeText(
-        payload.searchRouteReason,
-        "검색 route 판정 이유가 기록되지 않았습니다.",
-      ),
-      topicScope: this.normalizeTopicScope(payload.topicScope),
-      topicCountryCode: normalizeCountryCode(payload.topicCountryCode),
-      countryDetectionReason: this.normalizeText(
-        payload.countryDetectionReason,
-        "주제 국가 판정 이유가 기록되지 않았습니다.",
-      ),
-      isKoreaRelated:
-        typeof payload.isKoreaRelated === "boolean" ? payload.isKoreaRelated : false,
-      koreaRelevanceReason: this.normalizeText(
-        payload.koreaRelevanceReason,
-        "한국 관련성 판정 이유가 기록되지 않았습니다.",
-      ),
-    };
-  }
-
-  private buildUnsupportedRefinementResult(
-    scope: OpenAiReviewScopePayload,
-    rawClaim: string,
-  ): QueryRefinementResult {
-    const coreClaim = this.normalizeText(scope.coreClaim, rawClaim);
-    const normalizedClaim = this.normalizeText(scope.normalizedClaim, coreClaim);
-    const verificationGoal = this.normalizeText(
-      scope.verificationGoal,
-      "현재 VARO MVP 분석 범위에 해당하는지 확인합니다.",
-    );
-
-    return {
-      claimLanguageCode: scope.languageCode,
-      coreClaim,
-      normalizedClaim,
-      claimType: scope.claimType,
-      verificationGoal,
-      searchPlan: {
-        normalizedClaim,
-        claimType: scope.claimType,
-        verificationGoal,
-        searchRoute: "unsupported",
-        queries: [],
-      },
-      generatedQueries: [{ id: "q1", text: coreClaim, rank: 1 }],
-      searchRoute: "unsupported",
-      searchRouteReason: scope.searchRouteReason,
-      searchClaim: coreClaim,
-      searchQueries: [],
-      topicScope: scope.topicScope,
-      topicCountryCode: scope.topicCountryCode,
-      countryDetectionReason: scope.countryDetectionReason,
-      isKoreaRelated: scope.isKoreaRelated,
-      koreaRelevanceReason: scope.koreaRelevanceReason,
-    };
   }
 
   async applyRelevanceFiltering(
@@ -729,23 +554,6 @@ searchRoute는 korean_news 또는 unsupported 중 하나만 반환하세요. 해
       : "unknown";
   }
 
-  private normalizeQueries(queries: unknown, fallbackQueries: string[] = []): string[] {
-    const values = Array.isArray(queries) ? queries : [];
-    const normalized = [...values, ...fallbackQueries]
-      .filter((query): query is string => typeof query === "string")
-      .map((query) => query.trim().replace(/\s+/g, " "))
-      .filter(Boolean);
-
-    const deduped = Array.from(new Set(normalized));
-    const fallback = deduped[0] ?? "뉴스 검증";
-
-    while (deduped.length < 3) {
-      deduped.push(`${fallback} ${deduped.length + 1}`);
-    }
-
-    return deduped.slice(0, 3);
-  }
-
   private normalizeSearchPlan(
     payload: OpenAiQueryRefinementPayload,
     fallback: {
@@ -817,11 +625,12 @@ searchRoute는 korean_news 또는 unsupported 중 하나만 반환하세요. 해
     };
   }
 
-  private toQueryArtifacts(queries: string[]): QueryArtifact[] {
-    return queries.map((query, index) => ({
-      id: `q${index + 1}`,
-      text: query,
-      rank: index + 1,
+  private toSearchQueryArtifacts(queries: SearchPlanQueryArtifact[]): QueryArtifact[] {
+    return queries.map((query) => ({
+      id: query.id,
+      text: query.query,
+      rank: query.priority,
+      purpose: query.purpose,
     }));
   }
 

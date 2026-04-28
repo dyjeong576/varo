@@ -165,12 +165,31 @@ export class ReviewsQueryPreviewService {
           },
         ];
       });
-      const evidenceSignals = evidenceSignalSources.length
+      const snippetFallbackSources = evidenceSignalSources.length === 0
+        ? relevanceCandidates
+            .filter((c) => c.relevanceTier !== "discard" && c.rawSnippet)
+            .slice(0, PRIMARY_EXTRACTION_LIMIT + REFERENCE_PROMOTION_LIMIT)
+            .map((c) => ({
+              sourceId: c.id,
+              sourceType: c.sourceType,
+              publisherName: c.publisherName ?? null,
+              publishedAt: c.publishedAt ?? null,
+              rawTitle: c.rawTitle,
+              rawSnippet: c.rawSnippet,
+              originQueryIds: c.originQueryIds,
+              retrievalBucket: c.retrievalBucket,
+              evidenceSnippetText: c.rawSnippet ?? "",
+            }))
+        : [];
+      const signalInputSources = evidenceSignalSources.length
+        ? evidenceSignalSources
+        : snippetFallbackSources;
+      const evidenceSignals = signalInputSources.length
         ? await this.providersService.classifyEvidenceSignals({
             coreClaim: refinement.coreClaim,
             claimLanguageCode: refinement.claimLanguageCode,
             searchPlan: refinement.searchPlan,
-            sources: evidenceSignalSources,
+            sources: signalInputSources,
           })
         : [];
       const persistedArtifacts =

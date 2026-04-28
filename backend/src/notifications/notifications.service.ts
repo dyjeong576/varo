@@ -201,7 +201,7 @@ export class NotificationsService {
         userId: params.userId,
         notificationType: "review_completed",
         title: "근거 수집 완료",
-        body: `"${params.claim}" review preview가 준비되었습니다.`,
+        body: `"${params.claim}" 검토가 완료되었습니다.`,
         targetType: "review",
         targetId: params.reviewId,
       },

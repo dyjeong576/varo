@@ -27,7 +27,7 @@ describe("ReviewsOpenAiClient", () => {
     jest.restoreAllMocks();
   });
 
-  it("scope gate에서 unsupported면 query refinement 없이 out_of_scope 결과로 변환한다", async () => {
+  it("단일 LLM 호출에서 unsupported 판정 시 out_of_scope 결과로 변환한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -45,7 +45,15 @@ describe("ReviewsOpenAiClient", () => {
                       "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
                     searchRoute: "unsupported",
                     searchRouteReason:
-                      "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
+                      "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다. VARO가 현재 한국 뉴스만 분석한다.",
+                    searchPlan: {
+                      normalizedClaim: "트럼프가 관세를 발표했다",
+                      claimType: "policy",
+                      verificationGoal:
+                        "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
+                      searchRoute: "unsupported",
+                      queries: [],
+                    },
                     topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason: "미국 이슈로 판단했습니다.",
@@ -69,7 +77,7 @@ describe("ReviewsOpenAiClient", () => {
 
     expect(result.topicCountryCode).toBe("US");
     expect(result.searchRoute).toBe("unsupported");
-    expect(result.searchClaim).toBe("트럼프의 관세 발표");
+    expect(result.searchClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.normalizedClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.claimType).toBe("policy");
     expect(result.searchPlan.queries).toEqual([]);
@@ -82,39 +90,8 @@ describe("ReviewsOpenAiClient", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("search plan purpose가 중복되어도 누락 purpose를 fallback query로 보정한다", async () => {
-    global.fetch = jest.fn()
-      .mockResolvedValueOnce(
-        createFetchResponse({
-          jsonData: {
-            output: [
-              {
-                content: [
-                  {
-                    type: "output_text",
-                    text: JSON.stringify({
-                      languageCode: "ko",
-                      coreClaim: "한국 기준금리 동결",
-                      normalizedClaim: "한국은행이 기준금리를 동결했다",
-                      claimType: "policy",
-                      verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
-                      searchRoute: "korean_news",
-                      searchRouteReason:
-                        "한국 경제 정책 관련 뉴스성 claim입니다.",
-                      topicScope: "domestic",
-                      topicCountryCode: "KR",
-                      countryDetectionReason: "한국은행 기준금리 이슈입니다.",
-                      isKoreaRelated: true,
-                      koreaRelevanceReason: "한국 경제 정책이 직접 포함되어 있습니다.",
-                    }),
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
+  it("단일 LLM 호출에서 search plan purpose가 중복되어도 누락 purpose를 fallback query로 보정한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
           output: [
@@ -128,6 +105,9 @@ describe("ReviewsOpenAiClient", () => {
                     normalizedClaim: "한국은행이 기준금리를 동결했다",
                     claimType: "policy",
                     verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+                    searchRoute: "korean_news",
+                    searchRouteReason:
+                      "한국 경제 정책 관련 뉴스성 claim입니다.",
                     searchPlan: {
                       normalizedClaim: "한국은행이 기준금리를 동결했다",
                       claimType: "policy",
@@ -160,20 +140,6 @@ describe("ReviewsOpenAiClient", () => {
                         },
                       ],
                     },
-                    generatedQueries: [
-                      "한국은행 기준금리 동결",
-                      "기준금리 동결 발표",
-                      "금융통화위원회 기준금리",
-                    ],
-                    searchRoute: "korean_news",
-                    searchRouteReason:
-                      "한국 경제 정책 관련 뉴스성 claim입니다.",
-                    searchClaim: "한국은행 기준금리 동결",
-                    searchQueries: [
-                      "한국은행 기준금리 동결",
-                      "기준금리 최신 뉴스",
-                      "금융통화위원회 기준금리",
-                    ],
                     topicScope: "domestic",
                     topicCountryCode: "KR",
                     countryDetectionReason: "한국은행 기준금리 이슈입니다.",
@@ -200,9 +166,11 @@ describe("ReviewsOpenAiClient", () => {
       "primary_source",
       "contradiction_or_update",
     ]);
+    // sp2는 claim_specific 중복이므로 버려지고 current_state는 fallback 쿼리(coreClaim, index=1)로 채워진다
     expect(result.searchPlan.queries[1]?.query).toBe(
-      "기준금리 최신 뉴스",
+      "한국 기준금리 동결",
     );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("structured output text를 evidence signal 결과로 변환한다", async () => {

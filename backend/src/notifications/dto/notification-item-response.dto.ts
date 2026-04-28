@@ -24,7 +24,7 @@ export class NotificationItemResponseDto {
 
   @ApiProperty({
     description: "알림 본문",
-    example: "\"전기차 보조금 축소\" review preview가 준비되었습니다.",
+    example: "\"전기차 보조금 축소\" 검토가 완료되었습니다.",
   })
   message!: string;
 

@@ -168,7 +168,6 @@ function buildSignalBySourceId(
 function mapSignalToSourceStance(signal: EvidenceSignal): ReviewSourceStance {
   if (
     signal.stanceToClaim === "contradicts" ||
-    signal.stanceToClaim === "updates" ||
     signal.currentAnswerImpact === "weakens" ||
     signal.currentAnswerImpact === "overrides"
   ) {
@@ -182,7 +181,7 @@ function mapSignalToSourceStance(signal: EvidenceSignal): ReviewSourceStance {
     return "support";
   }
 
-  if (signal.stanceToClaim === "context") {
+  if (signal.stanceToClaim === "context" || signal.stanceToClaim === "updates") {
     return "context";
   }
 
@@ -381,14 +380,9 @@ function buildConfidenceScore(params: {
 function buildConsensusLevel(
   verdict: ReviewResultVerdict,
   supportCount: number,
-  conflictCount: number,
   hasCurrentUpdateConflict: boolean,
 ): ReviewConsensusLevel {
-  if (hasCurrentUpdateConflict) {
-    return "low";
-  }
-
-  if (verdict === "Unclear") {
+  if (hasCurrentUpdateConflict || verdict === "Unclear" || verdict === "Likely False") {
     return "low";
   }
 
@@ -396,7 +390,7 @@ function buildConsensusLevel(
     return "medium";
   }
 
-  return supportCount >= 2 || conflictCount >= 2 ? "high" : "medium";
+  return supportCount >= 2 ? "high" : "medium";
 }
 
 function getPublishedAtTime(source: Source): number {
@@ -422,14 +416,14 @@ function buildOfficialSourceSentence(params: {
   verificationCount: number;
 }): string {
   if (params.officialCount > 0) {
-    return "현재 수집된 자료 안에서는 공식 발표/공식 출처가 확인됐습니다.";
+    return "공식 출처에서도 이를 확인했습니다.";
   }
 
   if (params.verificationCount > 0) {
-    return "현재 수집된 자료 안에서는 공식 발표는 아직 확인되지 않았지만, 검증 성격의 출처는 포함되어 있습니다.";
+    return "검증 성격의 출처가 포함되어 있습니다.";
   }
 
-  return "현재 수집된 자료 안에서는 공식 발표/공식 출처는 아직 확인되지 않았습니다.";
+  return "";
 }
 
 function buildAnalysisSummary(params: {
@@ -454,10 +448,7 @@ function buildAnalysisSummary(params: {
     hasCurrentUpdateConflict,
     isScheduledEvent,
   } = params;
-  const officialSourceSentence = buildOfficialSourceSentence({
-    officialCount,
-    verificationCount,
-  });
+  const officialLine = buildOfficialSourceSentence({ officialCount, verificationCount });
 
   if (isScheduledEvent && hasCurrentUpdateConflict) {
     const latestSupportSource = pickLatestSource(supportSources);
@@ -466,54 +457,49 @@ function buildAnalysisSummary(params: {
     const conflictDate = formatPublishedAt(latestConflictSource);
     const updateSentence =
       supportSources.length > 0
-        ? `${supportDate ?? "초기/과거 보도"}는 이 주장을 뒷받침하지만, ${conflictDate ?? "더 최근 보도"}에서는 일정 연기 또는 변경 신호가 확인됩니다.`
-        : `${conflictDate ?? "최신 상태를 다룬 보도"}에서 일정 연기 또는 변경 신호가 확인됩니다.`;
+        ? `${supportDate ?? "초기 보도"}에서는 이 내용이 예정되어 있었지만, ${conflictDate ?? "최근 보도"}에서 일정 변경 또는 연기 신호가 확인됩니다.`
+        : `${conflictDate ?? "최근 보도"}에서 일정 변경 또는 연기 신호가 확인됩니다.`;
 
     return [
-      `현재 수집된 출처 기준으로는 "${coreClaim}"를 그대로 단정하기 어렵습니다.`,
+      `"${coreClaim}"에 대해 보도가 엇갈리고 있습니다.`,
       updateSentence,
-      officialSourceSentence,
-      "따라서 현재는 기존 공개 일정 또는 공개 예정 보도가 있었지만 최근 연기 보도가 나온 상태로 보는 것이 적절합니다.",
-      "이 요약은 현재 저장된 출처와 근거 스니펫만 기반으로 한 임시 요약입니다.",
-    ].join(" ");
+      officialLine,
+      "현재 상태를 정확히 파악하려면 최신 원문을 직접 확인해 보세요.",
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   const verdictLead: Record<ReviewResultVerdict, string> = {
-    "Likely True": `현재 수집된 출처 기준으로는 "${coreClaim}"에 부합하는 근거가 더 우세합니다.`,
-    "Likely False": `현재 수집된 출처 기준으로는 "${coreClaim}"와 맞지 않는 근거가 더 우세합니다.`,
-    "Mixed Evidence": `현재 수집된 출처 기준으로는 "${coreClaim}"에 대한 근거가 엇갈립니다.`,
-    Unclear: `현재 수집된 출처만으로는 "${coreClaim}"에 답하기 어렵습니다.`,
+    "Likely True": `수집된 뉴스들이 "${coreClaim}"을 뒷받침하고 있습니다.`,
+    "Likely False": `수집된 뉴스들은 대체로 "${coreClaim}"과 다른 내용을 담고 있습니다.`,
+    "Mixed Evidence": `"${coreClaim}"에 대한 보도가 엇갈리고 있습니다.`,
+    Unclear: `수집된 자료만으로는 "${coreClaim}"을 정확히 판단하기 어렵습니다.`,
   };
 
+  const supportCount = supportSources.length;
+  const conflictCount = conflictSources.length;
   const evidenceSentence =
-    supportSources.length > 0 && conflictSources.length > 0
-      ? "일부 출처는 이 주장을 뒷받침하지만, 다른 출처에서는 반박·정정·업데이트 신호가 함께 확인됩니다."
-      : supportSources.length > 0
-        ? "관련 출처들은 대체로 이 주장과 같은 방향의 내용을 담고 있습니다."
-        : conflictSources.length > 0
-          ? "관련 출처들은 대체로 이 주장과 맞지 않는 내용이나 반박 신호를 담고 있습니다."
+    supportCount > 0 && conflictCount > 0
+      ? `${supportCount}건의 기사가 이를 뒷받침하지만, ${conflictCount}건에서는 반박 또는 다른 내용이 확인됩니다.`
+      : supportCount > 0
+        ? `${supportCount}건의 기사가 같은 방향을 가리키고 있으며, 반박 보도는 현재 확인되지 않습니다.`
+        : conflictCount > 0
+          ? `${conflictCount}건의 기사에서 이와 다른 내용이 보도됐습니다.`
           : contextSources.length > 0
-            ? "수집된 출처는 배경 정보에 가깝고, 질문에 직접 답할 근거는 아직 부족합니다."
-            : "질문에 직접 답할 만한 근거가 충분히 수집되지 않았습니다.";
+            ? "관련 배경 정보는 수집됐지만, 질문에 직접 답할 근거는 아직 부족합니다."
+            : "관련 기사를 충분히 찾지 못했습니다.";
 
   const conclusion: Record<ReviewResultVerdict, string> = {
-    "Likely True":
-      "따라서 현재는 이 주장을 수집 출처 기준으로는 가능성이 높은 설명으로 볼 수 있습니다.",
-    "Likely False":
-      "따라서 현재는 이 주장을 그대로 받아들이기보다, 수집된 반박 근거를 먼저 확인하는 것이 적절합니다.",
-    "Mixed Evidence":
-      "따라서 현재는 한쪽 결론으로 단정하기보다, 최신 출처와 공식 출처를 함께 확인하는 것이 적절합니다.",
-    Unclear:
-      "따라서 현재는 결론을 보류하고 추가 출처를 확인하는 것이 적절합니다.",
+    "Likely True": `${officialLine ? officialLine + " " : ""}현재 수집된 정보 기준으로는 이 내용이 사실일 가능성이 높습니다.`,
+    "Likely False": `현재 수집된 정보 기준으로는 이 주장의 신빙성이 낮아 보입니다. 원문을 직접 확인해 보세요.`,
+    "Mixed Evidence": `${officialLine ? officialLine + " " : ""}한쪽으로 결론 내리기 어려운 상황입니다. 원문을 직접 확인해 보시기 바랍니다.`,
+    Unclear: "더 많은 정보를 확인하려면 관련 기사를 직접 검색해 보세요.",
   };
 
-  return [
-    verdictLead[verdict],
-    evidenceSentence,
-    officialSourceSentence,
-    conclusion[verdict],
-    "이 요약은 현재 저장된 출처와 근거 스니펫만 기반으로 한 임시 요약입니다.",
-  ].join(" ");
+  return [verdictLead[verdict], evidenceSentence, conclusion[verdict]]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function buildUncertaintyItems(params: {
@@ -533,28 +519,24 @@ function buildUncertaintyItems(params: {
     items.push(params.insufficiencyReason);
   }
 
-  if (params.verificationCount === 0) {
-    items.push("verification 또는 공식 출처가 충분하지 않습니다.");
-  }
-
   if (params.verdict === "Mixed Evidence") {
-    items.push("지지와 충돌 근거가 함께 있어 단일 결론으로 보기 어렵습니다.");
+    items.push("지지 기사와 반박 기사가 함께 확인됩니다.");
   }
 
   if (params.hasCurrentUpdateConflict) {
-    items.push("최신 업데이트/연기 신호가 있어 과거 보도 합의만으로 현재 기준 결론을 강화하지 않습니다.");
+    items.push("일정 변경이나 연기 관련 보도가 있어 최신 상태를 재확인할 필요가 있습니다.");
   }
 
   if (params.fetchedEvidenceCount < 2) {
-    items.push("추출 가능한 evidence 수가 적어 결과 안정성이 낮습니다.");
+    items.push("충분한 자료를 수집하지 못해 결과의 정확도가 낮을 수 있습니다.");
   }
 
   if (params.contextCount > params.supportCount + params.conflictCount) {
-    items.push("맥락 보완형 기사 비중이 높아 직접 입증력은 제한적일 수 있습니다.");
+    items.push("직접적인 근거보다 배경 설명 자료가 더 많습니다.");
   }
 
-  if (params.discardCount > 0) {
-    items.push(`${params.discardCount}건의 후보는 관련성이 낮아 제외됐습니다.`);
+  if (params.verificationCount === 0 && params.fetchedEvidenceCount >= 2) {
+    items.push("공식 발표나 검증 자료가 충분히 수집되지 않았습니다.");
   }
 
   return items.slice(0, 3);
@@ -562,10 +544,10 @@ function buildUncertaintyItems(params: {
 
 function buildUncertaintySummary(items: string[]): string {
   if (items.length === 0) {
-    return "현재 결과는 수집된 출처 기준 임시 분석이며, 이후 interpretation 단계에서 근거 간 관계가 다시 정리될 수 있습니다.";
+    return "이 결과는 자동 분석이므로 중요한 판단은 원문 기사를 직접 확인해 주세요.";
   }
 
-  return `${items[0]} 이 결과는 현재 저장된 source와 snippet에 기반한 임시 결과이므로 추가 근거가 들어오면 해석 강도가 달라질 수 있습니다.`;
+  return `${items[0]} 추가 정보가 확인되면 결과가 달라질 수 있습니다.`;
 }
 
 export function assembleReviewResult(
@@ -619,7 +601,10 @@ export function assembleReviewResult(
   const discardCount = input.sources.filter(
     (source) => source.relevanceTier === "discard",
   ).length;
-  const fetchedEvidenceCount = input.evidenceSnippets.length;
+  const signalEvidenceCount = (input.evidenceSignals ?? []).filter(
+    (signal) => signal.stanceToClaim !== "unknown",
+  ).length;
+  const fetchedEvidenceCount = input.evidenceSnippets.length || signalEvidenceCount;
   const verificationCount = input.sources.filter(
     (source) =>
       source.retrievalBucket === "verification" ||
@@ -629,13 +614,14 @@ export function assembleReviewResult(
     (source) => categorizeSourceType(source.sourceType) === "official",
   ).length;
   const hasHighTrustSource =
-    verificationCount > 0 &&
-    input.sources.some(
-      (source) =>
-        sourceStances[source.id] !== "unknown" &&
-        (source.retrievalBucket === "verification" ||
-          categorizeSourceType(source.sourceType) === "official"),
-    );
+    signalEvidenceCount >= 2 ||
+    (verificationCount > 0 &&
+      input.sources.some(
+        (source) =>
+          sourceStances[source.id] !== "unknown" &&
+          (source.retrievalBucket === "verification" ||
+            categorizeSourceType(source.sourceType) === "official"),
+      ));
 
   const verdict = buildVerdict({
     supportCount: supportSources.length,
@@ -675,7 +661,6 @@ export function assembleReviewResult(
       consensusLevel: buildConsensusLevel(
         verdict,
         supportSources.length,
-        conflictSources.length,
         hasCurrentUpdateConflict,
       ),
       analysisSummary: buildAnalysisSummary({

@@ -50,7 +50,7 @@ export class ReviewsProvidersService {
               query: query.text,
               queryId: query.id,
               queryPurpose: query.purpose,
-              display: 5,
+              display: 20,
               start: 1,
               sort: "sim",
             }),

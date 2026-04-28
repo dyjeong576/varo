@@ -161,7 +161,7 @@ describe("ReviewsProvidersService", () => {
     expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
     expect(result.searchRoute).toBe("unsupported");
-    expect(result.searchClaim).toBe("트럼프의 관세 발표");
+    expect(result.searchClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.searchPlan.queries).toEqual([]);
     expect(result.isKoreaRelated).toBe(false);
     expect(result.generatedQueries).toEqual([

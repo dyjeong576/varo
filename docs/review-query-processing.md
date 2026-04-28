@@ -53,28 +53,22 @@ Provider 전략은 아래로 고정한다.
 - 공백, 줄바꿈, 불필요한 반복 문장부호를 정리하는 수준의 기본 정규화를 수행한다.
 - 이 단계에서는 사용자의 표현을 임의로 사실 단정 문장으로 바꾸지 않는다.
 
-### 2. Scope Gate
+### 2. Claim Understanding, Scope Gate, and Search Planning
 
-- OpenAI가 먼저 `raw claim`이 한국 관련 정치·경제 뉴스성 claim인지 판정한다.
-- 이 단계에서는 검색어, search plan, source 수집 전략을 생성하지 않는다.
-- `search_route=unsupported`이면 검색하지 않고 `out_of_scope`로 종료한다.
-- `search_route=korean_news`인 경우에만 다음 단계에서 search planning을 수행한다.
-
-### 3. Claim Understanding and Search Planning
-
-- Scope Gate를 통과한 claim에 대해서만 OpenAI가 검토 대상 핵심 주장인 `core_claim`, 검증 가능한 형태의 `normalized_claim`, claim 성격인 `claim_type`, 검증 목표인 `verification_goal`, 지원 도메인인 `topic_domain`, 목적별 `search_plan`, `search_route`를 생성한다.
-- OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`도 생성한다.
+- OpenAI가 단일 호출로 claim 이해, 지원 범위 판정, 검색 계획 생성을 동시에 수행한다.
+- 판정 결과 `search_route=unsupported`이면 검색하지 않고 `out_of_scope`로 종료한다.
+- OpenAI가 생성하는 아티팩트는 `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `topic_domain`, 목적별 `search_plan`, `search_route`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`이다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
   - 고유명사, 날짜, 수치가 있으면 claim 구조화에는 보존하되, 검색 질의가 해당 표현에만 갇히지 않도록 한다.
   - 사용자 발화 키워드가 아니라 검증 목적에 맞는 검색 질의로 변환한다.
-  - `generated_queries`는 사용자-facing trace용이므로 원문 언어를 유지한다.
 - `search_plan.queries[]`의 기본 purpose는 아래 4개로 고정한다.
   - `claim_specific`: 사용자가 말한 claim 자체가 어떤 출처에서 나왔는지 확인한다.
   - `current_state`: 현재 기준 상태 또는 최신 보도를 확인한다.
   - `primary_source`: 공식 발표, 원문, 공시, 기관 문서 등 1차 출처를 찾는다.
   - `contradiction_or_update`: 반박, 정정, 변경, 취소, 업데이트 신호를 찾는다.
+- `korean_news` route의 쿼리 작성 원칙: 기사 제목에 실제로 등장할 법한 핵심 키워드 조합을 사용한다. 인물명·직책·기관명은 한국어 전체 이름으로 정확히 작성하고, 10~20자 이내 단문 키워드 조합으로 조사와 접속어를 최소화한다. 4개 쿼리 간 핵심 키워드 중복을 최소화해 서로 다른 각도를 커버한다.
 - `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
 - `topic_domain`은 아래 3개 중 하나로 고정한다.
   - `politics`: 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산 등 검증 가능한 정치 claim이다.
@@ -85,6 +79,7 @@ Provider 전략은 아래로 고정한다.
   - `unsupported`: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim이다.
 - `topic_domain`은 제품 지원 도메인 판정이고, `search_route`는 provider routing 판정이다.
 - 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 기록하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
+- `generated_queries`, `search_claim`, `search_queries`는 compat 필드로 코드에서 `search_plan.queries`로부터 파생되며, 실제 검색은 `search_plan.queries`를 사용한다.
 - 이 단계의 출력은 이후 search와 relevance filtering의 기준 입력이 된다.
 
 구현 기준 아티팩트는 아래 형태를 따른다.
@@ -195,7 +190,7 @@ sequenceDiagram
     User->>Frontend: claim 제출
     Frontend->>ReviewAPI: review 생성 요청
     ReviewAPI->>DB: claim / review job 저장
-    ReviewAPI->>QueryPlanner: raw claim 기반 normalized claim + search plan + topic domain + topic country + search_route 판정 요청
+    ReviewAPI->>QueryPlanner: raw claim 기반 scope 판정 + normalized claim + search plan + topic domain + topic country + search_route 단일 호출
     QueryPlanner-->>ReviewAPI: structured JSON 반환
     ReviewAPI->>DB: core_claim / search_plan / topic domain / topic country / search_route 저장
 
@@ -276,7 +271,7 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Claim Understanding and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `topic_domain`, `search_plan`, `generated_queries[]`, `search_claim`, `search_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
+| Claim Understanding, Scope Gate, and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `topic_domain`, `search_plan` (4개 purpose별 쿼리 포함), `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
 | Source Search | `search_plan.queries[]`, `search_route` | title, snippet, canonical URL, publisher metadata, provider metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]`, origin query purpose |
 | Relevance Filtering | `core_claim`, title, snippet, candidate metadata, query purpose, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`, origin query purpose |
