@@ -65,9 +65,7 @@ export class ReviewsProvidersService {
             includeDomains: this.buildKoreanTavilyIncludeDomains(input),
           })
           .then((candidates) =>
-            candidates.filter((candidate) =>
-              this.isKoreanTavilyCandidate(candidate, input),
-            ),
+            candidates.filter((candidate) => this.isKoreanTavilyCandidate(candidate)),
           ),
       ]);
 
@@ -198,29 +196,12 @@ export class ReviewsProvidersService {
   }
 
   private buildKoreanTavilyIncludeDomains(input: SearchSourcesInput): string[] {
-    return [
-      ...selectDomainsForBucket(input.domainRegistry, "familiar"),
-      ...selectDomainsForBucket(input.domainRegistry, "verification"),
-    ]
+    return selectDomainsForBucket(input.domainRegistry, "familiar")
       .map((domain) => domain.replace(/^\*\./, ""))
       .filter((domain, index, domains) => domains.indexOf(domain) === index);
   }
 
-  private isKoreanTavilyCandidate(
-    candidate: SearchCandidate,
-    input: SearchSourcesInput,
-  ): boolean {
-    const koreanRegistryIds = new Set(
-      input.domainRegistry
-        .filter((entry) => entry.countryCode === "KR")
-        .map((entry) => entry.id),
-    );
-
-    return (
-      candidate.sourceCountryCode === "KR" ||
-      (candidate.domainRegistryId
-        ? koreanRegistryIds.has(candidate.domainRegistryId)
-        : false)
-    );
+  private isKoreanTavilyCandidate(candidate: SearchCandidate): boolean {
+    return candidate.sourceCountryCode === "KR";
   }
 }

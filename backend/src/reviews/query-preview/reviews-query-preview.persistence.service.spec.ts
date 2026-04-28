@@ -265,6 +265,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           sourceCountryCode: "US",
           retrievalBucket: "verification",
           domainRegistryId: "us-verification",
+          sourcePoliticalLean: "centrist",
           relevanceTier: "primary",
           relevanceReason: "원문 검증 source입니다.",
         },
@@ -286,6 +287,7 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           sourceCountryCode: "US",
           retrievalBucket: "verification",
           domainRegistryId: "us-verification",
+          sourcePoliticalLean: "centrist",
           relevanceTier: "primary",
           relevanceReason: "원문 검증 source입니다.",
         },
@@ -312,6 +314,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     });
 
     expect(prisma.source.create).toHaveBeenCalledTimes(1);
+    expect(prisma.source.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        sourceProvider: "tavily-search",
+      }),
+    });
     expect(prisma.evidenceSnippet.create).toHaveBeenCalledTimes(1);
     expect(prisma.evidenceSnippet.update).toHaveBeenCalledWith({
       where: { id: "snippet-trump-tariff-update" },
@@ -344,6 +351,9 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
         }),
         handoffPayload: expect.objectContaining({
+          sourcePoliticalLeans: {
+            "trump-tariff-update": "centrist",
+          },
           evidenceSignals: [
             expect.objectContaining({
               sourceId: "trump-tariff-update",
@@ -370,59 +380,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     expect(result.handoffSourceIds).toEqual(["trump-tariff-update"]);
     expect(result.evidenceSnippets[0]?.stance).toBe("conflict");
     expect(result.evidenceSignals[0]?.sourceId).toBe("trump-tariff-update");
-  });
-
-  it("사용자 국가나 주제 국가와 무관하게 KR domain registry만 조회한다", async () => {
-    const prisma = createPrismaMock();
-    const notificationsService = createNotificationsServiceMock();
-    prisma.sourceDomainRegistry.findMany.mockResolvedValue([
-      {
-        id: "kr-familiar",
-        domain: "yna.co.kr",
-        countryCode: "KR",
-        languageCode: "ko",
-        sourceKind: "news_agency",
-        usageRole: "familiar_news",
-        priority: 10,
-        isActive: true,
-      },
-    ]);
-    const service = new ReviewsQueryPreviewPersistenceService(
-      prisma as never,
-      notificationsService as never,
-    );
-
-    const result = await service.loadSearchDomainRegistry();
-
-    expect(prisma.sourceDomainRegistry.findMany).toHaveBeenCalledWith({
-      where: {
-        isActive: true,
-        usageRole: {
-          in: [
-            "familiar_news",
-            "familiar_social",
-            "verification_official",
-            "verification_news",
-          ],
-        },
-        countryCode: {
-          in: ["KR"],
-        },
-      },
-      orderBy: [{ priority: "asc" }, { countryCode: "asc" }],
-    });
-    expect(result).toEqual([
-      {
-        id: "kr-familiar",
-        domain: "yna.co.kr",
-        countryCode: "KR",
-        languageCode: "ko",
-        sourceKind: "news_agency",
-        usageRole: "familiar_news",
-        priority: 10,
-        isActive: true,
-      },
-    ]);
   });
 
   it("app exception을 review job failed 상태로 기록한다", async () => {

@@ -11,17 +11,13 @@ import { AppException } from "../../common/exceptions/app-exception";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
-  DomainRegistryEntry,
   EvidenceSignal,
   ExtractedSource,
   QueryArtifact,
   QueryRefinementResult,
   SearchCandidate,
 } from "../reviews.types";
-import {
-  collectSearchDomainRegistryCriteria,
-  normalizeCountryCode,
-} from "../reviews.utils";
+import { normalizeCountryCode } from "../reviews.utils";
 import {
   buildCompletedReviewJobUpdate,
   buildEvidenceSnippetCreateInputs,
@@ -409,6 +405,15 @@ export class ReviewsQueryPreviewPersistenceService {
       createdSources,
       updatedEvidenceSnippets,
     );
+    const sourcePoliticalLeans = Object.fromEntries(
+      input.relevanceCandidates.flatMap((candidate) => {
+        const source = createdSourceByCandidateId.get(candidate.id);
+
+        return source && candidate.sourcePoliticalLean
+          ? [[source.id, candidate.sourcePoliticalLean] as const]
+          : [];
+      }),
+    );
     const queryRefinementPayload = buildQueryRefinementPayload(
       input.refinement,
       input.generatedQueries,
@@ -420,6 +425,7 @@ export class ReviewsQueryPreviewPersistenceService {
       updatedEvidenceSnippets.map((snippet) => snippet.id),
       insufficiencyReason,
       evidenceSignals,
+      sourcePoliticalLeans,
     );
 
     await this.prisma.reviewJob.update(
@@ -512,33 +518,6 @@ export class ReviewsQueryPreviewPersistenceService {
     });
   }
 
-  async loadSearchDomainRegistry(): Promise<DomainRegistryEntry[]> {
-    const criteria = collectSearchDomainRegistryCriteria();
-    const entries = await this.prisma.sourceDomainRegistry.findMany({
-      where: {
-        isActive: true,
-        usageRole: {
-          in: criteria.usageRoles,
-        },
-        countryCode: {
-          in: criteria.countryCodes,
-        },
-      },
-      orderBy: [{ priority: "asc" }, { countryCode: "asc" }],
-    });
-
-    return entries.map((entry) => ({
-      id: entry.id,
-      domain: entry.domain,
-      countryCode: entry.countryCode,
-      languageCode: entry.languageCode,
-      sourceKind: entry.sourceKind,
-      usageRole: entry.usageRole,
-      priority: entry.priority,
-      isActive: entry.isActive,
-    }));
-  }
-
   async resolveUserCountryCode(userId: string): Promise<string | null> {
     const profile = await this.prisma.userProfile.findUnique({
       where: {
@@ -598,9 +577,5 @@ export class ReviewsQueryPreviewPersistenceService {
         HttpStatus.BAD_REQUEST,
       );
     }
-  }
-
-  private get db(): any {
-    return this.prisma as any;
   }
 }

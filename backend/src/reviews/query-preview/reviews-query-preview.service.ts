@@ -4,6 +4,7 @@ import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-pro
 import { ReviewsProvidersService } from "../reviews.providers.service";
 import {
   deduplicateCandidates,
+  getKoreanSearchDomainRegistry,
   normalizeClaimText,
   selectExtractionCandidates,
 } from "../reviews.utils";
@@ -113,8 +114,6 @@ export class ReviewsQueryPreviewService {
         });
       }
 
-      const domainRegistry =
-        await this.persistenceService.loadSearchDomainRegistry();
       const initialCandidates = await this.providersService.searchSources({
         searchRoute,
         queries: searchQueries,
@@ -123,9 +122,9 @@ export class ReviewsQueryPreviewService {
         userCountryCode,
         topicCountryCode: refinement.topicCountryCode,
         topicScope: refinement.topicScope,
-        domainRegistry,
+        domainRegistry: getKoreanSearchDomainRegistry(),
       });
-      let relevanceCandidates = await this.providersService.applyRelevanceFiltering({
+      const relevanceCandidates = await this.providersService.applyRelevanceFiltering({
         coreClaim: refinement.coreClaim,
         claimLanguageCode: refinement.claimLanguageCode,
         searchRoute,
@@ -142,10 +141,11 @@ export class ReviewsQueryPreviewService {
       const extractedSources = extractionTargets.length
         ? await this.providersService.extractContent(extractionTargets)
         : [];
+      const extractedSourceByCanonicalUrl = new Map(
+        extractedSources.map((source) => [source.canonicalUrl, source]),
+      );
       const evidenceSignalSources = extractionTargets.flatMap((target) => {
-        const extracted = extractedSources.find(
-          (source) => source.canonicalUrl === target.canonicalUrl,
-        );
+        const extracted = extractedSourceByCanonicalUrl.get(target.canonicalUrl);
 
         if (!extracted) {
           return [];

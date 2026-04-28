@@ -4,7 +4,150 @@ import {
   QueryArtifact,
   RetrievalBucket,
   SearchCandidate,
+  SourcePoliticalLean,
 } from "./reviews.types";
+
+const KOREAN_TRUSTED_NEWS_DOMAINS: Array<{
+  id: string;
+  domain: string;
+  publisherName: string;
+  politicalLean: SourcePoliticalLean;
+  priority: number;
+}> = [
+  {
+    id: "kr-progressive-hani",
+    domain: "*.hani.co.kr",
+    publisherName: "한겨레",
+    politicalLean: "progressive",
+    priority: 10,
+  },
+  {
+    id: "kr-progressive-khan",
+    domain: "*.khan.co.kr",
+    publisherName: "경향신문",
+    politicalLean: "progressive",
+    priority: 11,
+  },
+  {
+    id: "kr-progressive-ohmynews",
+    domain: "*.ohmynews.com",
+    publisherName: "오마이뉴스",
+    politicalLean: "progressive",
+    priority: 12,
+  },
+  {
+    id: "kr-progressive-pressian",
+    domain: "*.pressian.com",
+    publisherName: "프레시안",
+    politicalLean: "progressive",
+    priority: 13,
+  },
+  {
+    id: "kr-centrist-yna",
+    domain: "*.yna.co.kr",
+    publisherName: "연합뉴스",
+    politicalLean: "centrist",
+    priority: 20,
+  },
+  {
+    id: "kr-centrist-hankookilbo",
+    domain: "*.hankookilbo.com",
+    publisherName: "한국일보",
+    politicalLean: "centrist",
+    priority: 21,
+  },
+  {
+    id: "kr-centrist-kmib",
+    domain: "*.kmib.co.kr",
+    publisherName: "국민일보",
+    politicalLean: "centrist",
+    priority: 22,
+  },
+  {
+    id: "kr-centrist-sbs",
+    domain: "*.sbs.co.kr",
+    publisherName: "SBS",
+    politicalLean: "centrist",
+    priority: 23,
+  },
+  {
+    id: "kr-centrist-jtbc",
+    domain: "*.jtbc.co.kr",
+    publisherName: "JTBC",
+    politicalLean: "centrist",
+    priority: 24,
+  },
+  {
+    id: "kr-conservative-chosun",
+    domain: "*.chosun.com",
+    publisherName: "조선일보",
+    politicalLean: "conservative",
+    priority: 30,
+  },
+  {
+    id: "kr-conservative-joongang",
+    domain: "*.joongang.co.kr",
+    publisherName: "중앙일보",
+    politicalLean: "conservative",
+    priority: 31,
+  },
+  {
+    id: "kr-conservative-donga",
+    domain: "*.donga.com",
+    publisherName: "동아일보",
+    politicalLean: "conservative",
+    priority: 32,
+  },
+  {
+    id: "kr-conservative-munhwa",
+    domain: "*.munhwa.com",
+    publisherName: "문화일보",
+    politicalLean: "conservative",
+    priority: 33,
+  },
+  {
+    id: "kr-conservative-tvchosun",
+    domain: "*.tvchosun.com",
+    publisherName: "TV조선",
+    politicalLean: "conservative",
+    priority: 34,
+  },
+  {
+    id: "kr-business-mk",
+    domain: "*.mk.co.kr",
+    publisherName: "매일경제",
+    politicalLean: "business",
+    priority: 40,
+  },
+  {
+    id: "kr-business-hankyung",
+    domain: "*.hankyung.com",
+    publisherName: "한국경제",
+    politicalLean: "business",
+    priority: 41,
+  },
+  {
+    id: "kr-business-sedaily",
+    domain: "*.sedaily.com",
+    publisherName: "서울경제",
+    politicalLean: "business",
+    priority: 42,
+  },
+  {
+    id: "kr-business-mt",
+    domain: "*.mt.co.kr",
+    publisherName: "머니투데이",
+    politicalLean: "business",
+    priority: 43,
+  },
+  {
+    id: "kr-business-edaily",
+    domain: "*.edaily.co.kr",
+    publisherName: "이데일리",
+    politicalLean: "business",
+    priority: 44,
+  },
+];
 
 const SOCIAL_SOURCE_DOMAINS = [
   "youtube.com",
@@ -15,6 +158,21 @@ const SOCIAL_SOURCE_DOMAINS = [
   "x.com",
   "twitter.com",
 ];
+
+export function getKoreanSearchDomainRegistry(): DomainRegistryEntry[] {
+  return KOREAN_TRUSTED_NEWS_DOMAINS.map((entry) => ({
+    id: entry.id,
+    domain: entry.domain,
+    countryCode: "KR",
+    languageCode: "ko",
+    sourceKind: "news_media",
+    usageRole: "familiar_news",
+    priority: entry.priority,
+    isActive: true,
+    publisherName: entry.publisherName,
+    politicalLean: entry.politicalLean,
+  }));
+}
 
 export function normalizeClaimText(rawClaim: string): string {
   return rawClaim.replace(/\s+/g, " ").replace(/[!?]{2,}/g, "?").trim();
@@ -66,6 +224,7 @@ export function deduplicateCandidates(candidates: SearchCandidate[]): SearchCand
       publishedAt: existing.publishedAt ?? candidate.publishedAt,
       sourceCountryCode: existing.sourceCountryCode ?? candidate.sourceCountryCode,
       domainRegistryId: existing.domainRegistryId ?? candidate.domainRegistryId,
+      sourcePoliticalLean: existing.sourcePoliticalLean ?? candidate.sourcePoliticalLean,
       retrievalBucket: pickPreferredBucket(existing.retrievalBucket, candidate.retrievalBucket),
     });
   }
@@ -314,21 +473,6 @@ export function countRelevantSources(candidates: SearchCandidate[]): number {
   return candidates.filter((candidate) => candidate.relevanceTier !== "discard").length;
 }
 
-export function collectSearchDomainRegistryCriteria(): {
-  usageRoles: string[];
-  countryCodes: string[];
-} {
-  return {
-    usageRoles: [
-      "familiar_news",
-      "familiar_social",
-      "verification_official",
-      "verification_news",
-    ],
-    countryCodes: ["KR"],
-  };
-}
-
 export function selectDomainsForBucket(
   registry: DomainRegistryEntry[],
   bucket: "familiar" | "verification",
@@ -356,8 +500,8 @@ function buildDomainSelectionCriteria(
   return {
     usageRoles:
       bucket === "familiar"
-        ? ["familiar_news", "familiar_social"]
-        : ["verification_official", "verification_news"],
+        ? ["familiar_news"]
+        : ["verification_news"],
     countryCodes: ["KR"],
   };
 }

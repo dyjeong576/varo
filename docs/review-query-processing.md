@@ -53,9 +53,16 @@ Provider 전략은 아래로 고정한다.
 - 공백, 줄바꿈, 불필요한 반복 문장부호를 정리하는 수준의 기본 정규화를 수행한다.
 - 이 단계에서는 사용자의 표현을 임의로 사실 단정 문장으로 바꾸지 않는다.
 
-### 2. Claim Understanding and Search Planning
+### 2. Scope Gate
 
-- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`, 검증 가능한 형태의 `normalized_claim`, claim 성격인 `claim_type`, 검증 목표인 `verification_goal`, 지원 도메인인 `topic_domain`, 목적별 `search_plan`, `search_route`를 생성한다.
+- OpenAI가 먼저 `raw claim`이 한국 관련 정치·경제 뉴스성 claim인지 판정한다.
+- 이 단계에서는 검색어, search plan, source 수집 전략을 생성하지 않는다.
+- `search_route=unsupported`이면 검색하지 않고 `out_of_scope`로 종료한다.
+- `search_route=korean_news`인 경우에만 다음 단계에서 search planning을 수행한다.
+
+### 3. Claim Understanding and Search Planning
+
+- Scope Gate를 통과한 claim에 대해서만 OpenAI가 검토 대상 핵심 주장인 `core_claim`, 검증 가능한 형태의 `normalized_claim`, claim 성격인 `claim_type`, 검증 목표인 `verification_goal`, 지원 도메인인 `topic_domain`, 목적별 `search_plan`, `search_route`를 생성한다.
 - OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`도 생성한다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
@@ -110,25 +117,25 @@ type SearchPlan = {
 };
 ```
 
-### 3. Source Search
+### 4. Source Search
 
 - Review API는 `search_route`에 따라 검색 provider를 선택한다.
-  - `korean_news`: Naver News Search API와 KR domain registry 기반 Tavily Search 보조검색을 병행한다.
+  - `korean_news`: Naver News Search API와 코드에 고정된 KR trusted news domain registry 기반 Tavily Search 보조검색을 병행한다.
   - `unsupported`: 검색하지 않고 `out_of_scope`로 종료한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화한다.
 - Tavily 검색 결과는 기존처럼 title, content/snippet, URL, publisher metadata를 source candidate로 정규화한다.
-- Tavily Search에는 KR familiar/verification domain을 `include_domains`로 전달하고, KR domain registry 또는 `sourceCountryCode=KR`로 확인되는 후보만 유지한다.
+- Tavily Search에는 코드에 고정된 KR trusted news domain을 `include_domains`로 전달하고, KR trusted news registry 또는 `sourceCountryCode=KR`로 확인되는 후보만 유지한다.
 - 이 단계에서는 결과를 최대한 넓게 받되, 후속 relevance filtering이 가능하도록 title, snippet, canonical URL, publisher metadata를 유지한다.
 - 각 source candidate에는 어떤 query에서 수집되었는지 추적할 수 있도록 `origin_query_ids[]`를 연결하고, 해당 query의 `purpose`도 audit metadata로 유지한다.
 - 각 source candidate에는 `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`를 함께 유지한다.
 
-### 4. Candidate Normalization and Deduplication
+### 5. Candidate Normalization and Deduplication
 
 - 병합된 검색 결과를 canonical URL 기준으로 정규화한다.
 - 동일 기사 재수집, 동일 보도의 파생 링크, 추적 파라미터가 다른 URL을 중복 후보로 묶는다.
 - 중복 제거 이후에도 각 source가 어떤 query와 query purpose에서 왔는지는 추적할 수 있어야 한다.
 
-### 5. Relevance Filtering
+### 6. Relevance Filtering
 
 - OpenAI는 각 candidate의 제목, snippet, `core_claim`, query purpose를 입력으로 받아 해당 source가 검토 대상 주장과 관련 있는지 판정한다.
 - relevance 입력에는 `topic_scope`, `topic_country_code`, `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`도 포함한다.
@@ -141,20 +148,20 @@ type SearchPlan = {
 - 이 단계는 검색 recall을 유지하면서 downstream 노이즈를 줄이는 핵심 필터 역할을 한다.
 - `unsupported` route는 relevance filtering 이전에 `out_of_scope`로 종료한다.
 
-### 6. Relevant Source Selection
+### 7. Relevant Source Selection
 
 - 1차 extraction 대상은 `primary` source만 사용한다.
 - 가능하면 extraction 대상에 공식 발표, 원문 링크, verification 성격 source를 최소 1개 포함한다.
 - `primary` source가 부족하면 `reference` source를 제한적으로 승격할 수 있다.
 - `reference` 승격 이후에도 관련 source가 충분하지 않으면 근거 부족 상태를 유지한 채 다음 단계로 전달한다.
 
-### 7. Content Extraction and Evidence Preparation
+### 8. Content Extraction and Evidence Preparation
 
 - `primary`와 승격된 `reference` source만 Content Extractor로 전달한다.
 - 본문 추출 결과에서 claim 검토에 사용할 수 있는 snippet 후보를 만든다.
 - 이 단계 산출물은 interpretation 단계로 넘길 evidence 입력의 기반이 된다.
 
-### 8. Evidence Signal Classification
+### 9. Evidence Signal Classification
 
 - Content Extraction 이후 OpenAI가 source/evidence별 signal을 구조화한다.
 - 이 단계의 출력은 사실 결론이 아니라 `stanceToClaim`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`이다.
@@ -163,7 +170,7 @@ type SearchPlan = {
 - 상세 signal은 `review_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
 - `/reviews/:reviewId` 조회 시에는 OpenAI를 다시 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
 
-### 9. Handoff to Interpretation
+### 10. Handoff to Interpretation
 
 - 정제된 claim, search plan, relevance를 통과한 source, evidence snippet 후보, evidence signal을 interpretation 단계로 전달한다.
 - 이 문서의 마지막 산출물은 `interpretation_handoff_payload`다.

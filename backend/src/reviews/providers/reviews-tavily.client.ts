@@ -201,7 +201,8 @@ export class ReviewsTavilyClient {
           searchRoute: input.searchRoute,
           sourceProvider: "tavily-search",
           sourceType: classifySourceType(canonicalUrl, rawTitle),
-          publisherName: this.inferPublisherName(canonicalUrl),
+          publisherName:
+            registryMatch?.publisherName ?? this.inferPublisherName(canonicalUrl),
           publishedAt: this.readPublishedAt(result),
           canonicalUrl,
           originalUrl,
@@ -216,7 +217,8 @@ export class ReviewsTavilyClient {
               : (registryMatch?.countryCode ??
                 inferCountryCodeFromUrl(canonicalUrl)),
           retrievalBucket: input.bucket,
-          domainRegistryId: registryMatch?.id ?? null,
+          domainRegistryId: null,
+          sourcePoliticalLean: registryMatch?.politicalLean ?? null,
         };
       })
       .filter((candidate): candidate is SearchCandidate => candidate !== null);

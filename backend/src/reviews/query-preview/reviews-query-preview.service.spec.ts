@@ -31,28 +31,6 @@ describe("ReviewsQueryPreviewService", () => {
         }),
     ),
     resolveUserCountryCode: jest.fn().mockResolvedValue("KR"),
-    loadSearchDomainRegistry: jest.fn().mockResolvedValue([
-      {
-        id: "kr-familiar",
-        domain: "yna.co.kr",
-        countryCode: "KR",
-        languageCode: "ko",
-        sourceKind: "news_agency",
-        usageRole: "familiar_news",
-        priority: 10,
-        isActive: true,
-      },
-      {
-        id: "us-verification",
-        domain: "reuters.com",
-        countryCode: "US",
-        languageCode: "en",
-        sourceKind: "news_agency",
-        usageRole: "verification_news",
-        priority: 20,
-        isActive: true,
-      },
-    ]),
     resetQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
     persistQueryPreviewResult: jest.fn(),
     persistOutOfScopeReview: jest.fn().mockResolvedValue({
@@ -298,7 +276,7 @@ describe("ReviewsQueryPreviewService", () => {
     expect(result.sources).toHaveLength(2);
     expect(result.sources[0]?.retrievalBucket).toBe("familiar");
     expect(result.sources[1]?.retrievalBucket).toBe("verification");
-    expect(result.sources[1]?.domainRegistryMatched).toBe(true);
+    expect(result.sources[1]?.domainRegistryMatched).toBe(false);
     expect(result.evidenceSnippets).toHaveLength(1);
     expect(result.evidenceSnippets[0]?.evidenceSummary).toBe("원문 검증 source입니다.");
     expect(persistence.resolveUserCountryCode).toHaveBeenCalledWith("user-1");
@@ -356,13 +334,12 @@ describe("ReviewsQueryPreviewService", () => {
         topicCountryCode: "US",
         domainRegistry: expect.arrayContaining([
           expect.objectContaining({
-            id: "kr-familiar",
+            id: "kr-centrist-yna",
             countryCode: "KR",
           }),
         ]),
       }),
     );
-    expect(persistence.loadSearchDomainRegistry).toHaveBeenCalledTimes(1);
   });
 
   it("해외뉴스 claim은 out_of_scope로 저장하고 source 수집을 건너뛴다", async () => {
@@ -449,7 +426,6 @@ describe("ReviewsQueryPreviewService", () => {
       { id: "q3", text: "트럼프 관세 업데이트", rank: 3 },
     ]);
     expect(providers.searchSources).not.toHaveBeenCalled();
-    expect(persistence.loadSearchDomainRegistry).not.toHaveBeenCalled();
     expect(persistence.persistOutOfScopeReview).toHaveBeenCalledWith(
       expect.objectContaining({
         refinement: expect.objectContaining({

@@ -76,7 +76,7 @@ export class ReviewsService {
         originQueryIds: candidate.originQueryIds,
         sourceCountryCode: candidate.sourceCountryCode,
         retrievalBucket: candidate.retrievalBucket,
-        domainRegistryMatched: Boolean(candidate.domainRegistryId),
+        domainRegistryMatched: false,
         stance: "unknown",
       })),
     };

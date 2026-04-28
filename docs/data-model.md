@@ -156,6 +156,7 @@
 | --- | --- | --- |
 | `id` | uuid / text id | source 식별자 |
 | `review_job_id` | fk | `review_jobs.id` 참조 |
+| `source_provider` | varchar(64) nullable | 수집 API/provider. `naver-search`, `tavily-search` 등 |
 | `source_type` | varchar(32) | 출처 유형 |
 | `publisher_name` | varchar(255) | 매체명 또는 기관명 |
 | `published_at` | timestamptz nullable | 발행 시각 |
@@ -172,9 +173,8 @@
 | `relevance_reason` | text nullable | relevance 판정 이유 |
 | `source_country_code` | varchar(16) nullable | source 국가 코드 |
 | `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
-| `domain_registry_id` | fk nullable | 매칭된 trusted domain registry |
 
-`search_route`와 `source_provider`는 search planning artifact 또는 source audit metadata에서 추적 가능해야 하며, 한국 정치·경제 뉴스는 `naver-search`와 `tavily-search` 보조검색 provider를 기록한다. search planning artifact에는 사용자-facing `generated_queries`, claim 이해 기반 `normalized_claim`, `claim_type`, `verification_goal`, 지원 도메인 판정용 `topic_domain`, 목적별 `search_plan`을 함께 보존한다. 이번 문서 기준에서는 DB migration 없이 기존 artifact/jsonb 계열 저장 구조에서 `search_plan.queries[].purpose`와 source별 origin query purpose를 추적하는 것을 기본값으로 둔다.
+`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. 한국 정치·경제 뉴스는 `naver-search`와 `tavily-search` 보조검색 provider를 기록한다. search planning artifact에는 사용자-facing `generated_queries`, claim 이해 기반 `normalized_claim`, `claim_type`, `verification_goal`, 지원 도메인 판정용 `topic_domain`, 목적별 `search_plan`을 함께 보존한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |
@@ -216,21 +216,7 @@
 | `duration_ms` | integer | 소요 시간 |
 | `trace_id` | varchar(128) | 추적 id |
 
-### 6.10 `source_domain_registry`
-| 컬럼 | 타입 | 설명 |
-| --- | --- | --- |
-| `id` | uuid / text id | registry 식별자 |
-| `domain` | text | 도메인 또는 wildcard 패턴 |
-| `country_code` | varchar(16) | 국가 코드 |
-| `language_code` | varchar(16) nullable | 주요 언어 코드 |
-| `source_kind` | varchar(64) | `government`, `news_agency`, `social_platform` 등 |
-| `usage_role` | varchar(64) | `familiar_news`, `familiar_social`, `verification_official`, `verification_news`, `global_reference` |
-| `priority` | integer | 검색 우선순위 |
-| `is_active` | boolean | 활성 여부 |
-| `created_at` | timestamptz | 생성 시각 |
-| `updated_at` | timestamptz | 갱신 시각 |
-
-### 6.11 `community_posts`
+### 6.10 `community_posts`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | 게시글 식별자 |
@@ -241,7 +227,7 @@
 | `created_at` | timestamptz | 생성 시각 |
 | `updated_at` | timestamptz | 갱신 시각 |
 
-### 6.12 `community_comments`
+### 6.11 `community_comments`
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid / text id | 댓글 식별자 |

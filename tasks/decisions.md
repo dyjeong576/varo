@@ -225,6 +225,13 @@
 
 ## 2026-04-28
 
+### Tavily KR Trusted Domain Registry
+- Tavily Search의 `include_domains`는 DB `source_domain_registry` 조회가 아니라 백엔드 코드에 고정된 한국 trusted news domain registry를 사용한다.
+- Tavily Search 범위는 한겨레, 경향신문, 오마이뉴스, 프레시안, 연합뉴스, 한국일보, 국민일보, SBS, JTBC, 조선일보, 중앙일보, 동아일보, 문화일보, TV조선, 매일경제, 한국경제, 서울경제, 머니투데이, 이데일리 도메인으로 제한한다.
+- registry에는 `progressive`, `centrist`, `conservative`, `business` 성향 메타데이터를 함께 저장한다.
+- 정치 성향 메타데이터는 검색 결과 균형과 출처 설명을 위한 내부 메타데이터이며, verdict 또는 출처 신뢰도 점수로 사용하지 않는다.
+- 이번 변경은 API 응답 shape, DB schema, Prisma migration을 변경하지 않는다.
+
 ### MVP Political/Economic Claim Scope
 - 2026-04-21 Search Provider Routing 결정은 유지하되, MVP 검토 도메인은 이번 결정으로 정치·경제로 좁힌다.
 - MVP 검토 범위는 국가와 무관한 뉴스성 claim 전체가 아니라 정치·경제 도메인의 사실성 claim으로 좁힌다.
@@ -240,6 +247,8 @@
 - MVP 검토 범위는 한국 관련 정치·경제 claim으로 고정한다.
 - 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
 - 신규 review 생성 기준 `search_route`는 `korean_news / unsupported`만 사용한다.
+- OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 한국 관련 정치·경제 뉴스성 claim이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
 - Tavily Search는 제거하지 않고 `korean_news`에서 Naver News Search와 항상 병행하는 한국 뉴스 보조 source search provider로 사용한다.
-- Tavily Search는 KR domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
+- Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
+- source별 수집 API는 `sources.source_provider`에 저장하고, DB 기반 `source_domain_registry` 테이블과 `sources.domain_registry_id`는 코드 고정 registry 전환에 따라 제거한다.
 - `TAVILY_API_KEY`, `TAVILY_SEARCH_TIMEOUT_MS`, `TAVILY_EXTRACT_TIMEOUT_MS` 설정을 유지한다.

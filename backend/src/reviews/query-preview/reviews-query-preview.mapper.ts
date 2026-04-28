@@ -12,6 +12,7 @@ import {
   QueryRefinementResult,
   SearchCandidate,
   SearchPlan,
+  SourcePoliticalLean,
 } from "../reviews.types";
 import { hasVerificationSource } from "../reviews.utils";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
@@ -129,13 +130,16 @@ export function buildSourceCreateInputs(
   candidates: SearchCandidate[],
   extractedSources: ExtractedSource[],
 ): Prisma.SourceUncheckedCreateInput[] {
+  const extractedSourceMap = new Map(
+    extractedSources.map((item) => [item.canonicalUrl, item]),
+  );
+
   return candidates.map((candidate) => {
-    const extracted = extractedSources.find(
-      (item) => item.canonicalUrl === candidate.canonicalUrl,
-    );
+    const extracted = extractedSourceMap.get(candidate.canonicalUrl);
 
     return {
       reviewJobId,
+      sourceProvider: candidate.sourceProvider,
       sourceType: candidate.sourceType,
       publisherName: candidate.publisherName,
       publishedAt: candidate.publishedAt ? new Date(candidate.publishedAt) : null,
@@ -153,7 +157,6 @@ export function buildSourceCreateInputs(
       relevanceReason: candidate.relevanceReason ?? null,
       sourceCountryCode: candidate.sourceCountryCode,
       retrievalBucket: candidate.retrievalBucket,
-      domainRegistryId: candidate.domainRegistryId,
     };
   });
 }
@@ -212,10 +215,12 @@ export function buildHandoffSourceIds(
   sources: Source[],
   evidenceSnippets: EvidenceSnippet[],
 ): string[] {
+  const snippetSourceIds = new Set(
+    evidenceSnippets.map((snippet) => snippet.sourceId),
+  );
+
   return sources
-    .filter((source) =>
-      evidenceSnippets.some((snippet) => snippet.sourceId === source.id),
-    )
+    .filter((source) => snippetSourceIds.has(source.id))
     .map((source) => source.id);
 }
 
@@ -280,6 +285,7 @@ export function buildHandoffPayload(
   snippetIds: string[],
   insufficiencyReason: string | null,
   evidenceSignals: EvidenceSignal[] = [],
+  sourcePoliticalLeans: Record<string, SourcePoliticalLean> = {},
 ): Prisma.InputJsonValue {
   return {
     coreClaim,
@@ -287,6 +293,7 @@ export function buildHandoffPayload(
     snippetIds,
     insufficiencyReason,
     evidenceSignals,
+    sourcePoliticalLeans,
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -394,7 +401,7 @@ export function mapPreviewResponse(params: {
       originQueryIds: parseOriginQueryIds(source.originQueryIds),
       sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
-      domainRegistryMatched: Boolean(source.domainRegistryId),
+      domainRegistryMatched: false,
       stance: assembledResult.sourceStances[source.id] ?? "unknown",
     })),
     evidenceSnippets: params.evidenceSnippets.map((snippet) => ({
@@ -772,7 +779,7 @@ export function mapStoredPreviewResponse(
       originQueryIds: parseOriginQueryIds(source.originQueryIds),
       sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
-      domainRegistryMatched: Boolean(source.domainRegistryId),
+      domainRegistryMatched: false,
       stance: assembledResult.sourceStances[source.id] ?? "unknown",
     })),
     evidenceSnippets: reviewJob.evidenceSnippets.map((snippet) => ({

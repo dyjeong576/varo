@@ -131,53 +131,9 @@ describe("ReviewsProvidersService", () => {
                     claimType: "policy",
                     verificationGoal:
                       "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
-                    searchPlan: {
-                      normalizedClaim: "트럼프가 관세를 발표했다",
-                      claimType: "policy",
-                      verificationGoal:
-                        "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
-                      searchRoute: "global_news",
-                      queries: [
-                        {
-                          id: "sp1",
-                          purpose: "claim_specific",
-                          query: "Trump tariff announcement",
-                          priority: 1,
-                        },
-                        {
-                          id: "sp2",
-                          purpose: "current_state",
-                          query: "Trump tariffs latest news",
-                          priority: 2,
-                        },
-                        {
-                          id: "sp3",
-                          purpose: "primary_source",
-                          query: "White House Trump tariff announcement",
-                          priority: 3,
-                        },
-                        {
-                          id: "sp4",
-                          purpose: "contradiction_or_update",
-                          query: "Trump tariff announcement update correction",
-                          priority: 4,
-                        },
-                      ],
-                    },
-                    generatedQueries: [
-                      "트럼프 관세 발표",
-                      "Trump tariff announcement",
-                      "미국 관세 정책 발표",
-                    ],
-                    searchRoute: "global_news",
+                    searchRoute: "unsupported",
                     searchRouteReason:
                       "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
-                    searchClaim: "Trump tariff announcement",
-                    searchQueries: [
-                      "Trump tariff announcement",
-                      "US tariff policy announcement",
-                      "Trump tariff update",
-                    ],
                     topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason:
@@ -205,10 +161,13 @@ describe("ReviewsProvidersService", () => {
     expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
     expect(result.searchRoute).toBe("unsupported");
-    expect(result.searchClaim).toBe("Trump tariff announcement");
-    expect(result.searchPlan.queries).toHaveLength(4);
+    expect(result.searchClaim).toBe("트럼프의 관세 발표");
+    expect(result.searchPlan.queries).toEqual([]);
     expect(result.isKoreaRelated).toBe(false);
-    expect(result.generatedQueries).toHaveLength(3);
+    expect(result.generatedQueries).toEqual([
+      { id: "q1", text: "트럼프의 관세 발표", rank: 1 },
+    ]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("real mode에서 한국 관련 검색을 Naver 뉴스 검색 client에 위임한다", async () => {
@@ -374,7 +333,7 @@ describe("ReviewsProvidersService", () => {
         searchRoute: "korean_news",
       }),
       bucket: "fallback",
-      includeDomains: ["yna.co.kr", "youtube.com", "go.kr"],
+      includeDomains: ["yna.co.kr"],
     });
   });
 
@@ -485,6 +444,86 @@ describe("ReviewsProvidersService", () => {
         body: expect.stringContaining("\"originQueryPurposes\\\": ["),
       }),
     );
+  });
+
+  it("real mode에서 OpenAI relevance 응답이 일부 후보를 누락하면 discard로 처리한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    decisions: [
+                      {
+                        candidateId: "c1",
+                        relevanceTier: "primary",
+                        relevanceReason: "직접 검증 근거입니다.",
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const service = createService({
+      reviewProviderMode: "real",
+      openAiApiKey: "openai-test-key",
+    });
+
+    const result = await service.applyRelevanceFiltering({
+      coreClaim: "한국은행이 기준금리를 동결했다",
+      claimLanguageCode: "ko",
+      searchRoute: "korean_news",
+      topicCountryCode: "KR",
+      topicScope: "domestic",
+      candidates: [
+        {
+          id: "c1",
+          searchRoute: "korean_news",
+          sourceProvider: "tavily-search",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "한국은행 기준금리 동결",
+          rawSnippet: "한국은행이 기준금리를 동결했습니다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "verification",
+          domainRegistryId: "kr-verification",
+        },
+        {
+          id: "c2",
+          searchRoute: "korean_news",
+          sourceProvider: "tavily-search",
+          sourceType: "news",
+          publisherName: "한국경제",
+          publishedAt: null,
+          canonicalUrl: "https://www.hankyung.com/article/202604010001",
+          originalUrl: "https://www.hankyung.com/article/202604010001",
+          rawTitle: "금리 관련 시장 반응",
+          rawSnippet: "시장 반응을 전했습니다.",
+          normalizedHash: "hash-2",
+          originQueryIds: ["q1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "verification",
+          domainRegistryId: "kr-verification",
+        },
+      ],
+    });
+
+    expect(result[0]?.relevanceTier).toBe("primary");
+    expect(result[1]?.relevanceTier).toBe("discard");
+    expect(result[1]?.relevanceReason).toBe("관련성 판정 결과가 누락되었습니다.");
   });
 
   it("applyRelevanceFiltering은 OpenAI API key가 없으면 실패한다", async () => {

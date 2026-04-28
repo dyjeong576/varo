@@ -115,16 +115,17 @@
 ### 6.1 단계
 
 1. claim 접수
-2. claim understanding / search planning
-3. source 검색
-4. 본문 추출
-5. evidence 정리
-6. preview detail 제공 가능 상태로 저장
-7. interpretation 생성
-8. 결과 저장
-9. 완료 알림 생성
-10. history 반영
-11. 인기 집계 입력 반영
+2. scope gate
+3. claim understanding / search planning
+4. source 검색
+5. 본문 추출
+6. evidence 정리
+7. preview detail 제공 가능 상태로 저장
+8. interpretation 생성
+9. 결과 저장
+10. 완료 알림 생성
+11. history 반영
+12. 인기 집계 입력 반영
 
 ### 6.2 상태값
 
@@ -147,11 +148,12 @@
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
 - 지원 도메인 판정은 `topic_domain`, provider 선택은 `search_route`가 담당하며 두 값은 별도 책임으로 유지한다.
+- OpenAI는 먼저 scope gate에서 한국 관련 정치·경제 뉴스성 claim인지 판정하고, `unsupported`이면 search plan과 query refinement를 생성하지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - 한국 관련 정치·경제 뉴스성 claim은 Naver News Search와 Tavily Search 보조검색을 병행한다.
 - 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
-- Tavily Search는 KR domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
+- Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
 
 ### 6.4 worker 책임
 

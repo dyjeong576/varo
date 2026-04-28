@@ -3,6 +3,11 @@ export type TopicScope = "domestic" | "foreign" | "multi_country" | "unknown";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
 export type SearchRoute = "korean_news" | "global_news" | "unsupported";
 export type SearchProvider = "naver-search" | "tavily-search";
+export type SourcePoliticalLean =
+  | "progressive"
+  | "centrist"
+  | "conservative"
+  | "business";
 export type QueryPurpose =
   | "claim_specific"
   | "current_state"
@@ -50,6 +55,8 @@ export interface DomainRegistryEntry {
   usageRole: string;
   priority: number;
   isActive: boolean;
+  publisherName?: string;
+  politicalLean?: SourcePoliticalLean;
 }
 
 export interface QueryArtifact {
@@ -91,6 +98,7 @@ export interface SearchCandidate {
   sourceCountryCode: string | null;
   retrievalBucket: RetrievalBucket;
   domainRegistryId: string | null;
+  sourcePoliticalLean?: SourcePoliticalLean | null;
   relevanceTier?: ReviewRelevanceTier;
   relevanceReason?: string | null;
   contentText?: string | null;

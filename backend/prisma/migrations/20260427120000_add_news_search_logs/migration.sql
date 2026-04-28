@@ -1,0 +1,3 @@
+-- No-op migration placeholder.
+-- This directory was created without a migration.sql file, which prevents
+-- Prisma from reading the local migration history.

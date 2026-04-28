@@ -86,6 +86,21 @@ interface OpenAiSearchPlanPayload {
   queries: OpenAiSearchPlanQueryPayload[];
 }
 
+interface OpenAiReviewScopePayload {
+  languageCode: string;
+  coreClaim: string;
+  normalizedClaim: string;
+  claimType: ReviewClaimType;
+  verificationGoal: string;
+  searchRoute: SearchRoute;
+  searchRouteReason: string;
+  topicScope: TopicScope;
+  topicCountryCode: string | null;
+  countryDetectionReason: string;
+  isKoreaRelated: boolean;
+  koreaRelevanceReason: string;
+}
+
 interface OpenAiQueryRefinementPayload {
   languageCode: string;
   coreClaim: string;
@@ -136,6 +151,15 @@ export class ReviewsOpenAiClient {
     apiKey: string,
     rawClaim: string,
   ): Promise<QueryRefinementResult> {
+    const scope = await this.classifyReviewScope(apiKey, rawClaim);
+
+    if (scope.searchRoute !== "korean_news") {
+      const result = this.buildUnsupportedRefinementResult(scope, rawClaim);
+      this.logGeneratedSearchQueries(result);
+
+      return result;
+    }
+
     const payload =
       await this.requestStructuredOutput<OpenAiQueryRefinementPayload>(
         apiKey,
@@ -348,6 +372,155 @@ isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 
     this.logGeneratedSearchQueries(result);
 
     return result;
+  }
+
+  private async classifyReviewScope(
+    apiKey: string,
+    rawClaim: string,
+  ): Promise<OpenAiReviewScopePayload> {
+    const payload =
+      await this.requestStructuredOutput<OpenAiReviewScopePayload>(
+        apiKey,
+        {
+          name: "review_scope_gate",
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "languageCode",
+              "coreClaim",
+              "normalizedClaim",
+              "claimType",
+              "verificationGoal",
+              "searchRoute",
+              "searchRouteReason",
+              "topicScope",
+              "topicCountryCode",
+              "countryDetectionReason",
+              "isKoreaRelated",
+              "koreaRelevanceReason",
+            ],
+            properties: {
+              languageCode: { type: "string" },
+              coreClaim: { type: "string" },
+              normalizedClaim: { type: "string" },
+              claimType: {
+                type: "string",
+                enum: CLAIM_TYPES,
+              },
+              verificationGoal: { type: "string" },
+              searchRoute: {
+                type: "string",
+                enum: SEARCH_ROUTES,
+              },
+              searchRouteReason: { type: "string" },
+              topicScope: {
+                type: "string",
+                enum: ["domestic", "foreign", "multi_country", "unknown"],
+              },
+              topicCountryCode: {
+                anyOf: [{ type: "string" }, { type: "null" }],
+              },
+              countryDetectionReason: { type: "string" },
+              isKoreaRelated: { type: "boolean" },
+              koreaRelevanceReason: { type: "string" },
+            },
+          },
+        },
+        [
+          {
+            role: "system",
+            content: `사용자의 claim이 VARO MVP 분석 범위인지 먼저 판정하세요. 이 단계에서는 검색어, search plan, source 수집 전략을 만들지 마세요.
+
+분석 가능 범위:
+- 한국 관련 정치·경제 뉴스성 claim만 korean_news입니다.
+- 한국 장소, 한국 정부/기관, 한국 기업/법인, 한국 시장, 한국 국민/이용자, 한국 정책, 국내 서비스 영향이 claim 자체에 직접 포함되어야 합니다.
+- 정치는 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산처럼 출처로 검증 가능한 claim입니다.
+- 경제는 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 출처로 검증 가능한 claim입니다.
+
+unsupported 기준:
+- 한국 관련성이 없거나 해외/글로벌 뉴스인 경우
+- 정치·경제 도메인 밖인 경우
+- 뉴스성 또는 사실성 검토 대상이 아닌 경우
+- 의료, 연예, 스포츠, 개인 상담, 투자 추천, 순수 의견, 미래 예측인 경우
+- provider로 근거 수집이 어렵다고 판단되는 경우
+
+searchRoute는 korean_news 또는 unsupported 중 하나만 반환하세요. 해외뉴스 요청은 VARO가 현재 한국뉴스만 분석한다고 searchRouteReason에 설명하세요. topicCountryCode는 claim 의미 기준 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요.`,
+          },
+          {
+            role: "user",
+            content: rawClaim,
+          },
+        ],
+        "검토 범위 판정 요청에 실패했습니다.",
+      );
+
+    return {
+      languageCode: this.normalizeText(payload.languageCode, "unknown"),
+      coreClaim: this.normalizeText(payload.coreClaim, rawClaim),
+      normalizedClaim: this.normalizeText(payload.normalizedClaim, rawClaim),
+      claimType: CLAIM_TYPES.includes(payload.claimType)
+        ? payload.claimType
+        : "general_fact",
+      verificationGoal: this.normalizeText(
+        payload.verificationGoal,
+        "현재 수집 가능한 출처 기준으로 claim을 검토합니다.",
+      ),
+      searchRoute: payload.searchRoute === "korean_news" ? "korean_news" : "unsupported",
+      searchRouteReason: this.normalizeText(
+        payload.searchRouteReason,
+        "검색 route 판정 이유가 기록되지 않았습니다.",
+      ),
+      topicScope: this.normalizeTopicScope(payload.topicScope),
+      topicCountryCode: normalizeCountryCode(payload.topicCountryCode),
+      countryDetectionReason: this.normalizeText(
+        payload.countryDetectionReason,
+        "주제 국가 판정 이유가 기록되지 않았습니다.",
+      ),
+      isKoreaRelated:
+        typeof payload.isKoreaRelated === "boolean" ? payload.isKoreaRelated : false,
+      koreaRelevanceReason: this.normalizeText(
+        payload.koreaRelevanceReason,
+        "한국 관련성 판정 이유가 기록되지 않았습니다.",
+      ),
+    };
+  }
+
+  private buildUnsupportedRefinementResult(
+    scope: OpenAiReviewScopePayload,
+    rawClaim: string,
+  ): QueryRefinementResult {
+    const coreClaim = this.normalizeText(scope.coreClaim, rawClaim);
+    const normalizedClaim = this.normalizeText(scope.normalizedClaim, coreClaim);
+    const verificationGoal = this.normalizeText(
+      scope.verificationGoal,
+      "현재 VARO MVP 분석 범위에 해당하는지 확인합니다.",
+    );
+
+    return {
+      claimLanguageCode: scope.languageCode,
+      coreClaim,
+      normalizedClaim,
+      claimType: scope.claimType,
+      verificationGoal,
+      searchPlan: {
+        normalizedClaim,
+        claimType: scope.claimType,
+        verificationGoal,
+        searchRoute: "unsupported",
+        queries: [],
+      },
+      generatedQueries: [{ id: "q1", text: coreClaim, rank: 1 }],
+      searchRoute: "unsupported",
+      searchRouteReason: scope.searchRouteReason,
+      searchClaim: coreClaim,
+      searchQueries: [],
+      topicScope: scope.topicScope,
+      topicCountryCode: scope.topicCountryCode,
+      countryDetectionReason: scope.countryDetectionReason,
+      isKoreaRelated: scope.isKoreaRelated,
+      koreaRelevanceReason: scope.koreaRelevanceReason,
+    };
   }
 
   async applyRelevanceFiltering(
@@ -861,7 +1034,7 @@ isKoreaRelated는 UX/설명용 메타데이터입니다. claim 자체에 한국 
       seenIds.add(decision.candidateId);
     }
 
-    return seenIds.size === candidateIds.size;
+    return true;
   }
 
   private isValidEvidenceSignalPayload(
