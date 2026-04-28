@@ -146,10 +146,12 @@
 - 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`와 `EvidenceSnippet.stance`를 계산 입력으로 유지한다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
+- 지원 도메인 판정은 `topic_domain`, provider 선택은 `search_route`가 담당하며 두 값은 별도 책임으로 유지한다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
-- 한국 뉴스성 claim은 Naver News Search, 해외/글로벌 뉴스성 claim은 Tavily Search/Extract로 검색한다.
-- 글로벌 route의 Tavily 검색 입력은 영어 `search_plan` query 또는 기존 호환용 `search_claim / search_queries` 아티팩트를 사용하고, 사용자-facing `core_claim / generated_queries`는 원문을 유지한다.
+- 한국 관련 정치·경제 뉴스성 claim은 Naver News Search와 Tavily Search 보조검색을 병행한다.
+- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
+- Tavily Search는 KR domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
 
 ### 6.4 worker 책임
 
@@ -314,14 +316,14 @@
 
 ### 10.2 Naver News Search
 
-- 한국 뉴스성 claim의 source 후보 수집
+- 한국 정치·경제 뉴스성 claim의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
 ### 10.3 Tavily Search / Extract
 
-- 해외/글로벌 뉴스성 claim의 source 후보 수집
+- 한국 뉴스 보조 source 후보 수집
 - source 본문 추출
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용

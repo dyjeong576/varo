@@ -204,7 +204,7 @@ describe("ReviewsProvidersService", () => {
     expect(result.claimLanguageCode).toBe("ko");
     expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
-    expect(result.searchRoute).toBe("global_news");
+    expect(result.searchRoute).toBe("unsupported");
     expect(result.searchClaim).toBe("Trump tariff announcement");
     expect(result.searchPlan.queries).toHaveLength(4);
     expect(result.isKoreaRelated).toBe(false);
@@ -233,11 +233,51 @@ describe("ReviewsProvidersService", () => {
           domainRegistryId: null,
         },
       ]);
+    const searchSourcesSpy = jest
+      .spyOn(ReviewsTavilyClient.prototype, "searchSources")
+      .mockResolvedValue([
+        {
+          id: "q2-fallback-c1",
+          searchRoute: "korean_news",
+          sourceProvider: "tavily-search",
+          sourceType: "news",
+          publisherName: "yna.co.kr",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100002",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100002",
+          rawTitle: "테슬라 한국 사업 관련 추가 보도",
+          rawSnippet: "국내 추가 보도입니다.",
+          normalizedHash: "hash-2",
+          originQueryIds: ["q2"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "fallback",
+          domainRegistryId: "kr-familiar",
+        },
+        {
+          id: "q2-fallback-c2",
+          searchRoute: "korean_news",
+          sourceProvider: "tavily-search",
+          sourceType: "news",
+          publisherName: "reuters.com",
+          publishedAt: null,
+          canonicalUrl: "https://www.reuters.com/world/us/tesla-update",
+          originalUrl: "https://www.reuters.com/world/us/tesla-update",
+          rawTitle: "Tesla update",
+          rawSnippet: "해외 보도입니다.",
+          normalizedHash: "hash-3",
+          originQueryIds: ["q2"],
+          sourceCountryCode: "US",
+          retrievalBucket: "fallback",
+          domainRegistryId: null,
+        },
+      ]);
     const service = createService({
       reviewProviderMode: "real",
       naverClientId: "naver-client-id",
       naverClientSecret: "naver-secret",
       naverSearchTimeoutMs: 40000,
+      tavilyApiKey: "tvly-test-key",
+      tavilySearchTimeoutMs: 41000,
     });
 
     const result = await service.searchSources({
@@ -308,6 +348,14 @@ describe("ReviewsProvidersService", () => {
       sourceCountryCode: "KR",
       domainRegistryId: null,
     });
+    expect(result[1]).toMatchObject({
+      id: "q2-fallback-c1",
+      searchRoute: "korean_news",
+      sourceProvider: "tavily-search",
+      sourceCountryCode: "KR",
+      retrievalBucket: "fallback",
+    });
+    expect(result).toHaveLength(2);
     expect(searchNewsSpy).toHaveBeenCalledWith({
       clientId: "naver-client-id",
       clientSecret: "naver-secret",
@@ -319,63 +367,29 @@ describe("ReviewsProvidersService", () => {
       start: 1,
       sort: "sim",
     });
+    expect(searchSourcesSpy).toHaveBeenCalledWith({
+      apiKey: "tvly-test-key",
+      timeoutMs: 41000,
+      input: expect.objectContaining({
+        searchRoute: "korean_news",
+      }),
+      bucket: "fallback",
+      includeDomains: ["yna.co.kr", "youtube.com", "go.kr"],
+    });
   });
 
-  it("real mode에서 글로벌 검색을 Tavily search client에 위임한다", async () => {
+  it("global_news route는 source search를 수행하지 않는다", async () => {
     const searchSourcesSpy = jest
       .spyOn(ReviewsTavilyClient.prototype, "searchSources")
-      .mockResolvedValue([
-        {
-          id: "q1-verification-c1",
-          searchRoute: "global_news",
-          sourceProvider: "tavily-search",
-          sourceType: "news",
-          publisherName: "reuters.com",
-          publishedAt: "2026-04-01T00:00:00.000Z",
-          canonicalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          originalUrl: "https://www.reuters.com/world/us/trump-tariff-update",
-          rawTitle: "Trump tariff announcement update",
-          rawSnippet: "원문 검증 보도입니다.",
-          normalizedHash: "hash-1",
-          originQueryIds: ["q1"],
-          sourceCountryCode: "US",
-          retrievalBucket: "verification",
-          domainRegistryId: null,
-        },
-      ]);
+      .mockResolvedValue([]);
     const service = createService({
       reviewProviderMode: "real",
       tavilyApiKey: "tvly-test-key",
       tavilySearchTimeoutMs: 41000,
     });
 
-    const result = await service.searchSources({
-      searchRoute: "global_news",
-      queries: [
-        {
-          id: "q1",
-          text: "Trump tariff announcement",
-          rank: 1,
-          purpose: "current_state",
-        },
-      ],
-      coreClaim: "트럼프의 관세 발표",
-      claimLanguageCode: "ko",
-      userCountryCode: "KR",
-      topicCountryCode: "US",
-      topicScope: "foreign",
-      domainRegistry: [],
-    });
-
-    expect(result[0]).toMatchObject({
-      id: "q1-verification-c1",
-      searchRoute: "global_news",
-      sourceProvider: "tavily-search",
-    });
-    expect(searchSourcesSpy).toHaveBeenCalledWith({
-      apiKey: "tvly-test-key",
-      timeoutMs: 41000,
-      input: expect.objectContaining({
+    await expect(
+      service.searchSources({
         searchRoute: "global_news",
         queries: [
           {
@@ -385,9 +399,18 @@ describe("ReviewsProvidersService", () => {
             purpose: "current_state",
           },
         ],
+        coreClaim: "트럼프의 관세 발표",
+        claimLanguageCode: "ko",
+        userCountryCode: "KR",
+        topicCountryCode: "US",
+        topicScope: "foreign",
+        domainRegistry: [],
       }),
-      bucket: "verification",
+    ).rejects.toMatchObject({
+      code: APP_ERROR_CODES.INPUT_VALIDATION_ERROR,
+      status: HttpStatus.BAD_REQUEST,
     });
+    expect(searchSourcesSpy).not.toHaveBeenCalled();
   });
 
   it("real mode에서 OpenAI relevance 요청에 retrieval bucket과 source country를 포함한다", async () => {
@@ -546,21 +569,23 @@ describe("ReviewsProvidersService", () => {
     expect(result[0]?.currentAnswerImpact).toBe("overrides");
   });
 
-  it("global search에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {
+  it("한국 뉴스 보조검색에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {
     const service = createService({
       reviewProviderMode: "real",
+      naverClientId: "naver-client-id",
+      naverClientSecret: "naver-secret",
       tavilyApiKey: null,
     });
 
     await expect(
       service.searchSources({
-        searchRoute: "global_news",
-        queries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
-        coreClaim: "트럼프의 관세 발표",
+        searchRoute: "korean_news",
+        queries: [{ id: "q1", text: "한국은행 기준금리", rank: 1 }],
+        coreClaim: "한국은행 기준금리",
         claimLanguageCode: "ko",
         userCountryCode: "KR",
-        topicCountryCode: "US",
-        topicScope: "foreign",
+        topicCountryCode: "KR",
+        topicScope: "domestic",
         domainRegistry: [],
       }),
     ).rejects.toMatchObject({

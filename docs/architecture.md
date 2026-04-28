@@ -32,7 +32,7 @@
 - Infra / Runtime: Amazon Linux EC2, Docker Compose, nginx container, certbot container, GHCR, GitHub Actions self-hosted runner
 - External Auth: Google login
 - External Search / AI:
-  - Provider router for Naver News Search and Tavily Search / Extract
+  - Provider router for Naver News Search, Tavily Search fallback, and Tavily Extract
   - OpenAI structured outputs
 
 ## 4. 서비스 도메인 구조
@@ -98,7 +98,7 @@ VARO는 아래 도메인으로 구성한다.
     |-- enqueue events/jobs ---> [Redis]
     |
     +--> [Workers]
-           |-- review pipeline --> [Provider router: Naver News Search / Tavily Search / Extract]
+           |-- review pipeline --> [Provider router: Naver News Search / Tavily Search fallback / Tavily Extract]
            |-- structured analysis -> [OpenAI]
            |-- notification jobs
            +-- persist ----------> [PostgreSQL]

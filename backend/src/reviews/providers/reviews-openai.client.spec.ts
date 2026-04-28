@@ -112,7 +112,7 @@ describe("ReviewsOpenAiClient", () => {
     );
 
     expect(result.topicCountryCode).toBe("US");
-    expect(result.searchRoute).toBe("global_news");
+    expect(result.searchRoute).toBe("unsupported");
     expect(result.searchClaim).toBe("Trump tariff announcement");
     expect(result.normalizedClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.claimType).toBe("policy");

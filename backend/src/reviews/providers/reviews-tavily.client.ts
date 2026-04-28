@@ -59,6 +59,7 @@ export class ReviewsTavilyClient {
           apiKey: params.apiKey,
           timeoutMs: params.timeoutMs,
           query,
+          searchRoute: params.input.searchRoute,
           bucket: params.bucket,
           includeDomains: params.includeDomains,
           registry: params.input.domainRegistry,
@@ -147,6 +148,7 @@ export class ReviewsTavilyClient {
     apiKey: string;
     timeoutMs: number;
     query: SearchSourcesInput["queries"][number];
+    searchRoute: SearchSourcesInput["searchRoute"];
     bucket: SearchCandidate["retrievalBucket"];
     includeDomains?: string[];
     registry: SearchSourcesInput["domainRegistry"];
@@ -196,7 +198,7 @@ export class ReviewsTavilyClient {
 
         return {
           id: `${input.query.id}-${input.bucket}-c${index + 1}`,
-          searchRoute: "global_news",
+          searchRoute: input.searchRoute,
           sourceProvider: "tavily-search",
           sourceType: classifySourceType(canonicalUrl, rawTitle),
           publisherName: this.inferPublisherName(canonicalUrl),

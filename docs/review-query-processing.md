@@ -15,7 +15,7 @@
 
 ## 문서 목적
 
-이 문서는 VARO의 뉴스 질의 처리 방식을 설명한다. 사용자의 자연어 입력을 바로 검색하지 않고, LLM으로 검증 가능한 claim과 목적별 search plan, 검색 provider route로 정제한 뒤 Naver News Search 또는 Tavily 검색과 relevance 필터를 거쳐 evidence 후보를 만드는 흐름을 정의한다.
+이 문서는 VARO의 정치·경제 뉴스 질의 처리 방식을 설명한다. 사용자의 자연어 입력을 바로 검색하지 않고, LLM으로 검증 가능한 claim과 목적별 search plan, 지원 도메인, 검색 provider route로 정제한 뒤 Naver News Search 또는 Tavily Search와 relevance 필터를 거쳐 evidence 후보를 만드는 흐름을 정의한다.
 
 적용 범위는 MVP review pipeline의 claim intake부터 interpretation handoff 직전까지다.
 
@@ -32,7 +32,7 @@
 핵심 목표는 아래와 같다.
 
 - 사용자 발화에서 검토 대상이 되는 핵심 claim을 분리한다.
-- 사용자 발화 키워드가 아니라 검증 목적별 search plan과 `search_route`를 생성해 provider별 검색 품질을 높인다.
+- 사용자 발화 키워드가 아니라 검증 목적별 search plan, `topic_domain`, `search_route`를 생성해 지원 범위와 provider별 검색 품질을 높인다.
 - 제목과 snippet만 비슷하지만 실제 claim 검토와 무관한 결과를 relevance filtering으로 제거한다.
 - 관련 있는 source만 본문 추출과 evidence 생성 단계로 전달한다.
 - interpretation 단계가 더 적은 노이즈와 더 높은 traceability를 가진 입력 패키지를 받게 한다.
@@ -40,10 +40,10 @@
 Provider 전략은 아래로 고정한다.
 
 - 한국 뉴스 검색 provider: Naver News Search
-- 해외/글로벌 뉴스 검색 provider: Tavily Search
+- 한국 뉴스 보조 검색 provider: Tavily Search
 - 본문 추출 provider: Tavily Extract 또는 Source Fetch 계층
 - LLM provider: OpenAI
-- 구조 원칙: provider router를 두고, 한국 뉴스성 claim은 Naver News Search, 그 외 해외/글로벌 뉴스성 claim은 Tavily Search/Extract로 처리한다.
+- 구조 원칙: 한국 관련 정치·경제 뉴스성 claim은 Naver News Search와 Tavily Search 보조검색을 병행하고, 해외/글로벌 뉴스 claim은 `unsupported`로 처리한다.
 
 ## 단계별 처리 흐름
 
@@ -55,7 +55,7 @@ Provider 전략은 아래로 고정한다.
 
 ### 2. Claim Understanding and Search Planning
 
-- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`, 검증 가능한 형태의 `normalized_claim`, claim 성격인 `claim_type`, 검증 목표인 `verification_goal`, 목적별 `search_plan`, `search_route`를 생성한다.
+- OpenAI가 `raw claim`을 바탕으로 검토 대상 핵심 주장인 `core_claim`, 검증 가능한 형태의 `normalized_claim`, claim 성격인 `claim_type`, 검증 목표인 `verification_goal`, 지원 도메인인 `topic_domain`, 목적별 `search_plan`, `search_route`를 생성한다.
 - OpenAI는 추가로 이 claim의 `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`도 생성한다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
@@ -63,18 +63,21 @@ Provider 전략은 아래로 고정한다.
   - 고유명사, 날짜, 수치가 있으면 claim 구조화에는 보존하되, 검색 질의가 해당 표현에만 갇히지 않도록 한다.
   - 사용자 발화 키워드가 아니라 검증 목적에 맞는 검색 질의로 변환한다.
   - `generated_queries`는 사용자-facing trace용이므로 원문 언어를 유지한다.
-  - `global_news` route의 `search_claim`, `search_queries`는 Tavily 검색을 위해 영어로 변환한다.
 - `search_plan.queries[]`의 기본 purpose는 아래 4개로 고정한다.
   - `claim_specific`: 사용자가 말한 claim 자체가 어떤 출처에서 나왔는지 확인한다.
   - `current_state`: 현재 기준 상태 또는 최신 보도를 확인한다.
   - `primary_source`: 공식 발표, 원문, 공시, 기관 문서 등 1차 출처를 찾는다.
   - `contradiction_or_update`: 반박, 정정, 변경, 취소, 업데이트 신호를 찾는다.
 - `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
-- `search_route`는 아래 3개 중 하나로 고정한다.
-  - `korean_news`: 한국 뉴스성 claim이며 Naver News Search를 사용한다.
-  - `global_news`: 한국 뉴스가 아닌 해외/글로벌 뉴스성 claim이며 Tavily Search를 사용한다.
+- `topic_domain`은 아래 3개 중 하나로 고정한다.
+  - `politics`: 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산 등 검증 가능한 정치 claim이다.
+  - `economy`: 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표 등 검증 가능한 경제 claim이다.
+  - `unsupported`: 의료, 연예, 스포츠, 개인 상담, 창작 요청, 순수 의견, 미래 예측, 투자 매수/매도 추천 등 MVP 지원 범위 밖이거나 사실성 검토가 어려운 claim이다.
+- `search_route`는 신규 생성 기준 아래 2개 중 하나로 고정한다.
+  - `korean_news`: 한국 정치·경제 뉴스성 claim이며 Naver News Search와 Tavily Search 보조검색을 병행한다.
   - `unsupported`: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim이다.
-- `unsupported`는 `out_of_scope`로 기록하되, 한국 관련성 여부만으로 해외/글로벌 claim을 제외하지 않는다.
+- `topic_domain`은 제품 지원 도메인 판정이고, `search_route`는 provider routing 판정이다.
+- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 기록하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
 - 이 단계의 출력은 이후 search와 relevance filtering의 기준 입력이 된다.
 
 구현 기준 아티팩트는 아래 형태를 따른다.
@@ -92,7 +95,8 @@ type SearchPlan = {
     | "incident"
     | "general_fact";
   verificationGoal: string;
-  searchRoute: "korean_news" | "global_news" | "unsupported";
+  topicDomain: "politics" | "economy" | "unsupported";
+  searchRoute: "korean_news" | "unsupported";
   queries: {
     id: string;
     purpose:
@@ -109,12 +113,11 @@ type SearchPlan = {
 ### 3. Source Search
 
 - Review API는 `search_route`에 따라 검색 provider를 선택한다.
-  - `korean_news`: Naver News Search API로 검색한다.
-  - `global_news`: Tavily Search로 검색한다. 이때 실제 검색 입력은 영어 `search_plan` query 또는 기존 호환용 `search_claim`, `search_queries`를 사용한다.
+  - `korean_news`: Naver News Search API와 KR domain registry 기반 Tavily Search 보조검색을 병행한다.
   - `unsupported`: 검색하지 않고 `out_of_scope`로 종료한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화한다.
 - Tavily 검색 결과는 기존처럼 title, content/snippet, URL, publisher metadata를 source candidate로 정규화한다.
-- 한국 뉴스 라우트의 기본 검색 provider는 Tavily가 아니며, KR domain registry 기반 Tavily 검색은 MVP 기본 경로에서 사용하지 않는다.
+- Tavily Search에는 KR familiar/verification domain을 `include_domains`로 전달하고, KR domain registry 또는 `sourceCountryCode=KR`로 확인되는 후보만 유지한다.
 - 이 단계에서는 결과를 최대한 넓게 받되, 후속 relevance filtering이 가능하도록 title, snippet, canonical URL, publisher metadata를 유지한다.
 - 각 source candidate에는 어떤 query에서 수집되었는지 추적할 수 있도록 `origin_query_ids[]`를 연결하고, 해당 query의 `purpose`도 audit metadata로 유지한다.
 - 각 source candidate에는 `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`를 함께 유지한다.
@@ -185,9 +188,9 @@ sequenceDiagram
     User->>Frontend: claim 제출
     Frontend->>ReviewAPI: review 생성 요청
     ReviewAPI->>DB: claim / review job 저장
-    ReviewAPI->>QueryPlanner: raw claim 기반 normalized claim + search plan + topic country + search_route 판정 요청
+    ReviewAPI->>QueryPlanner: raw claim 기반 normalized claim + search plan + topic domain + topic country + search_route 판정 요청
     QueryPlanner-->>ReviewAPI: structured JSON 반환
-    ReviewAPI->>DB: core_claim / search_plan / topic country / search_route 저장
+    ReviewAPI->>DB: core_claim / search_plan / topic domain / topic country / search_route 저장
 
     alt search_route=unsupported
         ReviewAPI->>DB: status=out_of_scope / result=null 저장
@@ -196,30 +199,9 @@ sequenceDiagram
         loop search_plan query
             ReviewAPI->>Naver: news.json 검색
             Naver-->>ReviewAPI: title / description / originallink / link / pubDate 반환
+            ReviewAPI->>Tavily: KR include_domains 기반 보조 search
+            Tavily-->>ReviewAPI: 한국 source 후보 반환
         end
-        ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / provider metadata 부여
-        ReviewAPI->>RelevanceFilter: route + query purpose + provider metadata 기반 relevance 판정 요청
-        RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
-        ReviewAPI->>DB: relevance / origin_query_ids / query purpose / searchRoute / sourceProvider 저장
-
-        alt extract 대상이 있는 경우
-            ReviewAPI->>Extractor: selected primary + limited reference source 추출 요청
-            Extractor-->>ReviewAPI: content / snippet 후보 반환
-        else extract 대상이 부족한 경우
-            ReviewAPI->>ReviewAPI: evidence 부족 상태 유지
-        end
-
-        ReviewAPI->>SignalClassifier: source/evidence 역할 분류 요청
-        SignalClassifier-->>ReviewAPI: evidenceSignals 반환
-        ReviewAPI->>DB: interpretation_handoff_payload / audit 저장
-    else search_route=global_news
-        opt Tavily search
-            loop search_plan query
-                ReviewAPI->>Tavily: news/general search
-                Tavily-->>ReviewAPI: search results 반환
-            end
-        end
-
         ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / provider metadata 부여
         ReviewAPI->>RelevanceFilter: route + query purpose + provider metadata 기반 relevance 판정 요청
         RelevanceFilter-->>ReviewAPI: primary / reference / discard + reason 반환
@@ -266,7 +248,7 @@ sequenceDiagram
         QueryPreviewService->>DB: claim / review job 생성
         QueryPreviewService->>DB: preview user country 조회
         QueryPreviewService->>Providers: claim understanding + search planning
-        Providers-->>QueryPreviewService: core_claim + search_plan + topic country + search_route
+        Providers-->>QueryPreviewService: core_claim + search_plan + topic domain + topic country + search_route
         alt search_route=unsupported
             QueryPreviewService->>DB: out_of_scope 상태 저장
         else searchable route
@@ -287,7 +269,7 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Claim Understanding and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `search_plan`, `generated_queries[]`, `search_claim`, `search_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
+| Claim Understanding and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `topic_domain`, `search_plan`, `generated_queries[]`, `search_claim`, `search_queries[]`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason` |
 | Source Search | `search_plan.queries[]`, `search_route` | title, snippet, canonical URL, publisher metadata, provider metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]`, origin query purpose |
 | Relevance Filtering | `core_claim`, title, snippet, candidate metadata, query purpose, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`, origin query purpose |
@@ -308,6 +290,7 @@ sequenceDiagram
 - `claim_language_code`
 - `generated_queries`
 - `search_plan`
+- `topic_domain`
 - `topic_scope`
 - `topic_country_code`
 - `country_detection_reason`

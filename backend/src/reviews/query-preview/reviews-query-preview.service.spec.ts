@@ -354,13 +354,18 @@ describe("ReviewsQueryPreviewService", () => {
         ],
         userCountryCode: "US",
         topicCountryCode: "US",
-        domainRegistry: [],
+        domainRegistry: expect.arrayContaining([
+          expect.objectContaining({
+            id: "kr-familiar",
+            countryCode: "KR",
+          }),
+        ]),
       }),
     );
-    expect(persistence.loadSearchDomainRegistry).not.toHaveBeenCalled();
+    expect(persistence.loadSearchDomainRegistry).toHaveBeenCalledTimes(1);
   });
 
-  it("global_news route는 isKoreaRelated와 무관하게 Tavily 검색 경로로 진행한다", async () => {
+  it("해외뉴스 claim은 out_of_scope로 저장하고 source 수집을 건너뛴다", async () => {
     const persistence = createPersistenceMock();
     const providers = {
       refineQuery: jest.fn().mockResolvedValue({
@@ -375,7 +380,7 @@ describe("ReviewsQueryPreviewService", () => {
           claimType: "policy",
           verificationGoal:
             "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
-          searchRoute: "global_news",
+          searchRoute: "unsupported",
           queries: [
             {
               id: "sp1",
@@ -408,8 +413,9 @@ describe("ReviewsQueryPreviewService", () => {
           { id: "q2", text: "미국 관세 정책 발표", rank: 2 },
           { id: "q3", text: "트럼프 관세 업데이트", rank: 3 },
         ],
-        searchRoute: "global_news",
-        searchRouteReason: "미국 정책 발표를 다루는 해외 뉴스성 claim입니다.",
+        searchRoute: "unsupported",
+        searchRouteReason:
+          "VARO는 현재 한국뉴스만 분석하므로 해외 뉴스 claim은 지원 범위 밖입니다.",
         searchClaim: "Trump tariff announcement",
         searchQueries: [
           { id: "q1", text: "Trump tariff announcement", rank: 1 },
@@ -427,13 +433,6 @@ describe("ReviewsQueryPreviewService", () => {
       applyRelevanceFiltering: jest.fn().mockResolvedValue([]),
       extractContent: jest.fn().mockResolvedValue([]),
     } as unknown as ReviewsProvidersService;
-    persistence.persistQueryPreviewResult.mockResolvedValue({
-      createdSources: [],
-      evidenceSnippets: [],
-      discardedSourceCount: 0,
-      handoffSourceIds: [],
-      insufficiencyReason: "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
-    });
     const service = new ReviewsQueryPreviewService(
       persistence as never,
       providers,
@@ -443,44 +442,21 @@ describe("ReviewsQueryPreviewService", () => {
       claim: "트럼프가 오늘 관세 발표했대",
     });
 
-    expect(result.status).toBe("partial");
+    expect(result.status).toBe("out_of_scope");
     expect(result.generatedQueries).toEqual([
       { id: "q1", text: "트럼프 관세 발표", rank: 1 },
       { id: "q2", text: "미국 관세 정책 발표", rank: 2 },
       { id: "q3", text: "트럼프 관세 업데이트", rank: 3 },
     ]);
-    expect(providers.searchSources).toHaveBeenCalledWith(
+    expect(providers.searchSources).not.toHaveBeenCalled();
+    expect(persistence.loadSearchDomainRegistry).not.toHaveBeenCalled();
+    expect(persistence.persistOutOfScopeReview).toHaveBeenCalledWith(
       expect.objectContaining({
-        searchRoute: "global_news",
-        queries: [
-          {
-            id: "sp1",
-            text: "Trump tariff announcement",
-            rank: 1,
-            purpose: "claim_specific",
-          },
-          {
-            id: "sp2",
-            text: "Trump tariffs latest news",
-            rank: 2,
-            purpose: "current_state",
-          },
-          {
-            id: "sp3",
-            text: "White House Trump tariff announcement",
-            rank: 3,
-            purpose: "primary_source",
-          },
-          {
-            id: "sp4",
-            text: "Trump tariff announcement update correction",
-            rank: 4,
-            purpose: "contradiction_or_update",
-          },
-        ],
+        refinement: expect.objectContaining({
+          searchRoute: "unsupported",
+        }),
       }),
     );
-    expect(persistence.persistOutOfScopeReview).not.toHaveBeenCalled();
   });
 
   it("같은 clientRequestId로 다시 호출하면 같은 reviewId를 재사용한다", async () => {

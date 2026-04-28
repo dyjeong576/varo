@@ -3,7 +3,6 @@
 ## 검색 Provider Routing 후속
 
 - provider별 실패 원인을 `external_request_logs.provider`와 내부 error detail에 구분해 남긴다.
-- 글로벌 route의 영어 `search_claim / search_queries`를 운영 로그와 디버그 툴에서 더 쉽게 추적할 수 있게 노출한다.
 
 ## Review history 중복 및 loading 재시도 상태 오류 수정
 

@@ -15,6 +15,7 @@ import {
   SearchCandidate,
   SearchSourcesInput,
 } from "./reviews.types";
+import { selectDomainsForBucket } from "./reviews.utils";
 
 @Injectable()
 export class ReviewsProvidersService {
@@ -37,35 +38,40 @@ export class ReviewsProvidersService {
       const clientId = this.getRequiredNaverClientId();
       const clientSecret = this.getRequiredNaverClientSecret();
       const timeoutMs = this.getNaverSearchTimeoutMs();
-      const queryResults = await Promise.all(
-        input.queries.map((query) =>
-          this.naverClient.searchNews({
-            clientId,
-            clientSecret,
-            timeoutMs,
-            query: query.text,
-            queryId: query.id,
-            queryPurpose: query.purpose,
-            display: 5,
-            start: 1,
-            sort: "sim",
-          }),
-        ),
-      );
+      const tavilyApiKey = this.getRequiredTavilyApiKey();
+      const tavilyTimeoutMs = this.getTavilySearchTimeoutMs();
+      const [naverResults, tavilyResults] = await Promise.all([
+        Promise.all(
+          input.queries.map((query) =>
+            this.naverClient.searchNews({
+              clientId,
+              clientSecret,
+              timeoutMs,
+              query: query.text,
+              queryId: query.id,
+              queryPurpose: query.purpose,
+              display: 5,
+              start: 1,
+              sort: "sim",
+            }),
+          ),
+        ).then((results) => results.flat()),
+        this.tavilyClient
+          .searchSources({
+            apiKey: tavilyApiKey,
+            timeoutMs: tavilyTimeoutMs,
+            input,
+            bucket: "fallback",
+            includeDomains: this.buildKoreanTavilyIncludeDomains(input),
+          })
+          .then((candidates) =>
+            candidates.filter((candidate) =>
+              this.isKoreanTavilyCandidate(candidate, input),
+            ),
+          ),
+      ]);
 
-      return queryResults.flat();
-    }
-
-    if (searchRoute === "global_news") {
-      const apiKey = this.getRequiredTavilyApiKey();
-      const timeoutMs = this.getTavilySearchTimeoutMs();
-
-      return this.tavilyClient.searchSources({
-        apiKey,
-        timeoutMs,
-        input,
-        bucket: "verification",
-      });
+      return [...naverResults, ...tavilyResults];
     }
 
     throw new AppException(
@@ -189,5 +195,32 @@ export class ReviewsProvidersService {
 
   private getTavilyExtractTimeoutMs(): number {
     return this.configService.get<number>("tavilyExtractTimeoutMs", 180000);
+  }
+
+  private buildKoreanTavilyIncludeDomains(input: SearchSourcesInput): string[] {
+    return [
+      ...selectDomainsForBucket(input.domainRegistry, "familiar"),
+      ...selectDomainsForBucket(input.domainRegistry, "verification"),
+    ]
+      .map((domain) => domain.replace(/^\*\./, ""))
+      .filter((domain, index, domains) => domains.indexOf(domain) === index);
+  }
+
+  private isKoreanTavilyCandidate(
+    candidate: SearchCandidate,
+    input: SearchSourcesInput,
+  ): boolean {
+    const koreanRegistryIds = new Set(
+      input.domainRegistry
+        .filter((entry) => entry.countryCode === "KR")
+        .map((entry) => entry.id),
+    );
+
+    return (
+      candidate.sourceCountryCode === "KR" ||
+      (candidate.domainRegistryId
+        ? koreanRegistryIds.has(candidate.domainRegistryId)
+        : false)
+    );
   }
 }

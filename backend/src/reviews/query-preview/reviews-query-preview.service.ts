@@ -81,8 +81,7 @@ export class ReviewsQueryPreviewService {
       const refinement = await this.providersService.refineQuery(normalizedClaim);
       const generatedQueries = refinement.generatedQueries;
       const searchRoute =
-        refinement.searchRoute ??
-        (refinement.isKoreaRelated ? "korean_news" : "unsupported");
+        refinement.searchRoute === "korean_news" ? "korean_news" : "unsupported";
       const searchQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
@@ -114,6 +113,8 @@ export class ReviewsQueryPreviewService {
         });
       }
 
+      const domainRegistry =
+        await this.persistenceService.loadSearchDomainRegistry();
       const initialCandidates = await this.providersService.searchSources({
         searchRoute,
         queries: searchQueries,
@@ -122,7 +123,7 @@ export class ReviewsQueryPreviewService {
         userCountryCode,
         topicCountryCode: refinement.topicCountryCode,
         topicScope: refinement.topicScope,
-        domainRegistry: [],
+        domainRegistry,
       });
       let relevanceCandidates = await this.providersService.applyRelevanceFiltering({
         coreClaim: refinement.coreClaim,

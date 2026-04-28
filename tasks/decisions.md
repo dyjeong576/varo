@@ -190,12 +190,11 @@
 
 ### Search Provider Routing
 - 2026-04-01의 Korea-Related Only MVP Scope 결정은 검색 범위 기준에서 대체한다.
-- MVP는 한국 유저를 기본 사용자로 두되, 해외/글로벌 뉴스성 claim도 검토 범위에 포함한다.
-- query refinement는 `search_route`를 `korean_news / global_news / unsupported` 중 하나로 판정한다.
+- 이 결정의 해외/글로벌 route 범위는 2026-04-28 최신 결정으로 대체되었다.
+- 신규 review 생성 기준 query refinement는 `search_route`를 `korean_news / unsupported` 중 하나로 판정한다.
 - `korean_news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
-- `global_news` route는 Tavily Search/Extract를 기본 검색 및 추출 provider로 사용한다.
+- Tavily Search는 한국 뉴스 보조 검색 provider로 사용하고, Tavily Extract는 본문 추출 provider로 사용한다.
 - `search_route`는 검색 provider 분기의 authoritative field로 사용하고, `isKoreaRelated`는 UX/설명용 메타데이터로만 유지한다.
-- `global_news` route에서는 사용자-facing `core_claim / generated_queries`는 원문을 유지하고, 실제 Tavily 검색 입력은 영어 `search_claim / search_queries`로 별도 생성해 사용한다.
 - `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim에만 사용하며, `out_of_scope` review job으로 기록한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
 - `real` 모드에서는 Naver, Tavily, OpenAI API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
@@ -223,3 +222,24 @@
 - `EvidenceSnippet.stance`에는 UI/호환용 `support`, `conflict`, `context`, `unknown` 값을 저장하고, 상세 signal은 `review_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
 - `/reviews/:reviewId` 조회 시에는 OpenAI를 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
 - scheduled event에서 최신 `latest_update/current_status` signal이 `weakens` 또는 `overrides`이면 과거 support가 많아도 합의성을 낮게 표시한다.
+
+## 2026-04-28
+
+### MVP Political/Economic Claim Scope
+- 2026-04-21 Search Provider Routing 결정은 유지하되, MVP 검토 도메인은 이번 결정으로 정치·경제로 좁힌다.
+- MVP 검토 범위는 국가와 무관한 뉴스성 claim 전체가 아니라 정치·경제 도메인의 사실성 claim으로 좁힌다.
+- 정치는 일반 정치 이슈까지 포함하되, 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산처럼 출처로 검증 가능한 claim에 한정한다.
+- 경제는 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 출처로 검증 가능한 claim에 한정한다.
+- 의료, 연예, 스포츠, 개인 상담, 창작 요청, 순수 의견, 미래 예측, 투자 매수/매도 추천은 MVP 지원 범위 밖으로 처리한다.
+- 사용자는 입력 전에 도메인을 직접 선택하지 않고, query refinement가 `topic_domain`을 `politics / economy / unsupported` 중 하나로 자동 판정한다.
+- `topic_domain`은 제품 지원 도메인 판정, `search_route`는 검색 가능 여부 판정으로 별도 유지한다.
+- DB schema, Prisma migration, 공개 API 응답 shape는 이번 결정으로 변경하지 않는다.
+
+### Korea News Only With Tavily Search Fallback
+- 2026-04-21 Search Provider Routing의 해외/글로벌 뉴스 route는 신규 생성 기준에서 사용하지 않는다.
+- MVP 검토 범위는 한국 관련 정치·경제 claim으로 고정한다.
+- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
+- 신규 review 생성 기준 `search_route`는 `korean_news / unsupported`만 사용한다.
+- Tavily Search는 제거하지 않고 `korean_news`에서 Naver News Search와 항상 병행하는 한국 뉴스 보조 source search provider로 사용한다.
+- Tavily Search는 KR domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
+- `TAVILY_API_KEY`, `TAVILY_SEARCH_TIMEOUT_MS`, `TAVILY_EXTRACT_TIMEOUT_MS` 설정을 유지한다.

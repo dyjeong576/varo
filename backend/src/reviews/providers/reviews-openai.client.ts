@@ -24,13 +24,9 @@ import { normalizeCountryCode } from "../reviews.utils";
 import { postJson } from "./reviews-provider-http";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const OPENAI_MODEL = "gpt-5-mini";
+const OPENAI_MODEL = "gpt-5-nano";
 const OPENAI_TIMEOUT_MS = 300000;
-const SEARCH_ROUTES: SearchRoute[] = [
-  "korean_news",
-  "global_news",
-  "unsupported",
-];
+const SEARCH_ROUTES: SearchRoute[] = ["korean_news", "unsupported"];
 const CLAIM_TYPES: ReviewClaimType[] = [
   "scheduled_event",
   "current_status",
@@ -273,15 +269,13 @@ searchPlan 작성 규칙:
 - generatedQueries 3개는 사용자-facing trace용이므로 원문 언어를 유지하세요.
 - searchClaim과 searchQueries는 기존 호환용 검색 입력입니다.
 - korean_news: searchClaim/searchQueries를 원문 언어 맥락으로 작성하세요.
-- global_news: searchClaim/searchQueries와 searchPlan.queries의 query를 자연스러운 영어로 작성하세요. 날짜, 수치, 고유명사는 유지하세요.
 - unsupported: searchClaim/searchQueries는 generatedQueries와 같은 맥락으로 채우되 실제 검색에는 사용되지 않습니다.
 
 languageCode는 원문 언어를 유지하세요. topicCountryCode는 사용자 프로필 국가가 아니라 claim/context 의미 기준의 중심 국가를 ISO 3166-1 alpha-2 대문자 코드로 반환하고, 식별이 어렵다면 null을 반환하세요. topicScope는 domestic, foreign, multi_country, unknown 중 하나만 선택하세요. countryDetectionReason에는 왜 그렇게 판정했는지 짧게 설명하세요.
 
-searchRoute는 korean_news, global_news, unsupported 중 하나만 반환하세요.
-- korean_news: 한국 뉴스성 claim. Naver News Search를 사용합니다.
-- global_news: 해외/글로벌 뉴스성 claim. Tavily Search를 사용합니다.
-- unsupported: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 어렵습니다.
+searchRoute는 korean_news, unsupported 중 하나만 반환하세요.
+- korean_news: 한국 관련 정치·경제 뉴스성 claim. Naver News Search를 사용합니다.
+- unsupported: 한국 관련성이 없거나, 해외/글로벌 뉴스이거나, 정치·경제 도메인 밖이거나, 뉴스성 또는 사실성 검토 대상이 아니거나, provider로 근거 수집이 어렵습니다. 의료, 연예, 스포츠, 개인 상담, 투자 추천, 순수 의견, 미래 예측은 unsupported입니다. 해외뉴스 요청은 VARO가 현재 한국뉴스만 분석한다고 설명하세요.
 
 searchRouteReason에는 route 선택 이유를 짧게 설명하세요.
 
