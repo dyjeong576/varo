@@ -26,6 +26,7 @@ import { postJson } from "./reviews-provider-http";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
+const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
 const SEARCH_ROUTES: SearchRoute[] = ["korean_news", "unsupported"];
 const CLAIM_TYPES: ReviewClaimType[] = [
   "scheduled_event",
@@ -90,6 +91,12 @@ interface OpenAiQueryRefinementPayload {
   searchRoute: SearchRoute;
 }
 
+interface OpenAiRequestOptions {
+  reasoningEffort?: "minimal" | "low" | "medium" | "high";
+  textVerbosity?: "low" | "medium" | "high";
+  maxOutputTokens?: number;
+}
+
 interface OpenAiRelevanceDecision {
   candidateId: string;
   relevanceTier: ReviewRelevanceTier;
@@ -132,6 +139,7 @@ export class ReviewsOpenAiClient {
     apiKey: string,
     rawClaim: string,
   ): Promise<QueryRefinementResult> {
+    const currentDate = new Date().toISOString().slice(0, 10);
     const payload =
       await this.requestStructuredOutput<OpenAiQueryRefinementPayload>(
         apiKey,
@@ -191,6 +199,7 @@ export class ReviewsOpenAiClient {
           {
             role: "system",
             content: `팩트체크 대상 주장을 분석해 JSON으로 반환하세요.
+현재 날짜: ${currentDate}
 
 ## 필드
 - coreClaim: 핵심 주장
@@ -199,6 +208,8 @@ export class ReviewsOpenAiClient {
 - searchRoute:
   - korean_news: 한국 정치·경제 뉴스성 claim (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
   - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천·순수 의견·미래 예측
+- route는 인물/기업의 국적보다 claim이 다루는 사건·제도·영향의 관할, 장소, 시장을 우선해 판정.
+- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 claim이면 korean_news.
 
 ## searchPlan.queries
 korean_news면 정확히 4개, unsupported면 빈 배열.
@@ -212,13 +223,7 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
   - claim_specific: 고유명사 + 핵심 행위
   - current_state: 현재 시점 키워드 포함
   - primary_source: "공식"·"발표"·"공시" 등 포함
-  - contradiction_or_update: "취소"·"번복"·"정정"·"부인" 등 포함
-
-예시 — "하정우 수석이 국회의원 출마하는 게 사실이야?":
-  claim_specific: "하정우 수석 국회의원 출마"
-  current_state: "하정우 수석 총선 출마 여부 최신"
-  primary_source: "하정우 수석 출마 공식 발표"
-  contradiction_or_update: "하정우 수석 출마 부인 취소"`
+  - contradiction_or_update: "취소"·"번복"·"정정"·"부인" 등 포함`
           },
           {
             role: "user",
@@ -226,6 +231,11 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
           },
         ],
         "질의 정제 요청에 실패했습니다.",
+        {
+          reasoningEffort: "minimal",
+          textVerbosity: "low",
+          maxOutputTokens: QUERY_REFINEMENT_MAX_OUTPUT_TOKENS,
+        },
       );
 
     const coreClaim = this.normalizeText(payload.coreClaim, rawClaim);
@@ -711,6 +721,7 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
     schema: { name: string; schema: Record<string, unknown> },
     input: Array<{ role: "system" | "user"; content: string }>,
     errorMessage: string,
+    options: OpenAiRequestOptions = {},
   ): Promise<T> {
     const response = await postJson<unknown>(
       OPENAI_RESPONSES_URL,
@@ -724,6 +735,7 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
           model: OPENAI_MODEL,
           input,
           text: {
+            ...(options.textVerbosity ? { verbosity: options.textVerbosity } : {}),
             format: {
               type: "json_schema",
               name: schema.name,
@@ -731,6 +743,12 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
               strict: true,
             },
           },
+          ...(options.reasoningEffort
+            ? { reasoning: { effort: options.reasoningEffort } }
+            : {}),
+          ...(options.maxOutputTokens
+            ? { max_output_tokens: options.maxOutputTokens }
+            : {}),
         }),
       },
       OPENAI_TIMEOUT_MS,

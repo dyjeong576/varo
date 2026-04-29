@@ -86,6 +86,16 @@ describe("ReviewsOpenAiClient", () => {
     expect(result.generatedQueries).toEqual([
       { id: "q1", text: "트럼프의 관세 발표", rank: 1 },
     ]);
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[0]?.[1]?.body as string),
+    ).toMatchObject({
+      reasoning: { effort: "minimal" },
+      text: { verbosity: "low" },
+      max_output_tokens: 1000,
+    });
+    expect((global.fetch as jest.Mock).mock.calls[0]?.[1]?.body).toEqual(
+      expect.stringContaining("사용자가 연도·기간을 말하지 않았으면 특정 연도·기간을 만들지 말 것"),
+    );
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -169,6 +179,131 @@ describe("ReviewsOpenAiClient", () => {
       "한국 기준금리 동결",
     );
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("claim의 관할과 장소가 한국 정치 맥락이면 korean_news route로 유지한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    coreClaim: "일론 머스크의 부산 국회의원 출마",
+                    normalizedClaim: "일론 머스크가 부산에서 국회의원에 출마한다",
+                    claimType: "scheduled_event",
+                    searchRoute: "korean_news",
+                    searchPlan: {
+                      queries: [
+                        {
+                          id: "sp1",
+                          purpose: "claim_specific",
+                          query: "일론 머스크 부산 출마",
+                          priority: 1,
+                        },
+                        {
+                          id: "sp2",
+                          purpose: "current_state",
+                          query: "일론 머스크 국회의원 출마 여부",
+                          priority: 2,
+                        },
+                        {
+                          id: "sp3",
+                          purpose: "primary_source",
+                          query: "일론 머스크 출마 공식 발표",
+                          priority: 3,
+                        },
+                        {
+                          id: "sp4",
+                          purpose: "contradiction_or_update",
+                          query: "일론 머스크 출마 부인 정정",
+                          priority: 4,
+                        },
+                      ],
+                    },
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new ReviewsOpenAiClient();
+    const result = await client.refineQuery(
+      "openai-test-key",
+      "일론머스크가 부산 국회의원 출마한다는게 사실이야?",
+    );
+
+    expect(result.searchRoute).toBe("korean_news");
+    expect(result.isKoreaRelated).toBe(true);
+    expect(result.topicCountryCode).toBe("KR");
+    expect(result.searchPlan.queries).toHaveLength(4);
+  });
+
+  it("해외 기업명으로 시작해도 한국 시장 영향 claim이면 korean_news route로 유지한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    coreClaim: "해외 기업의 한국 서비스 종료",
+                    normalizedClaim: "해외 기업이 한국에서 서비스를 종료한다",
+                    claimType: "corporate_action",
+                    searchRoute: "korean_news",
+                    searchPlan: {
+                      queries: [
+                        {
+                          id: "sp1",
+                          purpose: "claim_specific",
+                          query: "해외 기업 한국 서비스 종료",
+                          priority: 1,
+                        },
+                        {
+                          id: "sp2",
+                          purpose: "current_state",
+                          query: "한국 서비스 종료 여부 최신",
+                          priority: 2,
+                        },
+                        {
+                          id: "sp3",
+                          purpose: "primary_source",
+                          query: "한국 서비스 종료 공식 발표",
+                          priority: 3,
+                        },
+                        {
+                          id: "sp4",
+                          purpose: "contradiction_or_update",
+                          query: "한국 서비스 종료 부인 정정",
+                          priority: 4,
+                        },
+                      ],
+                    },
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new ReviewsOpenAiClient();
+    const result = await client.refineQuery(
+      "openai-test-key",
+      "어떤 해외 기업이 한국 서비스 접는다는 게 사실이야?",
+    );
+
+    expect(result.searchRoute).toBe("korean_news");
+    expect(result.isKoreaRelated).toBe(true);
+    expect(result.topicCountryCode).toBe("KR");
   });
 
   it("structured output text를 evidence signal 결과로 변환한다", async () => {
