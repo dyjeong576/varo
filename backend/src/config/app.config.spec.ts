@@ -26,8 +26,8 @@ describe("app.config", () => {
   });
 
   it("FRONTEND_BASE_URL 끝의 slash를 정규화한다", () => {
-    expect(buildFrontendRedirectUrl("http://localhost:3000/", "/reviews/123?tab=evidence")).toBe(
-      "http://localhost:3000/reviews/123?tab=evidence",
+    expect(buildFrontendRedirectUrl("http://localhost:3000/", "/answers/123?tab=evidence")).toBe(
+      "http://localhost:3000/answers/123?tab=evidence",
     );
   });
 
@@ -58,7 +58,7 @@ describe("app.config", () => {
     expect(config.googleCallbackUrl).toBe("http://localhost:4000/api/v1/auth/google/callback");
     expect(config.frontendBaseUrl).toBe("http://localhost:3000");
     expect(config.sessionCookieDomain).toBe("varocheck.com");
-    expect(config.reviewProviderMode).toBe("mock");
+    expect(config.answerProviderMode).toBe("mock");
     expect(config.openAiApiKey).toBeNull();
     expect(config.naverClientId).toBeNull();
     expect(config.naverClientSecret).toBeNull();

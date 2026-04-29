@@ -81,7 +81,7 @@ describe("AuthController (e2e)", () => {
       handleGoogleCallback: jest.fn().mockResolvedValue({
         sessionId: "session-id",
         expiresAt: new Date("2026-03-28T00:00:00.000Z"),
-        redirectTo: "/reviews/123?tab=evidence",
+        redirectTo: "/answers/123?tab=evidence",
       }),
     } as unknown as AuthService;
     const sessionService = {
@@ -113,7 +113,7 @@ describe("AuthController (e2e)", () => {
       response as never,
     );
 
-    expect(response.redirect).toHaveBeenCalledWith("http://localhost:3000/reviews/123?tab=evidence");
+    expect(response.redirect).toHaveBeenCalledWith("http://localhost:3000/answers/123?tab=evidence");
   });
 
   it("루트 경로도 프론트 절대 URL로 redirect 한다", async () => {

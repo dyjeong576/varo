@@ -5,7 +5,7 @@ import { SettingsPageShell } from "../_components/settings-page-shell";
 
 export const metadata: Metadata = buildPageMetadata(
   "알림 설정",
-  "review 완료와 커뮤니티 활동 알림의 수신 범위를 관리합니다.",
+  "answer 완료와 커뮤니티 활동 알림의 수신 범위를 관리합니다.",
 );
 
 export default function SettingsNotificationsPage() {

@@ -1,12 +1,12 @@
 import { ApiProperty } from "@nestjs/swagger";
 
 export const NOTIFICATION_RESPONSE_TYPES = [
-  "review_completed",
+  "answer_completed",
   "community_comment",
   "community_like",
 ] as const;
 
-export const NOTIFICATION_TARGET_TYPES = ["review", "community_post"] as const;
+export const NOTIFICATION_TARGET_TYPES = ["answer", "community_post"] as const;
 
 export class NotificationItemResponseDto {
   @ApiProperty({ description: "알림 식별자", example: "notification-1" })
@@ -15,7 +15,7 @@ export class NotificationItemResponseDto {
   @ApiProperty({
     description: "알림 종류",
     enum: NOTIFICATION_RESPONSE_TYPES,
-    example: "review_completed",
+    example: "answer_completed",
   })
   type!: (typeof NOTIFICATION_RESPONSE_TYPES)[number];
 
@@ -40,13 +40,13 @@ export class NotificationItemResponseDto {
   @ApiProperty({
     description: "알림 이동 대상 종류",
     enum: NOTIFICATION_TARGET_TYPES,
-    example: "review",
+    example: "answer",
   })
   targetType!: (typeof NOTIFICATION_TARGET_TYPES)[number];
 
   @ApiProperty({
     description: "알림 이동 대상 식별자",
-    example: "review-1",
+    example: "answer-1",
   })
   targetId!: string;
 }

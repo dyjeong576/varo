@@ -20,7 +20,7 @@ export interface AppConfig {
   sessionCookieName: string;
   sessionCookieDomain: string | null;
   sessionTtlDays: number;
-  reviewProviderMode: "mock" | "real";
+  answerProviderMode: "mock" | "real";
   openAiApiKey: string | null;
   naverClientId: string | null;
   naverClientSecret: string | null;
@@ -76,7 +76,7 @@ function readCanonicalHostStatus(value?: string): CanonicalHostStatus {
   return value === "live" ? "live" : "pending";
 }
 
-function readReviewProviderMode(value?: string, appEnv?: AppEnv): "mock" | "real" {
+function readAnswerProviderMode(value?: string, appEnv?: AppEnv): "mock" | "real" {
   if (value === "real") {
     return "real";
   }
@@ -191,7 +191,7 @@ export function getAppConfig(): AppConfig {
     sessionCookieName: getRequired("SESSION_COOKIE_NAME"),
     sessionCookieDomain,
     sessionTtlDays: ttl,
-    reviewProviderMode: readReviewProviderMode(getOptional("REVIEW_PROVIDER_MODE"), appEnv),
+    answerProviderMode: readAnswerProviderMode(getOptional("ANSWER_PROVIDER_MODE"), appEnv),
     openAiApiKey: getOptional("OPENAI_API_KEY") ?? null,
     naverClientId: getOptional("NAVER_CLIENT_ID") ?? null,
     naverClientSecret: getOptional("NAVER_CLIENT_SECRET") ?? null,

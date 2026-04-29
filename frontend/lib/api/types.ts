@@ -30,19 +30,19 @@ export interface UserMeResponse {
 }
 
 export interface NotificationPreferencesResponse {
-  reviewCompleted: boolean;
+  answerCompleted: boolean;
   communityComment: boolean;
   communityLike: boolean;
 }
 
 export interface NotificationItemResponse {
   id: string;
-  type: "review_completed" | "community_comment" | "community_like";
+  type: "answer_completed" | "community_comment" | "community_like";
   title: string;
   message: string;
   isRead: boolean;
   createdAt: string;
-  targetType: "review" | "community_post";
+  targetType: "answer" | "community_post";
   targetId: string;
 }
 
@@ -60,14 +60,14 @@ export interface UpdateProfilePayload {
 }
 
 export interface UpdateNotificationPreferencesPayload {
-  reviewCompleted?: boolean;
+  answerCompleted?: boolean;
   communityComment?: boolean;
   communityLike?: boolean;
 }
 
-export interface Review {
+export interface Answer {
   id: string;
-  claim: string;
+  check: string;
   verdict: VerdictState | null; // null if pending or partial
   createdAt: string;
 }

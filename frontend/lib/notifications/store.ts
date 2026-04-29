@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import type { NotificationsListResponse } from "@/lib/notifications/types";
-import { buildReviewEntryHref } from "@/lib/reviews/navigation";
+import { buildAnswerEntryHref } from "@/lib/answers/navigation";
 
 const CHANGE_EVENT = "varo-notifications-changed";
 
@@ -46,11 +46,11 @@ export function getUnreadNotificationCount(): number {
 }
 
 export function getNotificationHref(params: {
-  targetType: "review" | "community_post";
+  targetType: "answer" | "community_post";
   targetId: string;
 }): string {
-  if (params.targetType === "review") {
-    return buildReviewEntryHref(params.targetId, "notification");
+  if (params.targetType === "answer") {
+    return buildAnswerEntryHref(params.targetId, "notification");
   }
 
   return `/community/${encodeURIComponent(params.targetId)}`;

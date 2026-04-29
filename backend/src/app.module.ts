@@ -8,7 +8,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { PopularModule } from "./popular/popular.module";
 import { getAppConfig } from "./config/app.config";
 import { PrismaModule } from "./prisma/prisma.module";
-import { ReviewsModule } from "./reviews/reviews.module";
+import { AnswersModule } from "./answers/answers.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -21,7 +21,7 @@ import { UsersModule } from "./users/users.module";
     PrismaModule,
     AuthModule,
     UsersModule,
-    ReviewsModule,
+    AnswersModule,
     CommunityModule,
     NotificationsModule,
     PopularModule,

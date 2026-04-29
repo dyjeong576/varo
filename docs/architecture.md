@@ -14,7 +14,7 @@
 
 ### 2.1 근거 중심 원칙
 - VARO는 절대적 진실 판정기가 아니다.
-- review 도메인의 결과는 항상 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
+- answer 도메인의 결과는 항상 `check`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - 기사 수만으로 결론을 내리지 않고, 출처 추적 가능성을 유지한다.
 - 사용자가 근거를 직접 열람할 수 있어야 한다.
 
@@ -27,7 +27,7 @@
 ## 3. 기술 스택
 - Frontend: Next.js 16, React 19, TypeScript, App Router, Tailwind CSS 4
 - Backend API: NestJS, TypeScript, REST API
-- Worker / Async Processing: Node.js worker + Redis queue는 후속 확장 축이다. 현재 review preview 생성은 API 요청 안에서 동기 처리한다.
+- Worker / Async Processing: Node.js worker + Redis queue는 후속 확장 축이다. 현재 answer preview 생성은 API 요청 안에서 동기 처리한다.
 - Primary Database: PostgreSQL
 - Infra / Runtime: Amazon Linux EC2, Docker Compose, nginx container, certbot container, GHCR, GitHub Actions self-hosted runner
 - External Auth: Google login
@@ -44,8 +44,8 @@ VARO는 아래 도메인으로 구성한다.
 - 인증 게이트
 - 사용자 프로필
 
-### 4.2 Review & Evidence Pipeline
-- claim 입력
+### 4.2 Answer & Evidence Pipeline
+- check 입력
 - source 검색 및 수집
 - relevance와 evidence signal 통합 분류
 - preview detail 생성
@@ -95,11 +95,11 @@ VARO는 아래 도메인으로 구성한다.
 [NestJS API]
     |-- auth/session ----------> [Google Auth]
     |-- read/write ------------> [PostgreSQL]
-    |-- review preview pipeline -> [Naver News Search / Tavily Search fallback / OpenAI]
+    |-- answer preview pipeline -> [Naver News Search / Tavily Search fallback / OpenAI]
     |-- enqueue future jobs ----> [Redis]
     |
     +--> [Workers]
-           |-- planned long-running review jobs
+           |-- planned long-running answer jobs
            |-- planned source extraction / structured final interpretation
            |-- planned notification fan-out
            +-- persist ----------> [PostgreSQL]
@@ -108,11 +108,11 @@ VARO는 아래 도메인으로 구성한다.
 핵심 구조:
 
 - 프론트엔드는 서버 세션 확인 이후 보호 레이아웃을 렌더링한다.
-- 프론트엔드는 review preview, 인기, 커뮤니티, 히스토리, 알림 UI를 담당한다.
+- 프론트엔드는 answer preview, 인기, 커뮤니티, 히스토리, 알림 UI를 담당한다.
 - 프론트엔드는 일부 UI 상태를 localStorage에 유지한다.
 - 백엔드는 도메인 API와 공통 비즈니스 규칙을 담당한다.
-- 현재 review preview 생성은 NestJS API가 동기 처리한다.
-- worker는 장기적 review job, source extraction, 알림 fan-out 같은 후속 확장 책임으로 둔다.
+- 현재 answer preview 생성은 NestJS API가 동기 처리한다.
+- worker는 장기적 answer job, source extraction, 알림 fan-out 같은 후속 확장 책임으로 둔다.
 - PostgreSQL은 서비스 전반의 기준 데이터 저장소다.
 - Redis는 queue와 일시적 비동기 제어를 담당한다.
 
@@ -163,10 +163,10 @@ VARO는 아래 도메인으로 구성한다.
 - 로그인 상태 확인
 - 서버 세션 기반 auth gate
 - 서비스 라우팅
-- review preview 생성과 결과 조회
+- answer preview 생성과 결과 조회
 - 인기 / 커뮤니티 / 히스토리 / 알림 UI 렌더링
 - unread badge, loading state, optimistic interaction 처리
-- `varo.review-tasks` localStorage 관리
+- `varo.answer-tasks` localStorage 관리
 - 서버 notifications API 기반 badge/list/read state 관리
 
 ### 6.2 Backend API
@@ -174,11 +174,11 @@ VARO는 아래 도메인으로 구성한다.
 - 도메인별 REST API 제공
 - 권한 검사
 - 동기 요청 처리
-- 현재 review preview 파이프라인 실행
+- 현재 answer preview 파이프라인 실행
 - 후속 job enqueue 및 상태 관리
 
 ### 6.3 Workers
-- 장시간 review 분석 파이프라인 실행
+- 장시간 answer 분석 파이프라인 실행
 - source extraction과 retry
 - interpretation / verdict 저장
 - 장기적인 알림 fan-out
@@ -186,12 +186,12 @@ VARO는 아래 도메인으로 구성한다.
 
 ### 6.4 Data Layer
 - 사용자 / 세션 / 프로필
-- review / evidence / result
+- answer / evidence / result
 - community
 - notifications
 - history
 - popular read model input
-- pending draft, reviewId 승격, preview 상태, 오류, 알림 생성 여부
+- pending draft, answerId 승격, preview 상태, 오류, 알림 생성 여부
 - 서버 notifications / notification_reads / preferences 기반 알림 목록과 읽음 상태
 
 ## 7. 환경 구성
@@ -217,13 +217,13 @@ VARO는 아래 도메인으로 구성한다.
 - `NEXT_PUBLIC_*`에는 비밀값을 넣지 않는다.
 - 인증되지 않은 사용자는 보호된 화면과 API에 접근할 수 없다.
 - 커뮤니티는 익명 사용을 허용하지 않는다.
-- review 결과는 원문 출처 링크와 함께 제공되어야 한다.
+- answer 결과는 원문 출처 링크와 함께 제공되어야 한다.
 
 ### 8.2 운영
 - 모든 요청과 job에 trace id를 남긴다.
 - `environment=dev|prod` 태그를 로그와 메트릭에 포함한다.
-- 외부 API 실패율, review 완료율, 알림 생성 성공률, 인기 집계 지연을 관측한다.
-- review preview 단계별 소요시간 로그를 관측한다.
+- 외부 API 실패율, answer 완료율, 알림 생성 성공률, 인기 집계 지연을 관측한다.
+- answer preview 단계별 소요시간 로그를 관측한다.
 - queue 적체와 외부 provider 장애는 서비스 품질에 직접 연결되는 운영 지표로 본다.
 
 ## 9. 문서 역할

@@ -6,10 +6,10 @@ import { NotificationPreferencesResponseDto } from "./notification-preferences-r
 export class UpdateNotificationPreferencesDto extends PartialType(
   NotificationPreferencesResponseDto,
 ) {
-  @ApiPropertyOptional({ description: "review 완료 알림 수신 여부", example: true })
+  @ApiPropertyOptional({ description: "answer 완료 알림 수신 여부", example: true })
   @IsOptional()
   @IsBoolean()
-  override reviewCompleted?: boolean;
+  override answerCompleted?: boolean;
 
   @ApiPropertyOptional({ description: "커뮤니티 댓글 알림 수신 여부", example: true })
   @IsOptional()

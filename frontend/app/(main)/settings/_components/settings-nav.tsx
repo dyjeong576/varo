@@ -15,7 +15,7 @@ import {
 import { api } from "@/lib/api/client";
 import { clearNotificationPreferences } from "@/lib/notifications/preferences";
 import { clearNotifications } from "@/lib/notifications/store";
-import { clearReviewTasks } from "@/lib/reviews/task-store";
+import { clearAnswerTasks } from "@/lib/answers/task-store";
 
 export function SettingsNav() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export function SettingsNav() {
 
     try {
       await api.auth.logout();
-      clearReviewTasks();
+      clearAnswerTasks();
       clearNotifications();
       clearNotificationPreferences();
       router.replace("/login");

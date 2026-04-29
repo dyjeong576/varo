@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { PopularTopic } from '@/lib/types/popular';
-import { buildReviewEntryHref } from '@/lib/reviews/navigation';
+import { buildAnswerEntryHref } from '@/lib/answers/navigation';
 
 interface PopularTopicCardProps {
   topic: PopularTopic;
@@ -51,7 +51,7 @@ export const PopularTopicCard: React.FC<PopularTopicCardProps> = ({ topic }) => 
   };
 
   return (
-    <Link href={buildReviewEntryHref(topic.representativeReviewId, 'popular')} className="block">
+    <Link href={buildAnswerEntryHref(topic.representativeAnswerId, 'popular')} className="block">
       <article className="group relative flex items-start gap-6 p-6 bg-surface-container-lowest rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgba(0,80,203,0.08)] transition-all duration-300 cursor-pointer">
         <div className="flex-none flex items-center justify-center w-12 h-12">
           <span className={`text-3xl font-black italic ${topic.rank === 1 ? 'text-primary opacity-90' : 'text-on-surface-variant/30'}`}>
@@ -72,7 +72,7 @@ export const PopularTopicCard: React.FC<PopularTopicCardProps> = ({ topic }) => 
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <span className="material-symbols-outlined text-sm">article</span>
-              요청 {topic.reviewCount.toLocaleString()}건
+              요청 {topic.answerCount.toLocaleString()}건
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <span className="material-symbols-outlined text-sm">history</span>

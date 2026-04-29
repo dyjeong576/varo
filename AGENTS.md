@@ -19,9 +19,9 @@ VARO는 사용자가 어떤 뉴스, 주장, 사실성 있는 문장을 입력했
 - 결과는 반드시 "수집된 출처 기준의 해석"이어야 합니다.
 - 근거가 약하면 불확실하다고 명시해야 합니다.
 
-### 2.2 claim / evidence / interpretation / uncertainty를 분리할 것
+### 2.2 check / evidence / interpretation / uncertainty를 분리할 것
 항상 아래를 명확히 구분합니다.
-- 사용자가 입력한 주장(claim)
+- 사용자가 입력한 주장(check)
 - 수집된 출처와 증거(evidence)
 - AI의 해석(interpretation)
 - 남아 있는 불확실성(uncertainty)
@@ -61,7 +61,7 @@ VARO MVP의 목표는 아래와 같습니다.
 ## 4. MVP 범위
 MVP에서는 아래에 집중합니다.
 
-- claim 입력
+- check 입력
 - 관련 기사/출처 수집
 - 출처 카드 표시
 - 발행시각 / 매체명 / 링크 / 스니펫 표시

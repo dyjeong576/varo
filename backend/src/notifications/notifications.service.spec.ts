@@ -36,11 +36,11 @@ describe("NotificationsService", () => {
       [
         {
           id: "notification-1",
-          notificationType: "review_completed",
+          notificationType: "answer_completed",
           title: "근거 수집 완료",
           body: "본문",
-          targetType: "review",
-          targetId: "review-1",
+          targetType: "answer",
+          targetId: "answer-1",
           createdAt: new Date("2026-04-19T10:00:00.000Z"),
           reads: [],
         },
@@ -53,10 +53,10 @@ describe("NotificationsService", () => {
     expect(result.unreadCount).toBe(1);
     expect(result.items[0]).toMatchObject({
       id: "notification-1",
-      type: "review_completed",
+      type: "answer_completed",
       isRead: false,
-      targetType: "review",
-      targetId: "review-1",
+      targetType: "answer",
+      targetId: "answer-1",
     });
   });
 
@@ -64,7 +64,7 @@ describe("NotificationsService", () => {
     const { prisma, service } = createService();
     prisma.userNotificationPreference.upsert.mockResolvedValue({
       userId: "user-1",
-      reviewCompleted: true,
+      answerCompleted: true,
       communityComment: true,
       communityLike: true,
       updatedAt: new Date(),
@@ -78,7 +78,7 @@ describe("NotificationsService", () => {
       create: { userId: "user-1" },
     });
     expect(result).toEqual({
-      reviewCompleted: true,
+      answerCompleted: true,
       communityComment: true,
       communityLike: true,
     });

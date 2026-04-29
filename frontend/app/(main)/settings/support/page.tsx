@@ -10,9 +10,9 @@ export const metadata: Metadata = buildPageMetadata(
 
 const faqItems = [
   {
-    question: "review 결과는 사실을 확정해 주는 기능인가요?",
+    question: "answer 결과는 사실을 확정해 주는 기능인가요?",
     answer:
-      "아닙니다. VARO는 수집된 출처를 바탕으로 claim, evidence, interpretation, uncertainty를 구조화해 보여주는 서비스입니다. 결과는 절대적 진실 선언이 아니라 현재 확보된 근거 기준의 해석입니다.",
+      "아닙니다. VARO는 수집된 출처를 바탕으로 check, evidence, interpretation, uncertainty를 구조화해 보여주는 서비스입니다. 결과는 절대적 진실 선언이 아니라 현재 확보된 근거 기준의 해석입니다.",
     icon: MessageCircleQuestion,
   },
   {

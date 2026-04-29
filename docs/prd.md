@@ -2,13 +2,13 @@
 
 ## 1. Executive Summary
 
-VARO(Verified Analysis, Reasoned Opinion)는 사용자가 뉴스, 기사, 온라인 게시물, 인터뷰 발언처럼 사실성 검토가 필요한 `claim`을 입력하면 관련 `evidence`를 수집하고, 그 근거만을 기반으로 `interpretation`을 구조화해 보여주는 서비스다.
+VARO(Verified Analysis, Reasoned Opinion)는 사용자가 뉴스, 기사, 온라인 게시물, 인터뷰 발언처럼 사실성 검토가 필요한 `check`을 입력하면 관련 `evidence`를 수집하고, 그 근거만을 기반으로 `interpretation`을 구조화해 보여주는 서비스다.
 
 브랜드 표기는 기본적으로 `VARO`를 사용하고, 사용자-facing 포지셔닝 문구는 `Verified Analysis, Reasoned Opinion`으로 유지한다.
 
 MVP의 목적은 "진실을 판정"하는 것이 아니라, 사용자가 직접 판단할 수 있도록 근거와 맥락을 정리해 제공하는 것이다. 따라서 결과는 항상 수집된 출처 기준의 해석이어야 하며, 불확실성이 남아 있으면 이를 숨기지 않는다.
 
-이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하며, 검토 범위는 **한국 정치·경제** 도메인의 사실성 claim으로 고정한다. 한국 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, 네이버 후보가 충분하지 않을 때만 Tavily Search를 보조 검색 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 한국 정치·경제 범위를 벗어나는 claim은 지원 범위 밖으로 안내한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
+이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하며, 검토 범위는 **한국 정치·경제** 도메인의 사실성 check으로 고정한다. 한국 정치·경제 뉴스성 check은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, 네이버 후보가 충분하지 않을 때만 Tavily Search를 보조 검색 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 한국 정치·경제 범위를 벗어나는 check은 지원 범위 밖으로 안내한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
 
 ## 2. Product Vision
 
@@ -17,7 +17,7 @@ VARO의 장기 비전은 사용자가 어떤 주장에 대해서도 "왜 이런 
 제품은 아래 원칙을 유지해야 한다.
 
 - 절대적 진실 판정기처럼 행동하지 않는다.
-- `claim`, `evidence`, `interpretation`, `uncertainty`를 분리해 보여준다.
+- `check`, `evidence`, `interpretation`, `uncertainty`를 분리해 보여준다.
 - 사용자가 원문 출처까지 직접 확인할 수 있게 한다.
 - 상충하는 근거를 숨기지 않는다.
 
@@ -64,8 +64,8 @@ VARO의 장기 비전은 사용자가 어떤 주장에 대해서도 "왜 이런 
 
 VARO는 사용자가 하나의 주장에 대해 다음을 빠르게 확인하도록 돕는다.
 
-- 어떤 `claim`이 검토 대상인지
-- 해당 claim을 검증하기 위해 어떤 검색 관점이 필요한지
+- 어떤 `check`이 검토 대상인지
+- 해당 check을 검증하기 위해 어떤 검색 관점이 필요한지
 - 어떤 `evidence`가 수집되었는지
 - 수집된 출처를 기준으로 어떤 `interpretation`이 가능한지
 - 무엇이 아직 `uncertainty`로 남아 있는지
@@ -76,10 +76,10 @@ VARO는 사용자가 하나의 주장에 대해 다음을 빠르게 확인하도
 
 MVP에서 포함하는 범위는 아래와 같다.
 
-- 사용자가 검토하고 싶은 `claim` 입력
-- claim의 정치·경제 도메인 적합성 자동 판정
-- claim의 뉴스성 및 검색 provider route 확인
-- claim 이해 기반 search plan 생성
+- 사용자가 검토하고 싶은 `check` 입력
+- check의 정치·경제 도메인 적합성 자동 판정
+- check의 뉴스성 및 검색 provider route 확인
+- check 이해 기반 search plan 생성
 - 관련 출처 수집
 - 출처 메타데이터 표시
 - 검색 결과 스니펫과 evidence signal 기반 근거 표시
@@ -87,10 +87,10 @@ MVP에서 포함하는 범위는 아래와 같다.
 - 출처 간 일치, 충돌, 불확실성 표시
 - 결과 페이지 중심 UX
 
-MVP 기준 검토 가능 claim:
+MVP 기준 검토 가능 check:
 
-- 한국 정치·경제 뉴스성 claim
-- 한국 정치인 발언, 정당/정부 입장, 정책, 공약, 법안, 예산, 세금, 물가, 금리, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 사실성 검토가 가능한 claim
+- 한국 정치·경제 뉴스성 check
+- 한국 정치인 발언, 정당/정부 입장, 정책, 공약, 법안, 예산, 세금, 물가, 금리, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 사실성 검토가 가능한 check
 
 MVP 기준 현재 출처 범위:
 
@@ -104,10 +104,10 @@ MVP 기준 현재 출처 범위:
 
 - 완전한 다국어 지원
 - 뉴스성 또는 사실성 검토 대상이 아닌 일반 의견/상담/창작 요청
-- 지원 범위 밖 뉴스 claim
+- 지원 범위 밖 뉴스 check
 - 의료, 연예, 스포츠 등 정치·경제 밖의 도메인
 - 가치판단, 정쟁성 의견, 미래 예측, 투자 매수/매도 추천
-- 검색 provider로 근거 수집이 불가능한 claim에 대한 verdict 생성
+- 검색 provider로 근거 수집이 불가능한 check에 대한 verdict 생성
 - SNS 전체 네트워크 추적
 - 사람 또는 조직별 신뢰도 점수 체계
 - 법률 수준의 사실 인증
@@ -126,17 +126,17 @@ MVP 기준 현재 출처 범위:
 
 ## 10. Core Features
 
-### 10.1 Claim Input
+### 10.1 Check Input
 
 - 사용자가 사실성 검토가 필요한 문장을 입력한다.
-- 입력 단위는 `claim`이다.
+- 입력 단위는 `check`이다.
 
 ### 10.2 Source Collection
 
 - 시스템이 관련 `source`를 수집한다.
 - 현재 수집 범위는 Naver News Search와 필요 시 Tavily Search fallback으로 확인되는 뉴스 source다.
-- 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, claim 검증 목적에 맞는 search plan을 생성한다.
-- 기본 검색 목적은 `claim_specific`, `current_state`, `primary_source`, `contradiction_or_update`로 구분한다.
+- 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, check 검증 목적에 맞는 search plan을 생성한다.
+- 기본 검색 목적은 `check_specific`, `current_state`, `primary_source`, `contradiction_or_update`로 구분한다.
 - 시스템은 뉴스 검색에서 Naver News Search를 먼저 사용하고, 후보가 부족할 때만 Tavily Search fallback을 사용한다.
 
 ### 10.3 Evidence Preparation
@@ -145,7 +145,7 @@ MVP 기준 현재 출처 범위:
 - 본문 추출 기반 `evidence snippet`은 후속 확장 대상으로 두되, 현재 preview에서는 source-level signal을 우선 사용한다.
 - 사용자에게 어떤 source와 어떤 signal이 결과에 쓰였는지 추적 가능하게 제공한다.
 
-### 10.4 Structured Review Result
+### 10.4 Structured Answer Result
 
 - 수집된 출처와 evidence signal만 기반으로 `rule_based_preview` result를 생성한다.
 - 결과에는 verdict, 핵심 해석, 불확실성이 포함된다.
@@ -158,12 +158,12 @@ MVP 기준 현재 출처 범위:
 
 ## 11. Functional Requirements
 
-### 11.1 Input and Review Flow
+### 11.1 Input and Answer Flow
 
-- 사용자는 하나의 `claim`을 입력할 수 있어야 한다.
+- 사용자는 하나의 `check`을 입력할 수 있어야 한다.
 - 시스템은 입력 후 검토 진행 상태를 보여줄 수 있어야 한다.
-- 시스템은 정치·경제 뉴스성 claim인지 자동 판정해야 한다.
-- 시스템은 claim의 `search_route`를 판정하고, `unsupported`이면 verdict를 만들지 않고 지원 범위 밖 상태로 기록해야 한다.
+- 시스템은 정치·경제 뉴스성 check인지 자동 판정해야 한다.
+- 시스템은 check의 `search_route`를 판정하고, `unsupported`이면 verdict를 만들지 않고 지원 범위 밖 상태로 기록해야 한다.
 - 현재 구현에서 공개 API 기준 authoritative field는 `search_route`이며, 판정 이유는 `search_route_reason`으로 설명해야 한다.
 - 시스템은 `search_route`와 별도로 검증 목적별 `search_plan`을 생성해야 한다.
 - 시스템은 Naver 후보가 충분하면 Tavily를 호출하지 않아야 한다.
@@ -199,7 +199,7 @@ MVP 기준 현재 출처 범위:
 
 ### 11.5 Traceability
 
-- 각 결과는 어떤 `claim`에 대한 것인지 연결되어야 한다.
+- 각 결과는 어떤 `check`에 대한 것인지 연결되어야 한다.
 - 각 해석은 어떤 `source`와 evidence signal을 기반으로 했는지 추적 가능해야 한다. snippet row가 있는 경우에는 snippet까지 연결해야 한다.
 
 ## 12. Non-Functional Requirements
@@ -224,21 +224,21 @@ MVP 기준 현재 출처 범위:
 
 | 단위               | 설명                                                    |
 | ------------------ | ------------------------------------------------------- |
-| `claim`            | 사용자가 검토하고 싶은 문장 또는 주장                   |
+| `check`            | 사용자가 검토하고 싶은 문장 또는 주장                   |
 | `source`           | 수집된 기사 또는 뉴스 검색 결과에서 확인된 출처         |
-| `evidence signal`  | 각 source가 claim에 대해 수행하는 지지/충돌/맥락 역할   |
-| `review result`    | verdict, interpretation, uncertainty를 포함한 결과 단위 |
+| `evidence signal`  | 각 source가 check에 대해 수행하는 지지/충돌/맥락 역할   |
+| `answer result`    | verdict, interpretation, uncertainty를 포함한 결과 단위 |
 
 페이지 구조는 아래와 같다.
 
-- Claim 입력 페이지
+- Check 입력 페이지
 - 검토 진행 상태 페이지
 - 결과 페이지
 - 인기 주제 페이지
 
 ## 15. Screen-by-Screen Spec
 
-### 15.1 Claim 입력 화면
+### 15.1 Check 입력 화면
 
 목적:
 
@@ -246,7 +246,7 @@ MVP 기준 현재 출처 범위:
 
 포함 요소:
 
-- claim 입력 필드
+- check 입력 필드
 - 검토 시작 CTA
 - 서비스 설명 문구
 
@@ -263,7 +263,7 @@ MVP 기준 현재 출처 범위:
 
 포함 요소:
 
-- 현재 검토 중인 claim 요약
+- 현재 검토 중인 check 요약
 - 수집 및 분석 진행 상태
 - 결과 페이지로 이어지는 전환 상태
 
@@ -280,7 +280,7 @@ MVP 기준 현재 출처 범위:
 
 포함 요소:
 
-- claim 요약
+- check 요약
 - verdict
 - interpretation 요약
 - uncertainty 요약
@@ -298,7 +298,7 @@ MVP 기준 현재 출처 범위:
 
 목적:
 
-- 최근 24시간 동안 사용자 관심이 반복적으로 모인 주제를 빠르게 훑고 기존 review preview로 재진입하게 한다.
+- 최근 24시간 동안 사용자 관심이 반복적으로 모인 주제를 빠르게 훑고 기존 answer preview로 재진입하게 한다.
 
 포함 요소:
 
@@ -306,12 +306,12 @@ MVP 기준 현재 출처 범위:
 - topic 텍스트
 - 최근 24시간 `submitted + meaningful reopen` 합산 점수
 - 요청 수와 재열람 수 분리 표시
-- 대표 review preview 재진입 링크
+- 대표 answer preview 재진입 링크
 
 핵심 UX 포인트:
 
 - popularity는 단순 조회수가 아니라 새 검토 요청과 의미 있는 재진입의 합산임을 명시해야 한다.
-- 인기 항목 선택 시 새 검토를 만들지 않고 기존 review preview로 바로 들어가야 한다.
+- 인기 항목 선택 시 새 검토를 만들지 않고 기존 answer preview로 바로 들어가야 한다.
 - 인기 항목은 근거를 다시 확인하는 진입점이어야 하며, 결론 소비 화면처럼 과장되게 보이면 안 된다.
 
 ## 16. Verdict / Evidence Model
@@ -336,7 +336,7 @@ MVP의 verdict는 아래 네 단계로 고정한다.
 
 각 결과는 아래를 분리해서 다룬다.
 
-- `Claim`: 사용자가 입력한 검토 대상 문장
+- `Check`: 사용자가 입력한 검토 대상 문장
 - `Evidence`: 수집된 출처와 스니펫, 메타데이터
 - `Interpretation`: 수집된 출처만 기반으로 한 요약과 해석
 - `Uncertainty`: 남아 있는 모호함, 충돌, 부족한 근거
@@ -368,7 +368,7 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 
 초기 MVP에서 추적할 핵심 지표는 아래와 같다.
 
-- claim 제출 수
+- check 제출 수
 - 결과 페이지 도달률
 - 출처 카드 클릭률
 - 원문 링크 클릭률
@@ -398,11 +398,11 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 ## 20. Recommended MVP Decisions
 
 - 초기 타깃은 **한국 정치·경제 뉴스**를 소비하는 한국어 사용자로 둔다.
-- 한국 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 provider로 사용한다.
+- 한국 정치·경제 뉴스성 check은 네이버 뉴스 검색 API를 기본 검색 provider로 사용한다.
 - Tavily Search는 Naver 후보가 부족할 때만 한국 뉴스 보조 검색 provider로 사용한다.
 - Tavily Extract는 후속 본문 추출 확장용으로 유지하되, 현재 preview 생성 경로에서는 사용하지 않는다.
 - 핵심 경험은 결과 페이지 중심으로 설계한다.
-- 입력은 단일 claim 중심으로 단순하게 시작한다.
+- 입력은 단일 check 중심으로 단순하게 시작한다.
 - verdict는 4단계 모델을 유지한다.
 - source card에는 출처명, 발행 시각, URL, 핵심 스니펫, 출처 유형을 기본 포함한다.
 - source card의 뉴스사 성향 배지는 출처 맥락 표시용이며, 사실성 판단 점수가 아니다.
@@ -414,7 +414,7 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 
 ### Phase 1: MVP Launch
 
-- claim 입력
+- check 입력
 - 출처 수집
 - source card 표시
 - verdict 및 interpretation 표시

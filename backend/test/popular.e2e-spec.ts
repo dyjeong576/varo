@@ -10,11 +10,11 @@ describe("PopularController (e2e)", () => {
           topicText: "테슬라 한국 철수",
           rank: 1,
           popularityScore: 12,
-          reviewCount: 7,
+          answerCount: 7,
           reopenCount: 5,
           trend: "up",
           trendValue: 50,
-          representativeReviewId: "review-1",
+          representativeAnswerId: "answer-1",
           updatedAt: "2026-04-04T10:00:00.000Z",
         },
       ]),
@@ -25,7 +25,7 @@ describe("PopularController (e2e)", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].popularityScore).toBe(12);
-    expect(result[0].representativeReviewId).toBe("review-1");
+    expect(result[0].representativeAnswerId).toBe("answer-1");
     expect(popularService.listTopics).toHaveBeenCalled();
   });
 });

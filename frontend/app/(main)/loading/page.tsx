@@ -4,11 +4,11 @@ import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "re
 import { Loader2, CheckCircle2, RefreshCw, ArrowRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  getActiveReviewTask,
-  getReviewTask,
-  startReviewTask,
-  subscribeReviewTasks,
-} from "@/lib/reviews/task-store";
+  getActiveAnswerTask,
+  getAnswerTask,
+  startAnswerTask,
+  subscribeAnswerTasks,
+} from "@/lib/answers/task-store";
 
 const STAGES = [
   "준비 중",
@@ -26,17 +26,17 @@ function LoadingContent() {
   const draftId = searchParams.get("draft") ?? "";
   const [currentStage, setCurrentStage] = useState(0);
   const task = useSyncExternalStore(
-    subscribeReviewTasks,
-    () => (draftId ? getReviewTask(draftId) : null),
+    subscribeAnswerTasks,
+    () => (draftId ? getAnswerTask(draftId) : null),
     () => null,
   );
 
-  const claimQuery = task?.claim ?? "";
+  const checkQuery = task?.check ?? "";
   const errorMessage = task?.errorMessage ?? null;
   const isSubmitting =
     task?.status === "pending" || task?.status === "submitting";
-  const isCompleted = task?.status === "succeeded" && Boolean(task.reviewId);
-  const isProcessing = task?.status === "processing" && Boolean(task.reviewId);
+  const isCompleted = task?.status === "succeeded" && Boolean(task.answerId);
+  const isProcessing = task?.status === "processing" && Boolean(task.answerId);
   const isOutOfScope = task?.previewStatus === "out_of_scope";
 
   const activeStageIndex = useMemo(() => {
@@ -52,7 +52,7 @@ function LoadingContent() {
   }, [currentStage, isCompleted, task?.status]);
 
   useEffect(() => {
-    const resolvedDraftId = draftId || getActiveReviewTask()?.draftId;
+    const resolvedDraftId = draftId || getActiveAnswerTask()?.draftId;
 
     if (!resolvedDraftId) {
       router.replace("/");
@@ -64,7 +64,7 @@ function LoadingContent() {
       return;
     }
 
-    const loadTask = () => getReviewTask(resolvedDraftId);
+    const loadTask = () => getAnswerTask(resolvedDraftId);
     const initialTask = loadTask();
 
     if (!initialTask) {
@@ -72,18 +72,18 @@ function LoadingContent() {
       return;
     }
 
-    if (!initialTask.reviewId && initialTask.status !== "failed") {
-      void startReviewTask(resolvedDraftId).catch(() => undefined);
+    if (!initialTask.answerId && initialTask.status !== "failed") {
+      void startAnswerTask(resolvedDraftId).catch(() => undefined);
     }
 
     return undefined;
   }, [draftId, router]);
 
   useEffect(() => {
-    if (isProcessing && task?.reviewId) {
-      router.replace(`/reviews/${encodeURIComponent(task.reviewId)}`);
+    if (isProcessing && task?.answerId) {
+      router.replace(`/answers/${encodeURIComponent(task.answerId)}`);
     }
-  }, [isProcessing, router, task?.reviewId]);
+  }, [isProcessing, router, task?.answerId]);
 
   useEffect(() => {
     if (!isSubmitting || errorMessage) {
@@ -106,7 +106,7 @@ function LoadingContent() {
     setCurrentStage(0);
 
     try {
-      await startReviewTask(draftId);
+      await startAnswerTask(draftId);
     } catch {
       return;
     }
@@ -127,11 +127,11 @@ function LoadingContent() {
           {isOutOfScope ? "지원 범위 확인 완료" : "팩트체크 분석 중"}
         </h1>
         <h2 className="text-[15px] font-bold text-primary break-keep">
-          {claimQuery || "입력된 주장 분석 중..."}
+          {checkQuery || "입력된 주장 분석 중..."}
         </h2>
         <p className="mt-4 text-[13px] text-gray-500">
           {isOutOfScope
-            ? "현재 MVP는 한국 관련 claim만 검토합니다."
+            ? "현재 MVP는 한국 관련 check만 검토합니다."
             : "신뢰할 수 있는 정보를 위해 다각도로 검증 중입니다."}
         </p>
       </div>
@@ -173,7 +173,7 @@ function LoadingContent() {
         </div>
       </div>
 
-      {isCompleted && task.reviewId ? (
+      {isCompleted && task.answerId ? (
         <div className={`w-full max-w-sm mx-auto mb-6 rounded-[18px] border px-5 py-4 ${
           isOutOfScope
             ? "border-slate-200 bg-white"
@@ -188,7 +188,7 @@ function LoadingContent() {
           </p>
           <div className="mt-4 flex gap-3">
             <button
-              onClick={() => router.push(`/reviews/${task.reviewId}`)}
+              onClick={() => router.push(`/answers/${task.answerId}`)}
               className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
             >
               {isOutOfScope ? "기록 보기" : "결과 보기"}

@@ -38,7 +38,7 @@ export function NotificationList() {
 
   const getIcon = (type: NotificationItem["type"], isRead: boolean) => {
     switch(type) {
-      case "review_completed":
+      case "answer_completed":
         return <FileCheck className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-blue-600'}`} />;
       case "community_comment":
         return <MessageSquare className={`w-6 h-6 ${isRead ? 'text-gray-400' : 'text-slate-600'}`} />;
@@ -52,7 +52,7 @@ export function NotificationList() {
   const getIconBg = (type: NotificationItem["type"], isRead: boolean) => {
     if (isRead) return "bg-[#ecedfa]";
     switch(type) {
-      case "review_completed":
+      case "answer_completed":
         return "bg-[#dae1ff]";
       case "community_comment":
       case "community_like":

@@ -6,29 +6,29 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
 import { refreshNotifications } from "@/lib/notifications/store";
-import { ReviewHistoryList } from "@/components/reviews/ReviewHistoryList";
-import { ReviewPreviewSummary } from "@/lib/reviews/types";
-import { getMergedReviewSummaries } from "@/lib/reviews/history";
+import { AnswerHistoryList } from "@/components/answers/AnswerHistoryList";
+import { AnswerPreviewSummary } from "@/lib/answers/types";
+import { getMergedAnswerSummaries } from "@/lib/answers/history";
 import {
-  removeReviewTask,
-  removeReviewTaskByReviewId,
-  subscribeReviewTasks,
-} from "@/lib/reviews/task-store";
+  removeAnswerTask,
+  removeAnswerTaskByAnswerId,
+  subscribeAnswerTasks,
+} from "@/lib/answers/task-store";
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [reviews, setReviews] = useState<ReviewPreviewSummary[]>([]);
+  const [answers, setAnswers] = useState<AnswerPreviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [deletingAnswerId, setDeletingAnswerId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
-    getMergedReviewSummaries(api.reviews.getRecent)
+    getMergedAnswerSummaries(api.answers.getRecent)
       .then((result) => {
         if (active) {
-          setReviews(result);
+          setAnswers(result);
           setErrorMessage(null);
         }
       })
@@ -47,11 +47,11 @@ export default function HistoryPage() {
         }
       });
 
-    const unsubscribe = subscribeReviewTasks(() => {
-      void getMergedReviewSummaries(api.reviews.getRecent)
+    const unsubscribe = subscribeAnswerTasks(() => {
+      void getMergedAnswerSummaries(api.answers.getRecent)
         .then((result) => {
           if (active) {
-            setReviews(result);
+            setAnswers(result);
           }
         })
         .catch(() => undefined);
@@ -63,39 +63,39 @@ export default function HistoryPage() {
     };
   }, []);
 
-  const handleDeleteReview = async (review: ReviewPreviewSummary) => {
-    const isPendingReview = review.reviewId.startsWith("pending:");
-    const confirmMessage = isPendingReview
-      ? "이 임시 review 기록을 삭제하시겠습니까?"
-      : "이 review를 삭제하시겠습니까?";
+  const handleDeleteAnswer = async (answer: AnswerPreviewSummary) => {
+    const isPendingAnswer = answer.answerId.startsWith("pending:");
+    const confirmMessage = isPendingAnswer
+      ? "이 임시 answer 기록을 삭제하시겠습니까?"
+      : "이 answer를 삭제하시겠습니까?";
 
     if (!window.confirm(confirmMessage)) {
       return;
     }
 
-    setDeletingReviewId(review.reviewId);
+    setDeletingAnswerId(answer.answerId);
 
     try {
-      if (isPendingReview) {
-        removeReviewTask(review.reviewId);
+      if (isPendingAnswer) {
+        removeAnswerTask(answer.answerId);
       } else {
-        await api.reviews.delete(review.reviewId);
-        removeReviewTaskByReviewId(review.reviewId);
+        await api.answers.delete(answer.answerId);
+        removeAnswerTaskByAnswerId(answer.answerId);
         void refreshNotifications().catch(() => undefined);
       }
 
-      setReviews((currentReviews) =>
-        currentReviews.filter((item) => item.reviewId !== review.reviewId),
+      setAnswers((currentAnswers) =>
+        currentAnswers.filter((item) => item.answerId !== answer.answerId),
       );
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
         error instanceof ApiClientError
           ? error.message
-          : "review를 삭제하지 못했습니다.",
+          : "answer를 삭제하지 못했습니다.",
       );
     } finally {
-      setDeletingReviewId(null);
+      setDeletingAnswerId(null);
     }
   };
 
@@ -115,7 +115,7 @@ export default function HistoryPage() {
               History
             </h1>
             <p className="mt-1 text-sm text-[#6b7280]">
-              최근 검토한 review preview를 다시 확인할 수 있습니다.
+              최근 검토한 answer preview를 다시 확인할 수 있습니다.
             </p>
           </div>
         </div>
@@ -126,12 +126,12 @@ export default function HistoryPage() {
           </div>
         ) : null}
 
-        <ReviewHistoryList
-          reviews={reviews}
+        <AnswerHistoryList
+          answers={answers}
           isLoading={isLoading}
-          emptyMessage="아직 생성된 review 기록이 없습니다."
-          onDelete={handleDeleteReview}
-          deletingReviewId={deletingReviewId}
+          emptyMessage="아직 생성된 answer 기록이 없습니다."
+          onDelete={handleDeleteAnswer}
+          deletingAnswerId={deletingAnswerId}
         />
       </div>
     </div>

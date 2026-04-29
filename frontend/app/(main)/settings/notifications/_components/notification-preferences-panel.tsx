@@ -21,8 +21,8 @@ interface PreferenceItem {
 
 const preferenceItems: PreferenceItem[] = [
   {
-    key: "reviewCompleted",
-    title: "review 완료 알림",
+    key: "answerCompleted",
+    title: "answer 완료 알림",
     description: "요청한 리뷰가 준비되면 알림 목록과 상단 배지로 알려드려요.",
     icon: BellRing,
   },

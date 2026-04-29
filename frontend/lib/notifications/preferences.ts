@@ -11,7 +11,7 @@ type NotificationPreferencesSnapshot = {
 };
 
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
-  reviewCompleted: true,
+  answerCompleted: true,
   communityComment: true,
   communityLike: true,
 };

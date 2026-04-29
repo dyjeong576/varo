@@ -37,12 +37,12 @@
 
 ## 2026-04-01
 
-### Review Query Processing
-- review query processing 1차 구현 범위는 `claim intake ~ evidence preparation`까지로 제한한다.
-- review query backend의 1차 공개 API는 `POST /api/v1/reviews/query-processing-preview`로 둔다.
+### Answer Query Processing
+- answer query processing 1차 구현 범위는 `check intake ~ evidence preparation`까지로 제한한다.
+- answer query backend의 1차 공개 API는 `POST /api/v1/answers/query-processing-preview`로 둔다.
 - query refinement와 relevance filtering의 출력 모델은 `primary / reference / discard` 3단계로 고정한다.
 - source traceability는 source별 `origin_query_ids[]`를 유지하는 방식으로 구현한다.
-- dev 환경의 review provider mode 기본값은 `mock`, prod 기본값은 `real`로 둔다.
+- dev 환경의 answer provider mode 기본값은 `mock`, prod 기본값은 `real`로 둔다.
 - 1차 extraction 대상은 `primary` 우선, 부족 시 `reference` 제한 승격으로 처리한다.
 - 초기 실제 provider 조합은 Tavily search/extract + OpenAI structured outputs로 두었으나, 검색 provider 조합은 2026-04-21 Search Provider Routing 결정으로 대체한다.
 - query refinement와 relevance filtering의 OpenAI 모델은 모두 `gpt-5-mini`로 고정한다.
@@ -59,8 +59,8 @@
 
 ### Korea-Related Only MVP Scope
 - 이 결정은 2026-04-21의 Search Provider Routing 결정으로 대체되었다.
-- 당시 MVP는 claim 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 포함된 경우만 검토하기로 했다.
-- 당시에는 국내 맥락이 없는 순수 해외 이슈를 검토하지 않고 `out_of_scope` review job으로 기록하기로 했다.
+- 당시 MVP는 check 자체에 한국 장소, 기관, 법인, 시장, 국민, 정책, 국내 영향이 포함된 경우만 검토하기로 했다.
+- 당시에는 국내 맥락이 없는 순수 해외 이슈를 검토하지 않고 `out_of_scope` answer job으로 기록하기로 했다.
 - `out_of_scope`는 시스템 실패가 아니므로 `lastErrorCode`를 남기지 않고 verdict/result를 생성하지 않는 원칙은 유지한다.
 - 당시 source search는 KR `source_domain_registry`만 사용하며, 국가별 해외 verification routing과 domainless fallback search는 MVP 범위에서 제거하기로 했다.
 - retrieval bucket은 기존 저장/표시 호환성을 위해 `familiar / verification`을 유지하되, 신규 MVP 검색에서는 `fallback` bucket을 생성하지 않는다.
@@ -68,19 +68,19 @@
 
 ## 2026-04-02
 
-### Reviews Preview Integration
-- `/reviews/[reviewId]`는 최종 verdict 화면이 아니라 `query-processing-preview` 결과를 보여주는 evidence-first preview 화면으로 연결한다.
+### Answers Preview Integration
+- `/answers/[answerId]`는 최종 verdict 화면이 아니라 `query-processing-preview` 결과를 보여주는 evidence-first preview 화면으로 연결한다.
 - interpretation과 verdict가 아직 생성되지 않은 단계는 UI에서 명시적으로 안내한다.
-- preview 연동용 읽기 API는 `GET /api/v1/reviews`, `GET /api/v1/reviews/:reviewId`로 둔다.
-- `POST /api/v1/reviews/query-processing-preview`와 `GET /api/v1/reviews/:reviewId`는 같은 preview detail 계약을 공유한다.
-- review preview detail 계약에는 `rawClaim`, `createdAt`, source `originalUrl`, source `publishedAt`을 포함한다.
+- preview 연동용 읽기 API는 `GET /api/v1/answers`, `GET /api/v1/answers/:answerId`로 둔다.
+- `POST /api/v1/answers/query-processing-preview`와 `GET /api/v1/answers/:answerId`는 같은 preview detail 계약을 공유한다.
+- answer preview detail 계약에는 `rawCheck`, `createdAt`, source `originalUrl`, source `publishedAt`을 포함한다.
 - history drawer는 verdict 대신 `status/currentStage` 기반 상태 라벨을 노출한다.
 
-### Frontend Review Task Flow
-- review preview 생성 요청의 소유권은 `loading` 페이지가 아니라 프론트 전역 review task store가 가진다.
-- active review task가 진행 중이면 `Home` 진입 시 입력 화면 대신 기존 `/loading`으로 복귀시켜 중복 요청을 막는다.
-- history는 `claim + 시간` 휴리스틱 대신 `draftId -> reviewId` 승격 방식으로 중복 없이 병합한다.
-- review completion 알림은 `loading` 화면이 아니라 review task 성공 전이에서 1회 생성한다.
+### Frontend Answer Task Flow
+- answer preview 생성 요청의 소유권은 `loading` 페이지가 아니라 프론트 전역 answer task store가 가진다.
+- active answer task가 진행 중이면 `Home` 진입 시 입력 화면 대신 기존 `/loading`으로 복귀시켜 중복 요청을 막는다.
+- history는 `check + 시간` 휴리스틱 대신 `draftId -> answerId` 승격 방식으로 중복 없이 병합한다.
+- answer completion 알림은 `loading` 화면이 아니라 answer task 성공 전이에서 1회 생성한다.
 
 ### Community Feed Integration
 - 커뮤니티 1차 persisted 범위는 게시글 목록/상세/작성/수정/삭제, 댓글 작성, 게시글 공감 토글까지 포함한다.
@@ -101,22 +101,22 @@
 - 인기 주제는 `/popular` 탭 전용으로 노출하고 Home에는 노출하지 않는다.
 - 인기 주제 집계 API는 `GET /api/v1/popular/topics`로 둔다.
 - 인기 주제의 기본 집계 기준은 최근 24시간 내 `submitted + meaningful reopen` 합산 점수다.
-- 인기 topic 그룹 키는 `queryRefinement.coreClaim` 우선, 없으면 `claims.normalized_text` fallback으로 사용한다.
-- `meaningful reopen`은 `popular`, `history`, `notification`에서 기존 review preview로 재진입한 클릭만 포함한다.
+- 인기 topic 그룹 키는 `queryRefinement.coreCheck` 우선, 없으면 `checks.normalized_text` fallback으로 사용한다.
+- `meaningful reopen`은 `popular`, `history`, `notification`에서 기존 answer preview로 재진입한 클릭만 포함한다.
 - 최근 24시간 합산 점수가 10 이상인 topic만 `/popular`에 노출한다.
 - `/popular` 정렬은 합산 점수 우선, 동률이면 submitted 수와 최신성 순으로 유지한다.
-- 인기 항목 클릭 시 새 review를 만들지 않고 해당 topic의 대표 review preview로 재진입한다.
-- 대표 review는 최근 24시간 구간에서 가장 최근에 생성되거나 재진입된 eligible review로 고정한다.
-- `user_history`는 `submitted`, `reopened` entry를 저장하고, 인기 집계는 `review_jobs + user_history`를 읽는 실시간 read API로 구현한다.
+- 인기 항목 클릭 시 새 answer를 만들지 않고 해당 topic의 대표 answer preview로 재진입한다.
+- 대표 answer는 최근 24시간 구간에서 가장 최근에 생성되거나 재진입된 eligible answer로 고정한다.
+- `user_history`는 `submitted`, `reopened` entry를 저장하고, 인기 집계는 `answer_jobs + user_history`를 읽는 실시간 read API로 구현한다.
 - v1 인기 기능은 `popular_topics` 스냅샷 테이블과 worker를 도입하지 않는다.
 
 ## 2026-04-05
 
-### Review Result Screen Contract
-- `GET /api/v1/reviews/:reviewId`와 `POST /api/v1/reviews/query-processing-preview`는 preview artifact와 함께 result screen용 확장 detail 계약을 반환한다.
+### Answer Result Screen Contract
+- `GET /api/v1/answers/:answerId`와 `POST /api/v1/answers/query-processing-preview`는 preview artifact와 함께 result screen용 확장 detail 계약을 반환한다.
 - result screen용 `verdict`, `confidenceScore`, `consensusLevel`, `analysisSummary`, `uncertainty`는 DB 저장 없이 조회 시점 규칙 기반 파생 값으로 생성한다.
 - 위 임시 result는 `rule_based_preview` 모드로 명시하고, 이후 interpretation 단계의 LLM 결과로 교체 가능하게 둔다.
-- review detail 조회는 반드시 `userId + reviewId` owner scope를 함께 검증한다.
+- answer detail 조회는 반드시 `userId + answerId` owner scope를 함께 검증한다.
 
 ### Deployment Architecture
 - production 배포는 단일 레포를 유지하되 `frontend`와 `backend`를 별도 Docker image로 분리한다.
@@ -157,28 +157,28 @@
 
 ## 2026-04-15
 
-### Review Task History Deduplication
-- review task history는 `claim + 시간` 휴리스틱이 아니라 `clientRequestId`를 우선 병합 키로 사용한다.
-- `GET /api/v1/reviews` summary와 review detail 응답은 local pending draft와 server review job을 연결할 수 있도록 `clientRequestId`를 노출한다.
-- frontend의 local `draftId`는 review 생성 요청의 `clientRequestId`로 유지하고, 같은 값이 서버 응답에 있으면 하나의 history item으로 병합한다.
-- `/loading`의 성공 여부는 HTTP 요청 성공이 아니라 review payload의 `status/currentStage`를 기준으로 판정한다.
-- 서버가 `failed` 상태의 review detail을 반환하면 frontend는 성공 CTA와 completion notification을 만들지 않고 실패 상태를 유지한다.
+### Answer Task History Deduplication
+- answer task history는 `check + 시간` 휴리스틱이 아니라 `clientRequestId`를 우선 병합 키로 사용한다.
+- `GET /api/v1/answers` summary와 answer detail 응답은 local pending draft와 server answer job을 연결할 수 있도록 `clientRequestId`를 노출한다.
+- frontend의 local `draftId`는 answer 생성 요청의 `clientRequestId`로 유지하고, 같은 값이 서버 응답에 있으면 하나의 history item으로 병합한다.
+- `/loading`의 성공 여부는 HTTP 요청 성공이 아니라 answer payload의 `status/currentStage`를 기준으로 판정한다.
+- 서버가 `failed` 상태의 answer detail을 반환하면 frontend는 성공 CTA와 completion notification을 만들지 않고 실패 상태를 유지한다.
 
 ## 2026-04-19
 
 ### Settings Beta Follow-Up
 - `/settings/privacy`, `/settings/notifications`, `/settings/support`를 MVP 정보형 화면으로 추가한다.
 - 개인정보 보호 페이지는 정식 법무 문서가 아니라 현재 구현 기준의 MVP 처리방침 요약으로 제공한다.
-- 알림 설정은 frontend localStorage 기반으로 관리하고 기본값은 `review 완료`, `커뮤니티 댓글`, `커뮤니티 좋아요` 모두 `on`으로 둔다.
-- 이번 단계에서 실제로 생성 제어되는 알림은 `review 완료`만 포함한다.
+- 알림 설정은 frontend localStorage 기반으로 관리하고 기본값은 `answer 완료`, `커뮤니티 댓글`, `커뮤니티 좋아요` 모두 `on`으로 둔다.
+- 이번 단계에서 실제로 생성 제어되는 알림은 `answer 완료`만 포함한다.
 - `커뮤니티 댓글/좋아요 알림`은 설정 UI와 저장 구조만 선반영하고 실제 알림 생성/전달은 후속 작업으로 분리한다.
 - 고객 센터 페이지는 FAQ와 임시 문의 안내만 제공하고 실제 문의 접수 채널은 연결하지 않는다.
 
 ### Server-Backed Notifications
 - 알림의 source of truth는 browser localStorage가 아니라 server DB/API로 전환한다.
-- 알림 설정은 `user_notification_preferences` 테이블로 저장하고 기본값은 `review 완료`, `커뮤니티 댓글`, `커뮤니티 좋아요` 모두 `on`으로 둔다.
+- 알림 설정은 `user_notification_preferences` 테이블로 저장하고 기본값은 `answer 완료`, `커뮤니티 댓글`, `커뮤니티 좋아요` 모두 `on`으로 둔다.
 - 알림 목록 읽음 상태는 `notifications` + `notification_reads` 모델로 관리한다.
-- review 완료 알림은 review preview의 terminal non-failed 완료 시 서버에서 생성한다.
+- answer 완료 알림은 answer preview의 terminal non-failed 완료 시 서버에서 생성한다.
 - 댓글 알림은 게시글 작성자와 부모 댓글 작성자에게 보내고 자기 자신 알림은 생성하지 않는다.
 - 좋아요 알림은 게시글 좋아요와 댓글 좋아요를 모두 포함하며 최초 like 생성 시에만 보낸다.
 - 커뮤니티 알림 target은 MVP에서 post detail 페이지로 통일하고 comment anchor deep link는 후속 범위로 남긴다.
@@ -188,35 +188,35 @@
 ### Search Provider Routing
 - 2026-04-01의 Korea-Related Only MVP Scope 결정은 검색 범위 기준에서 대체한다.
 - 이 결정의 해외/글로벌 route 범위는 2026-04-28 최신 결정으로 대체되었다.
-- 신규 review 생성 기준 query refinement는 `search_route`를 `news / unsupported` 중 하나로 판정한다.
+- 신규 answer 생성 기준 query refinement는 `search_route`를 `news / unsupported` 중 하나로 판정한다.
 - `news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
 - Tavily Search는 한국 뉴스 보조 검색 provider로 사용하고, Tavily Extract는 본문 추출 provider로 사용한다.
-- `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim에만 사용하며, `out_of_scope` review job으로 기록한다.
+- `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 check에만 사용하며, `out_of_scope` answer job으로 기록한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
 - `real` 모드에서는 Naver, Tavily, OpenAI API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
 
 ## 2026-04-26
 
-### Claim Understanding 기반 Search Planning
-- review query refinement는 단순 키워드 추출이 아니라 claim understanding + search planning 단계로 확장한다.
+### Check Understanding 기반 Search Planning
+- answer query refinement는 단순 키워드 추출이 아니라 check understanding + search planning 단계로 확장한다.
 - `search_route`는 provider routing의 authoritative field로 유지하고, `search_plan`은 검증 목적별 검색 질의 생성을 담당한다.
-- 기본 search plan query purpose는 `claim_specific`, `current_state`, `primary_source`, `contradiction_or_update` 4개로 고정한다.
+- 기본 search plan query purpose는 `check_specific`, `current_state`, `primary_source`, `contradiction_or_update` 4개로 고정한다.
 - provider 검색은 기존 `generated_queries/search_queries`보다 `search_plan.queries`를 우선 사용한다.
 - preview API 응답 shape는 이번 단계에서 변경하지 않고, `search_plan`은 query refinement artifact와 내부 traceability에만 저장한다.
 - Prisma migration은 도입하지 않고 기존 JSON artifact와 `origin_query_ids` 기반 추적을 유지한다.
 
 ## 2026-04-27
 
-### Review Summary Copy
+### Answer Summary Copy
 - `rule_based_preview`의 `analysisSummary`는 신규 LLM 호출 없이 기존 source, evidence snippet, source stance, search plan purpose를 기반으로 생성한다.
 - summary는 지지/충돌/맥락 카운트 나열보다 사용자 질문에 대한 직접 답변, 최신 업데이트 신호, 공식 출처 여부, 남은 불확실성을 우선 설명한다.
 - API 응답 shape, DB schema, Prisma migration은 변경하지 않는다.
 
 ### Evidence Signal Consensus
 - 요약 문장은 DB에 저장하지 않는다.
-- OpenAI는 review 생성 시점에 source/evidence별 signal만 structured output으로 분류한다.
-- `EvidenceSnippet.stance`에는 UI/호환용 `support`, `conflict`, `context`, `unknown` 값을 저장하고, 상세 signal은 `review_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
-- `/reviews/:reviewId` 조회 시에는 OpenAI를 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
+- OpenAI는 answer 생성 시점에 source/evidence별 signal만 structured output으로 분류한다.
+- `EvidenceSnippet.stance`에는 UI/호환용 `support`, `conflict`, `context`, `unknown` 값을 저장하고, 상세 signal은 `answer_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
+- `/answers/:answerId` 조회 시에는 OpenAI를 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
 - scheduled event에서 최신 `latest_update/current_status` signal이 `weakens` 또는 `overrides`이면 과거 support가 많아도 합의성을 낮게 표시한다.
 
 ## 2026-04-28
@@ -228,28 +228,28 @@
 - 정치 성향 메타데이터는 검색 결과 균형과 출처 설명을 위한 내부 메타데이터이며, verdict 또는 출처 신뢰도 점수로 사용하지 않는다.
 - 이번 변경은 API 응답 shape, DB schema, Prisma migration을 변경하지 않는다.
 
-### MVP Political/Economic Claim Scope
+### MVP Political/Economic Check Scope
 - 2026-04-21 Search Provider Routing 결정은 유지하되, MVP 검토 도메인은 이번 결정으로 정치·경제로 좁힌다.
-- MVP 검토 범위는 국가와 무관한 뉴스성 claim 전체가 아니라 정치·경제 도메인의 사실성 claim으로 좁힌다.
-- 정치는 일반 정치 이슈까지 포함하되, 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산처럼 출처로 검증 가능한 claim에 한정한다.
-- 경제는 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 출처로 검증 가능한 claim에 한정한다.
+- MVP 검토 범위는 국가와 무관한 뉴스성 check 전체가 아니라 정치·경제 도메인의 사실성 check으로 좁힌다.
+- 정치는 일반 정치 이슈까지 포함하되, 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산처럼 출처로 검증 가능한 check에 한정한다.
+- 경제는 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 출처로 검증 가능한 check에 한정한다.
 - 의료, 연예, 스포츠, 개인 상담, 창작 요청, 순수 의견, 미래 예측, 투자 매수/매도 추천은 MVP 지원 범위 밖으로 처리한다.
 - 사용자는 입력 전에 도메인을 직접 선택하지 않고, query refinement가 `search_route`를 판정한다.
 - `search_route`는 검색 가능 여부 및 도메인 판정을 담당한다.
 - DB schema, Prisma migration, 공개 API 응답 shape는 이번 결정으로 변경하지 않는다.
 
-### Review Preview Latency Reduction
+### Answer Preview Latency Reduction
 - Naver News Search는 query별 상위 10개를 병렬로 요청하되, timeout은 코드에서 최대 8초로 제한한다.
-- 일부 Naver query가 실패해도 성공한 query 결과가 있으면 전체 review를 실패시키지 않고 partial source pool로 계속 진행한다.
+- 일부 Naver query가 실패해도 성공한 query 결과가 있으면 전체 answer를 실패시키지 않고 partial source pool로 계속 진행한다.
 - Tavily Search는 Naver 후보가 15건 미만일 때만 fallback으로 호출하며, timeout은 최대 8초로 제한한다.
 - relevance filtering과 evidence signal classification은 별도 OpenAI 호출로 나누지 않고 단일 structured output 호출로 처리한다.
 
 ### News Only With Tavily Search Fallback
 - 2026-04-21 Search Provider Routing의 해외/글로벌 뉴스 route는 신규 생성 기준에서 사용하지 않는다.
-- MVP 검토 범위는 정치·경제 claim으로 고정한다.
-- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
-- 신규 review 생성 기준 `search_route`는 `news / unsupported`만 사용한다.
-- OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 정치·경제 뉴스성 claim이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
+- MVP 검토 범위는 정치·경제 check으로 고정한다.
+- 해외/글로벌 뉴스 check은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
+- 신규 answer 생성 기준 `search_route`는 `news / unsupported`만 사용한다.
+- OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 정치·경제 뉴스성 check이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
 - Tavily Search는 제거하지 않고 `news`에서 Naver 후보가 부족할 때만 실행되는 뉴스 보조 source search provider로 사용한다.
 - Tavily Search는 코드에 고정된 trusted news domain registry 기반 include domain으로 제한하고, 신뢰할 수 있는 출처로 확인되는 후보만 유지한다.
 - source별 수집 API는 `sources.source_provider`에 저장하고, DB 기반 `source_domain_registry` 테이블과 `sources.domain_registry_id`는 코드 고정 registry 전환에 따라 제거한다.
@@ -257,23 +257,23 @@
 
 ## 2026-04-29
 
-### Async Review Preview Polling
-- review preview는 검색 완료 후 source를 먼저 노출하고, relevance/evidence signal 분류는 background에서 이어서 처리한다.
-- MVP 실시간 갱신 방식은 SSE가 아니라 기존 `GET /api/v1/reviews/:reviewId` 기반 polling으로 구현한다.
-- 새 생성 API는 `POST /api/v1/reviews/query-processing-preview/async`로 두고, 기존 동기 API는 호환용으로 유지한다.
+### Async Answer Preview Polling
+- answer preview는 검색 완료 후 source를 먼저 노출하고, relevance/evidence signal 분류는 background에서 이어서 처리한다.
+- MVP 실시간 갱신 방식은 SSE가 아니라 기존 `GET /api/v1/answers/:answerId` 기반 polling으로 구현한다.
+- 새 생성 API는 `POST /api/v1/answers/query-processing-preview/async`로 두고, 기존 동기 API는 호환용으로 유지한다.
 - 검색 직후 응답은 기존 detail 응답 shape를 유지하되 `status=searching`, `currentStage=relevance_and_signal_classification`, `result=null`, `sources[]`로 표현한다.
 - 별도 queue/worker는 도입하지 않고 단일 backend 인스턴스 전제의 in-process background promise로 처리한다.
 - DB schema와 Prisma migration은 변경하지 않는다.
 
-### Remove Claim Language Metadata
-- MVP는 한국뉴스 전용이므로 `claimLanguageCode`와 preview 응답의 `languageCode`를 제거한다.
-- OpenAI relevance/evidence signal 분류 입력에도 claim language field를 전달하지 않는다.
+### Remove Check Language Metadata
+- MVP는 한국뉴스 전용이므로 `checkLanguageCode`와 preview 응답의 `languageCode`를 제거한다.
+- OpenAI relevance/evidence signal 분류 입력에도 check language field를 전달하지 않는다.
 - 한국 trusted domain registry는 언어 메타데이터 없이 국가와 source 역할만 유지한다.
 
 ### Query Refinement Contract Simplification
-- `QueryRefinementResult`에서 `verificationGoal`, `searchClaim`, `searchQueries`를 제거한다.
+- `QueryRefinementResult`에서 `verificationGoal`, `searchCheck`, `searchQueries`를 제거한다.
 - `SearchPlan`은 중복 메타데이터 없이 `queries[]`만 유지한다.
-- `claimType`은 query refinement의 top-level field로만 유지하고, result assembly에는 별도 입력으로 전달한다.
+- `checkType`은 query refinement의 top-level field로만 유지하고, result assembly에는 별도 입력으로 전달한다.
 
 ### Source Political Lean Badge
 - 결과 페이지 source card에는 `style.txt` 기준 뉴스사 성향 배지를 표시한다.
@@ -281,3 +281,11 @@
 - 경제지는 `style.txt`의 3분류 기준을 따르며, 기타/정부/미분류 출처는 `기타`로 표시한다.
 - 성향 배지는 출처 맥락을 돕는 보조 메타데이터이며, verdict 또는 출처 신뢰도 점수로 사용하지 않는다.
 - 이번 변경은 공개 API 응답 shape, DB schema, Prisma migration을 변경하지 않는다.
+
+## 2026-04-30
+
+### Check/Answer Naming Migration
+- 제품 및 코드 용어에서 검토 대상 입력 단위는 `check`, 검토 결과 단위는 `answer`로 통일한다.
+- 공개 API 경로는 `/api/v1/answers` 기준으로 전환하고, frontend route도 `/answers/[answerId]`를 사용한다.
+- Prisma 모델은 `Check`, `AnswerJob`을 사용하고 DB table/column은 `checks`, `answer_jobs`, `check_id`, `answer_job_id`로 전환한다.
+- 기존 DB는 rename migration으로 따라오며, 저장된 JSON artifact key/value도 새 명칭으로 변환한다.

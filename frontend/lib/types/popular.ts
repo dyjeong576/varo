@@ -5,10 +5,10 @@ export interface PopularTopic {
   topicText: string;
   rank: number;
   popularityScore: number;
-  reviewCount: number;
+  answerCount: number;
   reopenCount: number;
   trend: TrendType;
   trendValue: number | null;
-  representativeReviewId: string;
+  representativeAnswerId: string;
   updatedAt: string;
 }

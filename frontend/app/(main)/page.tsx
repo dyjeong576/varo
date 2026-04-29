@@ -4,19 +4,19 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Loader2, MapPin } from "lucide-react";
 import {
-  createReviewTask,
-  getActiveReviewTask,
-  startReviewTask,
-  subscribeReviewTasks,
-} from "@/lib/reviews/task-store";
+  createAnswerTask,
+  getActiveAnswerTask,
+  startAnswerTask,
+  subscribeAnswerTasks,
+} from "@/lib/answers/task-store";
 
 export default function HomePage() {
-  const [claim, setClaim] = useState("");
+  const [check, setCheck] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const activeTask = useSyncExternalStore(
-    subscribeReviewTasks,
-    getActiveReviewTask,
+    subscribeAnswerTasks,
+    getActiveAnswerTask,
     () => null,
   );
 
@@ -28,10 +28,10 @@ export default function HomePage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!claim.trim() || isSubmitting) return;
+    if (!check.trim() || isSubmitting) return;
 
-    const normalizedClaim = claim.trim();
-    const activeTask = getActiveReviewTask();
+    const normalizedCheck = check.trim();
+    const activeTask = getActiveAnswerTask();
 
     if (activeTask) {
       router.push(`/loading?draft=${encodeURIComponent(activeTask.draftId)}`);
@@ -40,8 +40,8 @@ export default function HomePage() {
 
     setIsSubmitting(true);
 
-    const draftId = createReviewTask(normalizedClaim);
-    void startReviewTask(draftId);
+    const draftId = createAnswerTask(normalizedCheck);
+    void startAnswerTask(draftId);
 
     router.push(`/loading?draft=${encodeURIComponent(draftId)}`);
   };
@@ -81,15 +81,15 @@ export default function HomePage() {
         <form onSubmit={handleSearch} className="w-full flex justify-center">
           <div className={`relative w-full shadow-[0_2px_18px_rgba(0,0,0,0.06)] rounded-3xl group transition-all duration-300 focus-within:shadow-[0_4px_24px_rgba(37,99,235,0.12)] border border-gray-100 bg-white ${isSubmitting ? 'opacity-70 pointer-events-none' : ''}`}>
             <textarea
-              value={claim}
-              onChange={(e) => setClaim(e.target.value)}
+              value={check}
+              onChange={(e) => setCheck(e.target.value)}
               disabled={isSubmitting}
               placeholder="검증하고 싶은 소문, 뉴스, 주장을 입력하세요..."
               className="w-full rounded-3xl bg-transparent px-5 py-5 min-h-[140px] resize-none text-[15px] text-gray-800 placeholder:text-gray-400 focus:outline-none"
             />
             <button
               type="submit"
-              disabled={!claim.trim() || isSubmitting}
+              disabled={!check.trim() || isSubmitting}
               className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-md disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none transition-colors active:bg-blue-700"
               aria-label="분석 시작"
             >

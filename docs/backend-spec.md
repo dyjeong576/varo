@@ -33,14 +33,14 @@
 - 사용자 기본 정보 관리
 - 공개 프로필과 수정 가능 프로필 필드 관리
 
-### 3.3 Reviews / Evidence
+### 3.3 Answers / Evidence
 
-- claim 접수
+- check 접수
 - source 검색과 수집
 - relevance와 evidence signal 통합 분류
 - preview detail 생성
 - preview artifact 기반 `rule_based_preview` 결과 계산
-- review 상태 조회
+- answer 상태 조회
 
 ### 3.4 Community
 
@@ -77,7 +77,7 @@
 
 ## 4. 핵심 서버 원칙
 
-- review 도메인은 AGENTS와 PRD의 근거 중심 원칙을 유지한다.
+- answer 도메인은 AGENTS와 PRD의 근거 중심 원칙을 유지한다.
 - 서비스 전체는 인증, 분석, 커뮤니티, 알림, 히스토리를 하나의 계정 체계로 묶는다.
 - 비동기 처리가 필요한 영역은 queue와 worker로 분리한다.
 - API는 도메인 책임 기준으로 나누고, 외부 provider 호출은 서비스 레이어 또는 worker에 캡슐화한다.
@@ -100,7 +100,7 @@
 
 ### 5.3 권한 원칙
 
-- review 생성, history, community 작성, notifications 조회는 인증 사용자 기준
+- answer 생성, history, community 작성, notifications 조회는 인증 사용자 기준
 - 커뮤니티는 익명 허용 없음
 - 사용자 정보 수정은 허용된 필드만 가능
 
@@ -111,12 +111,12 @@
 - `real_name`, `gender`, `age_range`는 최초 1회만 설정 가능
 - 이후 수정 가능 필드는 `country`, `city`만 허용
 
-## 6. review & evidence 파이프라인
+## 6. answer & evidence 파이프라인
 
 ### 6.1 단계
 
-1. claim 접수와 `review_jobs` 생성
-2. claim understanding / scope gate / search planning
+1. check 접수와 `answer_jobs` 생성
+2. check understanding / scope gate / search planning
 3. `unsupported`이면 `out_of_scope` 저장 후 종료
 4. `news`이면 Naver News Search 우선 검색
 5. Naver 후보가 15건 미만이면 Tavily Search fallback 호출
@@ -141,26 +141,26 @@
 
 현재 query-processing preview 생성 경로에서 주로 쓰는 terminal 상태는 `partial`, `out_of_scope`, `failed`다. `queued`, `extracting`, `analyzing`, `completed`는 장기 pipeline 확장용 상태로 남아 있다.
 
-### 6.3 review 원칙
+### 6.3 answer 원칙
 
-- 결과는 `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
+- 결과는 `check`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - verdict는 기사 수나 단순 agreement score가 아니라 evidence 구조와 query purpose별 근거 성격을 바탕으로 계산한다.
 - 결과 화면용 summary는 내부 카운트 나열이 아니라 사용자 질문에 직접 답하는 문장으로 작성하고, 최신 출처, 업데이트/정정 신호, 공식 출처 여부, 남은 불확실성을 함께 설명한다.
-- OpenAI는 review 생성 시점에 relevance와 evidence signal을 단일 structured output 호출로 구조화하며, 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source와 signal trace를 기준으로 백엔드가 계산한다.
-- 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
+- OpenAI는 answer 생성 시점에 relevance와 evidence signal을 단일 structured output 호출로 구조화하며, 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source와 signal trace를 기준으로 백엔드가 계산한다.
+- 요약 문장 자체는 DB에 저장하지 않고, `answer_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
 - 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 판정 이유는 `search_route_reason`에 남긴다.
-- OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 claim**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
+- OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 check**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
-- `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
-- **한국 정치·경제 뉴스성 claim**은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
-- 한국 정치·경제를 벗어나는 해외/글로벌 뉴스 claim은 `unsupported/out_of_scope`로 처리한다.
+- `search_route=unsupported`인 check은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
+- **한국 정치·경제 뉴스성 check**은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
+- 한국 정치·경제를 벗어나는 해외/글로벌 뉴스 check은 `unsupported/out_of_scope`로 처리한다.
 - Tavily Search는 코드에 고정된 한국 뉴스 도메인 레지스트리 기반 include domain으로 제한하고, 신뢰할 수 있는 출처로 확인되는 후보만 유지한다.
 
 ### 6.4 현재 API 책임
 
-- `POST /api/v1/reviews/query-processing-preview` 요청 안에서 동기적으로 preview 파이프라인을 실행한다.
+- `POST /api/v1/answers/query-processing-preview` 요청 안에서 동기적으로 preview 파이프라인을 실행한다.
 - search provider 호출, relevance와 evidence signal 통합 분류, source/handoff 저장을 처리한다.
 - source fetch / 본문 추출과 OpenAI structured final interpretation 저장은 현재 preview 경로에서 수행하지 않는다.
 - 단계별 소요시간은 backend logger에 남긴다.
@@ -174,7 +174,7 @@
 
 ## 7. 서비스 이벤트와 비동기 처리
 
-### 7.1 review 완료 이벤트
+### 7.1 answer 완료 이벤트
 
 생성 시 후속 처리:
 
@@ -226,12 +226,12 @@
 - 보호 API는 cookie session 인증 필요 여부를 명시
 - 에러 응답 예시에는 도메인 에러 코드와 한국어 설명을 포함
 
-#### Reviews
+#### Answers
 
-- `POST /api/v1/reviews/query-processing-preview`: claim을 받아 review preview 생성 파이프라인을 시작하고 preview detail을 반환한다.
-- `GET /api/v1/reviews`: 현재 사용자의 최근 review preview 목록을 조회한다.
-- `GET /api/v1/reviews/:reviewId`: 특정 review의 detail과 preview artifact 기반 임시 result를 조회한다.
-- `POST /api/v1/reviews/:reviewId/reopen`: 기존 review 재진입 이벤트를 기록한다.
+- `POST /api/v1/answers/query-processing-preview`: check을 받아 answer preview 생성 파이프라인을 시작하고 preview detail을 반환한다.
+- `GET /api/v1/answers`: 현재 사용자의 최근 answer preview 목록을 조회한다.
+- `GET /api/v1/answers/:answerId`: 특정 answer의 detail과 preview artifact 기반 임시 result를 조회한다.
+- `POST /api/v1/answers/:answerId/reopen`: 기존 answer 재진입 이벤트를 기록한다.
 
 프론트는 현재 단계에서 DB 저장 final result보다 preview artifact 기반 detail 계약을 우선 소비한다.
 
@@ -264,7 +264,7 @@
 - `POST /api/v1/notifications/:notificationId/read`: 특정 알림을 읽음 처리한다.
 - `POST /api/v1/notifications/read-all`: 현재 사용자의 알림을 모두 읽음 처리한다.
 - `GET /api/v1/notifications/preferences`: 현재 사용자의 알림 수신 설정을 조회한다.
-- `PATCH /api/v1/notifications/preferences`: review 완료, 댓글, 좋아요 알림 설정을 수정한다.
+- `PATCH /api/v1/notifications/preferences`: answer 완료, 댓글, 좋아요 알림 설정을 수정한다.
 
 #### History
 
@@ -281,12 +281,12 @@
 - `Session`
 - `AuthProvider`
 
-### 9.2 Review
+### 9.2 Answer
 
-- `CreateReviewPreviewRequest`
-- `ReviewJob`
-- `ReviewPreviewDetail`
-- `ReviewResult`
+- `CreateAnswerPreviewRequest`
+- `AnswerJob`
+- `AnswerPreviewDetail`
+- `AnswerResult`
 - `SourceCard`
 - `EvidenceSnippet`
 
@@ -326,7 +326,7 @@
 
 ### 10.2 Naver News Search
 
-- **한국 정치·경제 뉴스성 claim**의 source 후보 수집
+- **한국 정치·경제 뉴스성 check**의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
 - search plan query별 상위 10개를 요청한다.
 - Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
@@ -339,14 +339,14 @@
 - Tavily Search는 Naver 후보가 15건 미만일 때만 **한국 뉴스** 보조 source 후보 수집에 사용한다.
 - Tavily Search는 코드 고정 **한국 뉴스 도메인 레지스트리**를 `include_domains`로 사용한다.
 - Tavily Search fallback timeout은 최대 8초로 제한한다.
-- Tavily Search 실패 또는 timeout은 전체 review 실패로 처리하지 않고, Naver 결과만으로 partial preview를 계속 만든다.
+- Tavily Search 실패 또는 timeout은 전체 answer 실패로 처리하지 않고, Naver 결과만으로 partial preview를 계속 만든다.
 - Tavily Extract는 env와 client가 남아 있지만 현재 query-processing preview 생성 경로에서는 호출하지 않는다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
 ### 10.4 OpenAI Structured Outputs
 
-- review 도메인의 query refinement, relevance와 evidence signal 통합 분류
+- answer 도메인의 query refinement, relevance와 evidence signal 통합 분류
 - 입력에 없는 사실을 생성하지 않도록 제한
 - relevance/evidence signal 통합 분류는 사실 결론을 내리지 않고, source/raw snippet이 현재 질문에 대해 `supports`, `contradicts`, `updates`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
 - structured final interpretation 생성은 현재 preview 경로가 아니라 후속 확장 범위다.
@@ -378,10 +378,10 @@
 - `EXTRACTION_FAILED`
 - `LLM_SCHEMA_ERROR`
 - `CONFIG_VALIDATION_ERROR`
-- `REVIEW_PARTIAL`
+- `ANSWER_PARTIAL`
 - `INTERNAL_ERROR`
 
-### 11.3 review 도메인 규칙
+### 11.3 answer 도메인 규칙
 
 - `partial`은 정상 응답 본문 내 상태값으로 표현한다.
 - 근거 부족은 결과 내부의 `uncertainty`와 도메인 상태로 드러낸다.
@@ -435,16 +435,16 @@
 
 - trace id 발급
 - `environment=dev|prod` 태그 유지
-- review 완료율 / partial 비율 / 외부 provider 실패율 관측
-- review preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `query_refinement`, `source_search`, `relevance_and_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
+- answer 완료율 / partial 비율 / 외부 provider 실패율 관측
+- answer preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `query_refinement`, `source_search`, `relevance_and_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
 - 알림 생성 성공률, ranking 집계 지연, community mutation 실패율 관측
 
-## 13. review 도메인 특별 원칙
+## 13. answer 도메인 특별 원칙
 
-review 도메인은 서비스 전체 안의 하나의 핵심 서브시스템이지만, 아래 원칙은 강하게 유지한다.
+answer 도메인은 서비스 전체 안의 하나의 핵심 서브시스템이지만, 아래 원칙은 강하게 유지한다.
 
 - 진실 기계처럼 행동하지 않는다.
 - 수집된 출처 기준 해석만 제공한다.
-- `claim`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
+- `check`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - 사용자가 원문을 열람할 수 있게 한다.
 - 상충하는 근거와 부족한 근거를 숨기지 않는다.

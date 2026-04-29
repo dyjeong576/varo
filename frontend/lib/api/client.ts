@@ -17,16 +17,16 @@ import type {
   UpdateCommunityPostPayload,
 } from "@/lib/types/community";
 import {
-  mapReviewPreviewDetail,
-  mapReviewPreviewSummary,
-} from "@/lib/reviews/mappers";
-import type { ReviewEntrySource } from "@/lib/reviews/navigation";
+  mapAnswerPreviewDetail,
+  mapAnswerPreviewSummary,
+} from "@/lib/answers/mappers";
+import type { AnswerEntrySource } from "@/lib/answers/navigation";
 import type {
-  ReviewPreviewDetail,
-  ReviewPreviewDetailResponse,
-  ReviewPreviewSummary,
-  ReviewPreviewSummaryResponse,
-} from "@/lib/reviews/types";
+  AnswerPreviewDetail,
+  AnswerPreviewDetailResponse,
+  AnswerPreviewSummary,
+  AnswerPreviewSummaryResponse,
+} from "@/lib/answers/types";
 import type { PopularTopic } from "@/lib/types/popular";
 import type { TrendType } from "@/lib/types/popular";
 import type {
@@ -109,9 +109,9 @@ function normalizeCommunityPostDetail(post: CommunityPostDetail): CommunityPostD
 }
 
 function normalizePopularTopic(topic: PopularTopicApiResponse): PopularTopic {
-  const reviewCount =
-    typeof topic.reviewCount === "number" && Number.isFinite(topic.reviewCount)
-      ? topic.reviewCount
+  const answerCount =
+    typeof topic.answerCount === "number" && Number.isFinite(topic.answerCount)
+      ? topic.answerCount
       : 0;
   const reopenCount =
     typeof topic.reopenCount === "number" && Number.isFinite(topic.reopenCount)
@@ -120,7 +120,7 @@ function normalizePopularTopic(topic: PopularTopicApiResponse): PopularTopic {
   const popularityScore =
     typeof topic.popularityScore === "number" && Number.isFinite(topic.popularityScore)
       ? topic.popularityScore
-      : reviewCount + reopenCount;
+      : answerCount + reopenCount;
   const trend: TrendType =
     topic.trend === "up" || topic.trend === "down" || topic.trend === "steady"
       ? topic.trend
@@ -134,14 +134,14 @@ function normalizePopularTopic(topic: PopularTopicApiResponse): PopularTopic {
         ? topic.rank
         : 0,
     popularityScore,
-    reviewCount,
+    answerCount,
     reopenCount,
     trend,
     trendValue:
       typeof topic.trendValue === "number" && Number.isFinite(topic.trendValue)
         ? topic.trendValue
         : null,
-    representativeReviewId: topic.representativeReviewId ?? "",
+    representativeAnswerId: topic.representativeAnswerId ?? "",
     updatedAt: topic.updatedAt ?? new Date(0).toISOString(),
   };
 }
@@ -150,7 +150,7 @@ function normalizeNotificationPreferences(
   preferences: NotificationPreferencesResponse,
 ): NotificationPreferences {
   return {
-    reviewCompleted: preferences.reviewCompleted,
+    answerCompleted: preferences.answerCompleted,
     communityComment: preferences.communityComment,
     communityLike: preferences.communityLike,
   };
@@ -175,45 +175,45 @@ function normalizeNotificationsList(
 }
 
 export const api = {
-  reviews: {
-    getRecent: async (): Promise<ReviewPreviewSummary[]> => {
-      const response = await apiRequest<ReviewPreviewSummaryResponse[]>(
-        "/api/v1/reviews",
+  answers: {
+    getRecent: async (): Promise<AnswerPreviewSummary[]> => {
+      const response = await apiRequest<AnswerPreviewSummaryResponse[]>(
+        "/api/v1/answers",
       );
 
-      return response.map(mapReviewPreviewSummary);
+      return response.map(mapAnswerPreviewSummary);
     },
     create: async (
-      claim: string,
+      check: string,
       clientRequestId?: string,
-    ): Promise<ReviewPreviewDetail> => {
-      const response = await apiRequest<ReviewPreviewDetailResponse>(
-        "/api/v1/reviews/query-processing-preview/async",
+    ): Promise<AnswerPreviewDetail> => {
+      const response = await apiRequest<AnswerPreviewDetailResponse>(
+        "/api/v1/answers/query-processing-preview/async",
         {
           method: "POST",
-          body: JSON.stringify({ claim, clientRequestId }),
+          body: JSON.stringify({ check, clientRequestId }),
         },
       );
 
-      return mapReviewPreviewDetail(response);
+      return mapAnswerPreviewDetail(response);
     },
-    getDetail: async (reviewId: string): Promise<ReviewPreviewDetail> => {
-      const response = await apiRequest<ReviewPreviewDetailResponse>(
-        `/api/v1/reviews/${encodeURIComponent(reviewId)}`,
+    getDetail: async (answerId: string): Promise<AnswerPreviewDetail> => {
+      const response = await apiRequest<AnswerPreviewDetailResponse>(
+        `/api/v1/answers/${encodeURIComponent(answerId)}`,
       );
 
-      return mapReviewPreviewDetail(response);
+      return mapAnswerPreviewDetail(response);
     },
-    delete: async (reviewId: string): Promise<{ ok: true }> =>
-      apiRequest<{ ok: true }>(`/api/v1/reviews/${encodeURIComponent(reviewId)}`, {
+    delete: async (answerId: string): Promise<{ ok: true }> =>
+      apiRequest<{ ok: true }>(`/api/v1/answers/${encodeURIComponent(answerId)}`, {
         method: "DELETE",
       }),
     recordReopen: async (
-      reviewId: string,
-      source: ReviewEntrySource,
+      answerId: string,
+      source: AnswerEntrySource,
     ): Promise<{ ok: true }> =>
       apiRequest<{ ok: true }>(
-        `/api/v1/reviews/${encodeURIComponent(reviewId)}/reopen`,
+        `/api/v1/answers/${encodeURIComponent(answerId)}/reopen`,
         {
           method: "POST",
           body: JSON.stringify({ source }),

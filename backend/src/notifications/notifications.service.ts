@@ -12,7 +12,7 @@ import { UpdateNotificationPreferencesDto } from "./dto/update-notification-pref
 const NOTIFICATION_PAGE_SIZE = 50;
 
 type NotificationPreferenceKey =
-  | "reviewCompleted"
+  | "answerCompleted"
   | "communityComment"
   | "communityLike";
 
@@ -170,13 +170,13 @@ export class NotificationsService {
     const preferences = await this.prisma.userNotificationPreference.upsert({
       where: { userId },
       update: {
-        reviewCompleted: payload.reviewCompleted ?? undefined,
+        answerCompleted: payload.answerCompleted ?? undefined,
         communityComment: payload.communityComment ?? undefined,
         communityLike: payload.communityLike ?? undefined,
       },
       create: {
         userId,
-        reviewCompleted: payload.reviewCompleted ?? true,
+        answerCompleted: payload.answerCompleted ?? true,
         communityComment: payload.communityComment ?? true,
         communityLike: payload.communityLike ?? true,
       },
@@ -185,12 +185,12 @@ export class NotificationsService {
     return this.toPreferenceResponse(preferences);
   }
 
-  async createReviewCompletedNotification(params: {
+  async createAnswerCompletedNotification(params: {
     userId: string;
-    reviewId: string;
-    claim: string;
+    answerId: string;
+    check: string;
   }): Promise<void> {
-    const enabled = await this.isPreferenceEnabled(params.userId, "reviewCompleted");
+    const enabled = await this.isPreferenceEnabled(params.userId, "answerCompleted");
 
     if (!enabled) {
       return;
@@ -199,11 +199,11 @@ export class NotificationsService {
     await this.prisma.notification.create({
       data: {
         userId: params.userId,
-        notificationType: "review_completed",
+        notificationType: "answer_completed",
         title: "근거 수집 완료",
-        body: `"${params.claim}" 검토가 완료되었습니다.`,
-        targetType: "review",
-        targetId: params.reviewId,
+        body: `"${params.check}" 검토가 완료되었습니다.`,
+        targetType: "answer",
+        targetId: params.answerId,
       },
     });
   }
@@ -370,7 +370,7 @@ export class NotificationsService {
     preference: UserNotificationPreference,
   ): NotificationPreferencesResponseDto {
     return {
-      reviewCompleted: preference.reviewCompleted,
+      answerCompleted: preference.answerCompleted,
       communityComment: preference.communityComment,
       communityLike: preference.communityLike,
     };

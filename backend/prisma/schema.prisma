@@ -15,7 +15,7 @@ model User {
   createdAt               DateTime                   @default(now()) @map("created_at")
   profile                 UserProfile?
   sessions                Session[]
-  reviewJobs              ReviewJob[]
+  answerJobs              AnswerJob[]
   historyEntries          UserHistory[]
   communityPosts          CommunityPost[]
   communityComments       CommunityComment[]
@@ -53,20 +53,20 @@ model Session {
   @@map("sessions")
 }
 
-model Claim {
+model Check {
   id             String      @id @default(uuid())
   rawText        String      @map("raw_text")
   normalizedText String      @map("normalized_text")
   createdAt      DateTime    @default(now()) @map("created_at")
-  reviewJobs     ReviewJob[]
+  answerJobs     AnswerJob[]
 
-  @@map("claims")
+  @@map("checks")
 }
 
-model ReviewJob {
+model AnswerJob {
   id                  String            @id @default(uuid())
   userId              String            @map("user_id")
-  claimId             String            @map("claim_id")
+  checkId             String            @map("check_id")
   clientRequestId     String?           @map("client_request_id")
   status              String
   currentStage        String            @map("current_stage")
@@ -79,35 +79,35 @@ model ReviewJob {
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
   user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  claim               Claim             @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  check               Check             @relation(fields: [checkId], references: [id], onDelete: Cascade)
   sources             Source[]
   evidenceSnippets    EvidenceSnippet[]
   historyEntries      UserHistory[]
 
   @@index([userId])
-  @@index([claimId])
+  @@index([checkId])
   @@unique([userId, clientRequestId])
-  @@map("review_jobs")
+  @@map("answer_jobs")
 }
 
 model UserHistory {
   id         String    @id @default(uuid())
   userId     String    @map("user_id")
-  reviewJobId String   @map("review_job_id")
+  answerJobId String   @map("answer_job_id")
   entryType  String    @map("entry_type")
   createdAt  DateTime  @default(now()) @map("created_at")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewJob  ReviewJob @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  answerJob  AnswerJob @relation(fields: [answerJobId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
-  @@index([reviewJobId, createdAt])
+  @@index([answerJobId, createdAt])
   @@index([entryType, createdAt])
   @@map("user_history")
 }
 
 model Source {
   id               String               @id @default(uuid())
-  reviewJobId      String               @map("review_job_id")
+  answerJobId      String               @map("answer_job_id")
   sourceProvider   String               @map("source_provider")
   sourceType       String               @map("source_type")
   publisherName    String?              @map("publisher_name")
@@ -125,26 +125,26 @@ model Source {
   relevanceTier    String?              @map("relevance_tier")
   relevanceReason  String?              @map("relevance_reason")
   retrievalBucket  String?              @map("retrieval_bucket")
-  reviewJob        ReviewJob            @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  answerJob        AnswerJob            @relation(fields: [answerJobId], references: [id], onDelete: Cascade)
   evidenceSnippets EvidenceSnippet[]
 
-  @@index([reviewJobId])
+  @@index([answerJobId])
   @@index([sourceProvider])
   @@map("sources")
 }
 
 model EvidenceSnippet {
   id          String   @id @default(uuid())
-  reviewJobId String   @map("review_job_id")
+  answerJobId String   @map("answer_job_id")
   sourceId    String   @map("source_id")
   snippetText String   @map("snippet_text")
   stance      String
   startOffset Int?     @map("start_offset")
   endOffset   Int?     @map("end_offset")
-  reviewJob   ReviewJob @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
+  answerJob   AnswerJob @relation(fields: [answerJobId], references: [id], onDelete: Cascade)
   source      Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
-  @@index([reviewJobId])
+  @@index([answerJobId])
   @@index([sourceId])
   @@map("evidence_snippets")
 }
@@ -241,7 +241,7 @@ model NotificationRead {
 
 model UserNotificationPreference {
   userId           String   @id @map("user_id")
-  reviewCompleted  Boolean  @default(true) @map("review_completed")
+  answerCompleted  Boolean  @default(true) @map("answer_completed")
   communityComment Boolean  @default(true) @map("community_comment")
   communityLike    Boolean  @default(true) @map("community_like")
   updatedAt        DateTime @updatedAt @map("updated_at")

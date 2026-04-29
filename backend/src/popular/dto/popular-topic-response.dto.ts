@@ -14,7 +14,7 @@ export class PopularTopicResponseDto {
   popularityScore!: number;
 
   @ApiProperty({ description: "최근 24시간 submitted 수", example: 12 })
-  reviewCount!: number;
+  answerCount!: number;
 
   @ApiProperty({ description: "최근 24시간 meaningful reopen 수", example: 6 })
   reopenCount!: number;
@@ -34,10 +34,10 @@ export class PopularTopicResponseDto {
   trendValue!: number | null;
 
   @ApiProperty({
-    description: "대표 review preview 식별자",
-    example: "review-1",
+    description: "대표 answer preview 식별자",
+    example: "answer-1",
   })
-  representativeReviewId!: string;
+  representativeAnswerId!: string;
 
   @ApiProperty({
     description: "최근 popularity 활동 시각",

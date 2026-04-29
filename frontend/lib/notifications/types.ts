@@ -1,9 +1,9 @@
 export type NotificationType =
-  | "review_completed"
+  | "answer_completed"
   | "community_comment"
   | "community_like";
 
-export type NotificationTargetType = "review" | "community_post";
+export type NotificationTargetType = "answer" | "community_post";
 
 export interface NotificationItem {
   id: string;
@@ -17,7 +17,7 @@ export interface NotificationItem {
 }
 
 export interface NotificationPreferences {
-  reviewCompleted: boolean;
+  answerCompleted: boolean;
   communityComment: boolean;
   communityLike: boolean;
 }

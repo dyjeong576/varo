@@ -1,26 +1,26 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { normalizeClaimText } from "../reviews/reviews.utils";
+import { normalizeCheckText } from "../answers/answers.utils";
 import { PopularTopicResponseDto } from "./dto/popular-topic-response.dto";
 
 type TrendType = "up" | "down" | "steady";
 
 const MIN_POPULARITY_SCORE = 10;
 
-type ReviewJobRecord = {
+type AnswerJobRecord = {
   id: string;
   createdAt: Date;
   queryRefinement: unknown;
   handoffPayload: unknown;
-  claim: {
+  check: {
     normalizedText: string;
   };
 };
 
 type UserHistoryRecord = {
   createdAt: Date;
-  reviewJob: ReviewJobRecord;
+  answerJob: AnswerJobRecord;
 };
 
 type TopicAggregate = {
@@ -30,7 +30,7 @@ type TopicAggregate = {
   previousSubmittedCount: number;
   currentReopenCount: number;
   previousReopenCount: number;
-  representativeReviewId: string | null;
+  representativeAnswerId: string | null;
   updatedAt: Date | null;
 };
 
@@ -49,15 +49,15 @@ export class PopularService {
     const currentWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const previousWindowStart = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-    const [reviewJobs, reopenEvents] = await Promise.all([
-      this.loadSubmittedReviewJobs(previousWindowStart),
+    const [answerJobs, reopenEvents] = await Promise.all([
+      this.loadSubmittedAnswerJobs(previousWindowStart),
       this.loadReopenEvents(previousWindowStart),
     ]);
 
     const topicMap = new Map<string, TopicAggregate>();
 
-    for (const reviewJob of reviewJobs) {
-      this.registerSubmittedEvent(topicMap, reviewJob, currentWindowStart);
+    for (const answerJob of answerJobs) {
+      this.registerSubmittedEvent(topicMap, answerJob, currentWindowStart);
     }
 
     for (const reopenEvent of reopenEvents) {
@@ -68,7 +68,7 @@ export class PopularService {
       .filter(
         (aggregate) =>
           aggregate.currentSubmittedCount + aggregate.currentReopenCount >= MIN_POPULARITY_SCORE &&
-          aggregate.representativeReviewId &&
+          aggregate.representativeAnswerId &&
           aggregate.updatedAt,
       )
       .map((aggregate) => {
@@ -85,11 +85,11 @@ export class PopularService {
           topicKey: aggregate.topicKey,
           topicText: aggregate.topicText,
           popularityScore,
-          reviewCount: aggregate.currentSubmittedCount,
+          answerCount: aggregate.currentSubmittedCount,
           reopenCount: aggregate.currentReopenCount,
           trend,
           trendValue,
-          representativeReviewId: aggregate.representativeReviewId!,
+          representativeAnswerId: aggregate.representativeAnswerId!,
           updatedAt: aggregate.updatedAt!,
         };
       })
@@ -98,8 +98,8 @@ export class PopularService {
           return right.popularityScore - left.popularityScore;
         }
 
-        if (right.reviewCount !== left.reviewCount) {
-          return right.reviewCount - left.reviewCount;
+        if (right.answerCount !== left.answerCount) {
+          return right.answerCount - left.answerCount;
         }
 
         return right.updatedAt.getTime() - left.updatedAt.getTime();
@@ -111,19 +111,19 @@ export class PopularService {
       topicText: topic.topicText,
       rank: index + 1,
       popularityScore: topic.popularityScore,
-      reviewCount: topic.reviewCount,
+      answerCount: topic.answerCount,
       reopenCount: topic.reopenCount,
       trend: topic.trend,
       trendValue: topic.trendValue,
-      representativeReviewId: topic.representativeReviewId,
+      representativeAnswerId: topic.representativeAnswerId,
       updatedAt: topic.updatedAt.toISOString(),
     }));
   }
 
-  private async loadSubmittedReviewJobs(
+  private async loadSubmittedAnswerJobs(
     previousWindowStart: Date,
-  ): Promise<ReviewJobRecord[]> {
-    return (await this.db.reviewJob.findMany({
+  ): Promise<AnswerJobRecord[]> {
+    return (await this.db.answerJob.findMany({
       where: {
         createdAt: {
           gte: previousWindowStart,
@@ -137,13 +137,13 @@ export class PopularService {
         createdAt: true,
         queryRefinement: true,
         handoffPayload: true,
-        claim: {
+        check: {
           select: {
             normalizedText: true,
           },
         },
       },
-    })) as ReviewJobRecord[];
+    })) as AnswerJobRecord[];
   }
 
   private async loadReopenEvents(
@@ -172,13 +172,13 @@ export class PopularService {
         },
         select: {
           createdAt: true,
-          reviewJob: {
+          answerJob: {
             select: {
               id: true,
               createdAt: true,
               queryRefinement: true,
               handoffPayload: true,
-              claim: {
+              check: {
                 select: {
                   normalizedText: true,
                 },
@@ -199,19 +199,19 @@ export class PopularService {
 
   private registerSubmittedEvent(
     topicMap: Map<string, TopicAggregate>,
-    reviewJob: ReviewJobRecord,
+    answerJob: AnswerJobRecord,
     currentWindowStart: Date,
   ): void {
-    if (!this.hasHandoffPayload(reviewJob.handoffPayload)) {
+    if (!this.hasHandoffPayload(answerJob.handoffPayload)) {
       return;
     }
 
-    const { topicKey, topicText } = this.resolveTopic(reviewJob);
+    const { topicKey, topicText } = this.resolveTopic(answerJob);
     const aggregate = this.getOrCreateAggregate(topicMap, topicKey, topicText);
 
-    if (reviewJob.createdAt >= currentWindowStart) {
+    if (answerJob.createdAt >= currentWindowStart) {
       aggregate.currentSubmittedCount += 1;
-      this.maybeUpdateRepresentative(aggregate, topicText, reviewJob.id, reviewJob.createdAt);
+      this.maybeUpdateRepresentative(aggregate, topicText, answerJob.id, answerJob.createdAt);
       return;
     }
 
@@ -223,11 +223,11 @@ export class PopularService {
     historyEntry: UserHistoryRecord,
     currentWindowStart: Date,
   ): void {
-    if (!this.hasHandoffPayload(historyEntry.reviewJob.handoffPayload)) {
+    if (!this.hasHandoffPayload(historyEntry.answerJob.handoffPayload)) {
       return;
     }
 
-    const { topicKey, topicText } = this.resolveTopic(historyEntry.reviewJob);
+    const { topicKey, topicText } = this.resolveTopic(historyEntry.answerJob);
     const aggregate = this.getOrCreateAggregate(topicMap, topicKey, topicText);
 
     if (historyEntry.createdAt >= currentWindowStart) {
@@ -235,7 +235,7 @@ export class PopularService {
       this.maybeUpdateRepresentative(
         aggregate,
         topicText,
-        historyEntry.reviewJob.id,
+        historyEntry.answerJob.id,
         historyEntry.createdAt,
       );
       return;
@@ -244,14 +244,14 @@ export class PopularService {
     aggregate.previousReopenCount += 1;
   }
 
-  private resolveTopic(reviewJob: ReviewJobRecord): {
+  private resolveTopic(answerJob: AnswerJobRecord): {
     topicKey: string;
     topicText: string;
   } {
-    const fallbackClaim = normalizeClaimText(reviewJob.claim.normalizedText);
-    const coreClaim = this.extractCoreClaim(reviewJob.queryRefinement);
-    const topicKey = normalizeClaimText(coreClaim ?? fallbackClaim);
-    const topicText = coreClaim ?? fallbackClaim;
+    const fallbackCheck = normalizeCheckText(answerJob.check.normalizedText);
+    const coreCheck = this.extractCoreCheck(answerJob.queryRefinement);
+    const topicKey = normalizeCheckText(coreCheck ?? fallbackCheck);
+    const topicText = coreCheck ?? fallbackCheck;
 
     return { topicKey, topicText };
   }
@@ -274,7 +274,7 @@ export class PopularService {
       previousSubmittedCount: 0,
       currentReopenCount: 0,
       previousReopenCount: 0,
-      representativeReviewId: null,
+      representativeAnswerId: null,
       updatedAt: null,
     };
 
@@ -285,12 +285,12 @@ export class PopularService {
   private maybeUpdateRepresentative(
     aggregate: TopicAggregate,
     topicText: string,
-    reviewId: string,
+    answerId: string,
     eventDate: Date,
   ): void {
     if (!aggregate.updatedAt || eventDate > aggregate.updatedAt) {
       aggregate.updatedAt = eventDate;
-      aggregate.representativeReviewId = reviewId;
+      aggregate.representativeAnswerId = answerId;
       aggregate.topicText = topicText;
     }
   }
@@ -299,18 +299,18 @@ export class PopularService {
     return this.isRecord(value) && Object.keys(value).length > 0;
   }
 
-  private extractCoreClaim(value: unknown): string | null {
+  private extractCoreCheck(value: unknown): string | null {
     if (!this.isRecord(value)) {
       return null;
     }
 
-    const coreClaim = value.coreClaim;
+    const coreCheck = value.coreCheck;
 
-    if (typeof coreClaim !== "string") {
+    if (typeof coreCheck !== "string") {
       return null;
     }
 
-    const normalized = normalizeClaimText(coreClaim);
+    const normalized = normalizeCheckText(coreCheck);
     return normalized ? normalized : null;
   }
 

@@ -5,14 +5,14 @@ import Link from "next/link";
 import { Menu, X, Settings, History } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { APP_NAME, APP_TAGLINE } from "@/lib/config/app";
-import { ReviewPreviewSummary } from "@/lib/reviews/types";
-import { getMergedReviewSummaries } from "@/lib/reviews/history";
-import { subscribeReviewTasks } from "@/lib/reviews/task-store";
-import { ReviewHistoryList } from "@/components/reviews/ReviewHistoryList";
+import { AnswerPreviewSummary } from "@/lib/answers/types";
+import { getMergedAnswerSummaries } from "@/lib/answers/history";
+import { subscribeAnswerTasks } from "@/lib/answers/task-store";
+import { AnswerHistoryList } from "@/components/answers/AnswerHistoryList";
 
 export function HistoryDrawer() {
   const [isOpen, setIsOpen] = useState(false);
-  const [reviews, setReviews] = useState<ReviewPreviewSummary[]>([]);
+  const [answers, setAnswers] = useState<AnswerPreviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const openDrawer = () => {
@@ -21,21 +21,21 @@ export function HistoryDrawer() {
   };
 
   useEffect(() => {
-    return subscribeReviewTasks(() => {
+    return subscribeAnswerTasks(() => {
       if (!isOpen) {
         return;
       }
 
-      void getMergedReviewSummaries(api.reviews.getRecent).then((result) => {
-        setReviews(result);
+      void getMergedAnswerSummaries(api.answers.getRecent).then((result) => {
+        setAnswers(result);
       });
     });
   }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
-      getMergedReviewSummaries(api.reviews.getRecent).then((res) => {
-        setReviews(res);
+      getMergedAnswerSummaries(api.answers.getRecent).then((res) => {
+        setAnswers(res);
       }).finally(() => {
         setIsLoading(false);
       });
@@ -105,8 +105,8 @@ export function HistoryDrawer() {
             {APP_NAME}가 최근 검토한 이슈들의 리포트입니다. 각 항목을 열어 출처와 판단 맥락을 확인하세요.
           </p>
 
-          <ReviewHistoryList
-            reviews={reviews}
+          <AnswerHistoryList
+            answers={answers}
             isLoading={isLoading}
             onNavigate={() => setIsOpen(false)}
           />

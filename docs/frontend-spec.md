@@ -3,7 +3,7 @@
 ## 1. 문서 목적
 
 이 문서는 현재 VARO 프론트엔드 구현을 기준으로 기술 구조와 사용자 경험 범위를 정리한다.  
-핵심 대상은 모바일 웹 우선의 반응형 Next.js 애플리케이션이며, 인증, review preview, 인기, 커뮤니티, 히스토리, 서버 알림 흐름을 하나의 앱 셸 안에서 연결하는 방식을 설명한다.
+핵심 대상은 모바일 웹 우선의 반응형 Next.js 애플리케이션이며, 인증, answer preview, 인기, 커뮤니티, 히스토리, 서버 알림 흐름을 하나의 앱 셸 안에서 연결하는 방식을 설명한다.
 
 ## 2. 프론트엔드 기술 스택
 
@@ -20,12 +20,12 @@
 
 - 로그인 상태와 프로필 완성 여부 기반 진입 제어
 - 서비스 공통 레이아웃과 내비게이션 제공
-- review preview 생성, loading 상태 표시, detail 렌더링
+- answer preview 생성, loading 상태 표시, detail 렌더링
 - 인기 주제, 커뮤니티, 히스토리, 알림 UI 제공
 - 사용자 프로필 조회 및 일부 수정 UI 제공
 - badge, unread, loading, error, empty state를 일관된 방식으로 관리
 
-프론트엔드는 verdict 계산, source 해석, 인기 집계 계산 같은 서버 책임을 직접 수행하지 않는다. 다만 현재 구현에서는 review task와 notification 일부 상태를 클라이언트 localStorage에 보조 저장한다.
+프론트엔드는 verdict 계산, source 해석, 인기 집계 계산 같은 서버 책임을 직접 수행하지 않는다. 다만 현재 구현에서는 answer task와 notification 일부 상태를 클라이언트 localStorage에 보조 저장한다.
 
 ## 4. 앱 셸 구조
 
@@ -54,7 +54,7 @@
 - History
 - Settings
 - Settings 내부에서 User Info 진입
-- 최근 review preview 요약 리스트
+- 최근 answer preview 요약 리스트
 
 ## 5. 주요 화면군
 
@@ -74,12 +74,12 @@
 
 - 중앙 입력 영역
 - 분석 시작 CTA
-- active review task 감지 시 `/loading` 복귀
+- active answer task 감지 시 `/loading` 복귀
 - 간결한 서비스 소개 카피
 
 ### 5.4 Analysis Loading
 
-- 전역 review task store 기반 진행 상태
+- 전역 answer task store 기반 진행 상태
 - 안내용 단계 메시지
 - 실패 시 재시도 / 홈 이동
 - 완료 시 결과 보기
@@ -87,7 +87,7 @@
 
 ### 5.5 Analysis Result
 
-- claim
+- check
 - provisional verdict / confidence / 수집된 출처 간 일치도
 - 수집 뉴스 종합 요약 / 공식 출처 확인 상태
 - source distribution / agreement / conflict summary
@@ -103,7 +103,7 @@
 
 - 인기 질문 랭킹
 - 순위 / 질문 요약 / 요청 수 / 재열람 수 / 합산 점수
-- 대표 review preview 재진입
+- 대표 answer preview 재진입
 
 ### 5.7 Community
 
@@ -130,14 +130,14 @@
 - Settings는 `내 정보 관리`, `개인정보 보호`, `알림 설정`, `고객 센터` 진입을 제공
 - 개인정보 보호와 고객 센터는 정보형 서브페이지로 제공
 - 알림 설정은 서버 저장 기반 토글 UI를 제공
-- review 완료, community 댓글, community 좋아요 알림이 모두 실제 서버 생성 흐름에 연결된다
+- answer 완료, community 댓글, community 좋아요 알림이 모두 실제 서버 생성 흐름에 연결된다
 
 ### 5.10 Notifications
 
-- review preview 완료 알림
+- answer preview 완료 알림
 - community 댓글 / 좋아요 알림
 - 읽음 / 미확인 상태
-- review 알림 클릭은 meaningful reopen source로 기록
+- answer 알림 클릭은 meaningful reopen source로 기록
 - 커뮤니티 알림 클릭은 관련 게시글 상세로 이동한다
 
 ## 6. 클라이언트 상태 모델
@@ -150,9 +150,9 @@
 - `history/list`
 - `community/feed`
 - `popular/ranking`
-- `review/tasks`
+- `answer/tasks`
 
-### 6.2 review 상태
+### 6.2 answer 상태
 
 - 클라이언트 task 상태
   - `pending`
@@ -190,7 +190,7 @@
 
 추가 보조 상태:
 
-- `varo.review-tasks`: pending draft, reviewId 승격, 오류 메시지, 알림 생성 여부 저장
+- `varo.answer-tasks`: pending draft, answerId 승격, 오류 메시지, 알림 생성 여부 저장
 - history 화면은 서버 응답과 local pending task 요약을 병합해 렌더링
 
 ## 7. 라우팅 원칙
@@ -201,7 +201,7 @@
 - `/onboarding/profile`
 - `/`
 - `/loading`
-- `/reviews/[reviewId]`
+- `/answers/[answerId]`
 - `/popular`
 - `/community`
 - `/community/write`
@@ -218,7 +218,7 @@
 - 결과 페이지는 deep link로 재진입 가능해야 함
 - 결과 재진입은 선택적 `entry` query를 통해 source를 전달할 수 있어야 함
 - `entry` 값은 `popular | history | notification`만 허용
-- 해당 query가 있으면 프론트는 review reopen API를 호출한 뒤 URL에서 query를 제거
+- 해당 query가 있으면 프론트는 answer reopen API를 호출한 뒤 URL에서 query를 제거
 - 알림 클릭은 관련 화면으로 직접 이동해야 함
 
 ## 8. API 소비 방식
@@ -235,14 +235,14 @@
 - `GET /api/v1/users/me`
 - `PATCH /api/v1/users/me/profile`
 
-### 8.3 review 관련
+### 8.3 answer 관련
 
-- `POST /api/v1/reviews/query-processing-preview`
-- `GET /api/v1/reviews`
-- `GET /api/v1/reviews/{reviewId}`
-- `POST /api/v1/reviews/{reviewId}/reopen`
+- `POST /api/v1/answers/query-processing-preview`
+- `GET /api/v1/answers`
+- `GET /api/v1/answers/{answerId}`
+- `POST /api/v1/answers/{answerId}/reopen`
 
-`POST /api/v1/reviews/query-processing-preview`는 현재 최종 완료까지 오래 걸리는 비동기 job id만 반환하지 않고, 백엔드가 동기적으로 preview pipeline을 실행한 뒤 detail을 반환한다. 프론트의 loading 단계 메시지는 실제 backend stage polling이 아니라 local task store 기반 안내용 진행 상태다.
+`POST /api/v1/answers/query-processing-preview`는 현재 최종 완료까지 오래 걸리는 비동기 job id만 반환하지 않고, 백엔드가 동기적으로 preview pipeline을 실행한 뒤 detail을 반환한다. 프론트의 loading 단계 메시지는 실제 backend stage polling이 아니라 local task store 기반 안내용 진행 상태다.
 
 ### 8.4 서비스 기능 관련
 
@@ -261,13 +261,13 @@
 
 프론트는 도메인별 API client 계층을 통해 서버와 통신하고, 화면 컴포넌트가 HTTP 세부사항을 직접 다루지 않도록 유지한다. notifications도 동일하게 서버 API를 소비한다.
 
-## 9. review 화면 정보 구조
+## 9. answer 화면 정보 구조
 
-review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
+answer 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 
 표시 순서:
 
-1. claim
+1. check
 2. provisional verdict / confidence / 수집된 출처 간 일치도
 3. rule-based 수집 뉴스 종합 요약과 공식 출처 확인 상태
 4. evidence snippet 또는 source raw snippet 기반 근거
@@ -318,5 +318,5 @@ review 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 - 과장 없는 카피
 - 모바일 우선 반응형
 - unread, loading, empty, error 상태를 누락하지 않음
-- review 도메인에서는 결론보다 근거를 먼저 이해하게 함
+- answer 도메인에서는 결론보다 근거를 먼저 이해하게 함
 - 현재 구현이 preview artifact 기반 임시 result 중심이라는 사실을 UI 문구와 문서에서 일관되게 유지함
