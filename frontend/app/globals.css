@@ -41,6 +41,22 @@ body {
   background: linear-gradient(135deg, #0050cb 0%, #0066ff 100%);
 }
 
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #e8edf5 0%, #f8fafc 42%, #dbe4ef 56%, #e8edf5 100%);
+  background-size: 240% 100%;
+  animation: skeleton-shimmer 2.3s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;

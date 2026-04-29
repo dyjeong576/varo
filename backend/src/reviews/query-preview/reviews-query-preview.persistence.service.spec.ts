@@ -45,6 +45,21 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
             ...data,
           }),
         ),
+      update: jest
+        .fn()
+        .mockImplementation(
+          ({
+            where,
+            data,
+          }: {
+            where: { id: string };
+            data: Record<string, unknown>;
+          }) =>
+            Promise.resolve({
+              id: where.id,
+              ...data,
+            }),
+        ),
     },
     evidenceSnippet: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -182,6 +197,85 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         handoffPayload: Prisma.DbNull,
       },
     });
+  });
+
+  it("검색 완료 직후 source를 저장하고 signal 분류 진행 상태로 갱신한다", async () => {
+    const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
+    const service = new ReviewsQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
+
+    const result = await service.persistSearchPreviewSources({
+      reviewJob: { id: "review-1" },
+      refinement: {
+        claimLanguageCode: "ko",
+        coreClaim: "한국은행 기준금리 동결",
+        normalizedClaim: "한국은행이 기준금리를 동결했다",
+        claimType: "policy",
+        verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+        searchPlan: {
+          normalizedClaim: "한국은행이 기준금리를 동결했다",
+          claimType: "policy",
+          verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+          searchRoute: "korean_news",
+          queries: [
+            {
+              id: "sp1",
+              purpose: "claim_specific",
+              query: "한국은행 기준금리 동결",
+              priority: 1,
+            },
+          ],
+        },
+        generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+        searchRoute: "korean_news",
+        searchRouteReason: "한국 경제 뉴스 claim입니다.",
+        searchClaim: "한국은행 기준금리 동결",
+        searchQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+        topicCountryCode: "KR",
+        countryDetectionReason: "한국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 기관과 경제 정책이 포함되어 있습니다.",
+      },
+      generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+      candidates: [
+        {
+          id: "c1",
+          searchRoute: "korean_news",
+          sourceProvider: "naver-search",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "한국은행 기준금리 동결",
+          rawSnippet: "한국은행은 기준금리를 동결했다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["sp1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: null,
+          relevanceTier: "reference",
+          relevanceReason: "검색 결과 후보입니다.",
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(prisma.reviewJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "review-1" },
+        data: expect.objectContaining({
+          status: "searching",
+          currentStage: "relevance_and_signal_classification",
+          searchedSourceCount: 1,
+          handoffPayload: Prisma.DbNull,
+        }),
+      }),
+    );
+    expect(notificationsService.createReviewCompletedNotification).not.toHaveBeenCalled();
   });
 
   it("source와 evidence를 저장하고 review job handoff 상태를 업데이트한다", async () => {

@@ -75,6 +75,40 @@ export class ReviewsController {
     return this.reviewsService.createQueryProcessingPreview(current.user.id, payload);
   }
 
+  @Post("query-processing-preview/async")
+  @ApiCookieAuth("sessionAuth")
+  @UseGuards(SessionAuthGuard)
+  @ApiOperation({
+    summary: "review query processing 비동기 미리보기 실행",
+    description:
+      "source search가 끝나면 수집된 출처를 먼저 반환하고, relevance/evidence signal 분류는 background에서 이어서 처리합니다.",
+  })
+  @ApiOkResponse({
+    description: "질의 처리 비동기 미리보기 시작 성공",
+    type: ReviewQueryProcessingPreviewResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: "claim 검증 실패",
+    type: ApiErrorResponseDto,
+  })
+  @ApiBadGatewayResponse({
+    description: "외부 provider 처리 실패",
+    type: ApiErrorResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "세션이 없거나 만료됨",
+    type: ApiErrorResponseDto,
+  })
+  async createQueryProcessingPreviewAsync(
+    @CurrentUser() current: { user: { id: string } },
+    @Body() payload: CreateReviewQueryProcessingPreviewDto,
+  ): Promise<ReviewQueryProcessingPreviewResponseDto> {
+    return this.reviewsService.createQueryProcessingPreviewAsync(
+      current.user.id,
+      payload,
+    );
+  }
+
   @Get()
   @ApiCookieAuth("sessionAuth")
   @UseGuards(SessionAuthGuard)

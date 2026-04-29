@@ -205,6 +205,7 @@ export interface ReviewPreviewDetail {
 export type ReviewTaskStatus =
   | "pending"
   | "submitting"
+  | "processing"
   | "succeeded"
   | "failed";
 

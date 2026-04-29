@@ -256,3 +256,13 @@
 - Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
 - source별 수집 API는 `sources.source_provider`에 저장하고, DB 기반 `source_domain_registry` 테이블과 `sources.domain_registry_id`는 코드 고정 registry 전환에 따라 제거한다.
 - `TAVILY_API_KEY`, `TAVILY_SEARCH_TIMEOUT_MS`, `TAVILY_EXTRACT_TIMEOUT_MS` 설정을 유지한다.
+
+## 2026-04-29
+
+### Async Review Preview Polling
+- review preview는 검색 완료 후 source를 먼저 노출하고, relevance/evidence signal 분류는 background에서 이어서 처리한다.
+- MVP 실시간 갱신 방식은 SSE가 아니라 기존 `GET /api/v1/reviews/:reviewId` 기반 polling으로 구현한다.
+- 새 생성 API는 `POST /api/v1/reviews/query-processing-preview/async`로 두고, 기존 동기 API는 호환용으로 유지한다.
+- 검색 직후 응답은 기존 detail 응답 shape를 유지하되 `status=searching`, `currentStage=relevance_and_signal_classification`, `result=null`, `sources[]`로 표현한다.
+- 별도 queue/worker는 도입하지 않고 단일 backend 인스턴스 전제의 in-process background promise로 처리한다.
+- DB schema와 Prisma migration은 변경하지 않는다.

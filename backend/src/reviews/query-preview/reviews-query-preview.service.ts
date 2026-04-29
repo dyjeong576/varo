@@ -1,7 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { ReviewJob, Source } from "@prisma/client";
 import { CreateReviewQueryProcessingPreviewDto } from "../dto/create-review-query-processing-preview.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
 import { ReviewsProvidersService } from "../reviews.providers.service";
+import {
+  QueryArtifact,
+  QueryRefinementResult,
+  SearchCandidate,
+} from "../reviews.types";
 import {
   deduplicateCandidates,
   getKoreanSearchDomainRegistry,
@@ -10,6 +16,7 @@ import {
 import { mapPreviewResponse } from "./reviews-query-preview.mapper";
 import {
   mapOutOfScopePreviewResponse,
+  mapSearchPreviewResponse,
   mapStoredPreviewResponse,
   mapStoredPreviewSummary,
 } from "./reviews-query-preview.mapper";
@@ -185,12 +192,205 @@ export class ReviewsQueryPreviewService {
     }
   }
 
+  async createQueryProcessingPreviewAsync(
+    userId: string,
+    payload: CreateReviewQueryProcessingPreviewDto,
+  ): Promise<ReviewQueryProcessingPreviewResponseDto> {
+    const normalizedClaim = normalizeClaimText(payload.claim);
+    this.persistenceService.validateNormalizedClaim(normalizedClaim);
+
+    const existingReview =
+      payload.clientRequestId &&
+      (await this.persistenceService.findQueryProcessingPreviewByClientRequestId(
+        userId,
+        payload.clientRequestId,
+      ));
+
+    if (existingReview && existingReview.status !== "failed") {
+      return mapStoredPreviewResponse(existingReview);
+    }
+
+    const { claim, reviewJob } = existingReview
+      ? {
+          claim: {
+            id: existingReview.claim.id,
+            rawText: existingReview.claim.rawText,
+          },
+          reviewJob: {
+            id: existingReview.id,
+            createdAt: existingReview.createdAt,
+            clientRequestId: existingReview.clientRequestId,
+          },
+        }
+      : await this.persistenceService.createClaimAndReviewJob({
+          userId,
+          rawClaim: payload.claim,
+          normalizedClaim,
+          clientRequestId: payload.clientRequestId,
+        });
+
+    if (existingReview) {
+      await this.persistenceService.resetQueryProcessingPreview(reviewJob.id);
+    }
+
+    try {
+      const refinementStartedAt = Date.now();
+      const refinement = await this.providersService.refineQuery(normalizedClaim);
+      this.logStageDuration("query_refinement", refinementStartedAt, reviewJob.id);
+      const generatedQueries = refinement.generatedQueries;
+      const searchRoute =
+        refinement.searchRoute === "korean_news" ? "korean_news" : "unsupported";
+      const searchQueries =
+        refinement.searchPlan?.queries?.length
+          ? refinement.searchPlan.queries.map((query) => ({
+              id: query.id,
+              text: query.query,
+              rank: query.priority,
+              purpose: query.purpose,
+            }))
+          : (refinement.searchQueries ?? refinement.generatedQueries);
+
+      if (searchRoute === "unsupported") {
+        const persistedOutOfScope =
+          await this.persistenceService.persistOutOfScopeReview({
+            userId,
+            reviewJob,
+            refinement,
+            generatedQueries,
+          });
+
+        return mapOutOfScopePreviewResponse({
+          reviewJob,
+          claim,
+          createdAt: reviewJob.createdAt,
+          normalizedClaim,
+          refinement,
+          generatedQueries,
+          insufficiencyReason: persistedOutOfScope.insufficiencyReason,
+        });
+      }
+
+      const initialCandidates = await this.providersService.searchSources({
+        searchRoute,
+        queries: searchQueries,
+        coreClaim: refinement.coreClaim,
+        claimLanguageCode: refinement.claimLanguageCode,
+        topicCountryCode: refinement.topicCountryCode,
+        domainRegistry: getKoreanSearchDomainRegistry(),
+      });
+      const classificationCandidates = deduplicateCandidates(initialCandidates).slice(
+        0,
+        RELEVANCE_LIMIT,
+      );
+      const previewCandidates = classificationCandidates.map((candidate) => ({
+        ...candidate,
+        relevanceTier: candidate.relevanceTier ?? "reference",
+        relevanceReason:
+          candidate.relevanceReason ??
+          "검색 결과 후보입니다. 근거 신호 분류가 진행 중입니다.",
+      }));
+      const createdSources =
+        await this.persistenceService.persistSearchPreviewSources({
+          reviewJob,
+          refinement,
+          generatedQueries,
+          candidates: previewCandidates,
+        });
+
+      void this.completeAsyncQueryProcessingPreview({
+        userId,
+        reviewJob,
+        refinement,
+        generatedQueries,
+        candidates: classificationCandidates,
+        existingSources: createdSources,
+      });
+
+      return mapSearchPreviewResponse({
+        reviewJob,
+        claim,
+        createdAt: reviewJob.createdAt,
+        normalizedClaim,
+        refinement,
+        generatedQueries,
+        sources: createdSources,
+      });
+    } catch (error) {
+      this.logger.error(
+        this.buildPreviewFailureLogMessage({
+          userId,
+          reviewJobId: reviewJob.id,
+          claimId: claim.id,
+          clientRequestId: reviewJob.clientRequestId ?? payload.clientRequestId ?? null,
+          error,
+        }),
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.persistenceService.markReviewJobFailed(reviewJob.id, error);
+      throw error;
+    }
+  }
+
   async createTestQueryProcessingPreview(
     payload: CreateReviewQueryProcessingPreviewDto,
   ): Promise<ReviewQueryProcessingPreviewResponseDto> {
     const previewUser = await this.persistenceService.ensurePreviewUser();
 
     return this.createQueryProcessingPreview(previewUser.id, payload);
+  }
+
+  private async completeAsyncQueryProcessingPreview(params: {
+    userId: string;
+    reviewJob: Pick<ReviewJob, "id">;
+    refinement: QueryRefinementResult;
+    generatedQueries: QueryArtifact[];
+    candidates: SearchCandidate[];
+    existingSources: Source[];
+  }): Promise<void> {
+    try {
+      const relevanceStartedAt = Date.now();
+      const relevanceSignalResult =
+        await this.providersService.classifyRelevanceAndEvidenceSignals({
+          coreClaim: params.refinement.coreClaim,
+          claimLanguageCode: params.refinement.claimLanguageCode,
+          searchRoute: "korean_news",
+          topicCountryCode: params.refinement.topicCountryCode,
+          searchPlan: params.refinement.searchPlan,
+          candidates: params.candidates,
+        });
+      this.logStageDuration(
+        "relevance_and_signal_classification",
+        relevanceStartedAt,
+        params.reviewJob.id,
+      );
+      const evidenceSignals = relevanceSignalResult.evidenceSignals.slice(
+        0,
+        PRIMARY_EXTRACTION_LIMIT + REFERENCE_PROMOTION_LIMIT,
+      );
+
+      await this.persistenceService.persistQueryPreviewResult({
+        userId: params.userId,
+        reviewJob: params.reviewJob,
+        refinement: params.refinement,
+        generatedQueries: params.generatedQueries,
+        relevanceCandidates: relevanceSignalResult.relevanceCandidates,
+        evidenceSignals,
+        primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
+        existingSources: params.existingSources,
+      });
+    } catch (error) {
+      this.logger.error(
+        this.buildPreviewFailureLogMessage({
+          userId: params.userId,
+          reviewJobId: params.reviewJob.id,
+          claimId: "unknown",
+          clientRequestId: null,
+          error,
+        }),
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.persistenceService.markReviewJobFailed(params.reviewJob.id, error);
+    }
   }
 
   async listQueryProcessingPreviews(

@@ -35,6 +35,14 @@ interface PersistQueryPreviewResultInput {
   relevanceCandidates: SearchCandidate[];
   evidenceSignals?: EvidenceSignal[];
   primaryExtractionLimit: number;
+  existingSources?: Source[];
+}
+
+interface PersistSearchPreviewSourcesInput {
+  reviewJob: Pick<ReviewJob, "id">;
+  refinement: QueryRefinementResult;
+  generatedQueries: QueryArtifact[];
+  candidates: SearchCandidate[];
 }
 
 export interface PersistedQueryPreviewArtifacts {
@@ -329,14 +337,27 @@ export class ReviewsQueryPreviewPersistenceService {
   async persistQueryPreviewResult(
     input: PersistQueryPreviewResultInput,
   ): Promise<PersistedQueryPreviewArtifacts> {
-    const sourceCreateInputs = buildSourceCreateInputs(
-      input.reviewJob.id,
-      input.relevanceCandidates,
-      [],
-    );
-    const createdSources = await Promise.all(
-      sourceCreateInputs.map((data) => this.prisma.source.create({ data })),
-    );
+    const createdSources = input.existingSources?.length
+      ? await Promise.all(
+          input.existingSources.map((source, index) => {
+            const candidate = input.relevanceCandidates[index];
+
+            return this.prisma.source.update({
+              where: { id: source.id },
+              data: {
+                relevanceTier: candidate?.relevanceTier ?? source.relevanceTier,
+                relevanceReason: candidate?.relevanceReason ?? source.relevanceReason,
+              },
+            });
+          }),
+        )
+      : await Promise.all(
+          buildSourceCreateInputs(
+            input.reviewJob.id,
+            input.relevanceCandidates,
+            [],
+          ).map((data) => this.prisma.source.create({ data })),
+        );
 
     const evidenceSnippets: EvidenceSnippet[] = [];
     const createdSourceByCandidateId = new Map(
@@ -438,6 +459,38 @@ export class ReviewsQueryPreviewPersistenceService {
       insufficiencyReason,
       evidenceSignals,
     };
+  }
+
+  async persistSearchPreviewSources(
+    input: PersistSearchPreviewSourcesInput,
+  ): Promise<Source[]> {
+    const sourceCreateInputs = buildSourceCreateInputs(
+      input.reviewJob.id,
+      input.candidates,
+      [],
+    );
+    const createdSources = await Promise.all(
+      sourceCreateInputs.map((data) => this.prisma.source.create({ data })),
+    );
+    const queryRefinementPayload = buildQueryRefinementPayload(
+      input.refinement,
+      input.generatedQueries,
+    );
+
+    await this.prisma.reviewJob.update({
+      where: { id: input.reviewJob.id },
+      data: {
+        status: "searching",
+        currentStage: "relevance_and_signal_classification",
+        searchedSourceCount: createdSources.length,
+        processedSourceCount: 0,
+        lastErrorCode: null,
+        queryRefinement: queryRefinementPayload,
+        handoffPayload: Prisma.DbNull,
+      },
+    });
+
+    return createdSources;
   }
 
   async persistOutOfScopeReview(params: {

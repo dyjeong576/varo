@@ -27,6 +27,16 @@ export class ReviewsService {
     return this.queryPreviewService.createQueryProcessingPreview(userId, payload);
   }
 
+  async createQueryProcessingPreviewAsync(
+    userId: string,
+    payload: CreateReviewQueryProcessingPreviewDto,
+  ): Promise<ReviewQueryProcessingPreviewResponseDto> {
+    return this.queryPreviewService.createQueryProcessingPreviewAsync(
+      userId,
+      payload,
+    );
+  }
+
   async createTestQueryProcessingPreview(
     payload: CreateReviewQueryProcessingPreviewDto,
   ): Promise<ReviewQueryProcessingPreviewResponseDto> {

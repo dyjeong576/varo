@@ -455,6 +455,63 @@ export function mapOutOfScopePreviewResponse(params: {
   };
 }
 
+export function mapSearchPreviewResponse(params: {
+  reviewJob: Pick<ReviewJob, "id" | "clientRequestId">;
+  claim: Pick<ReviewClaimRecord, "id" | "rawText">;
+  createdAt: Date;
+  normalizedClaim: string;
+  refinement: QueryRefinementResult;
+  generatedQueries: QueryArtifact[];
+  sources: Source[];
+}): ReviewQueryProcessingPreviewResponseDto {
+  return {
+    reviewId: params.reviewJob.id,
+    clientRequestId: params.reviewJob.clientRequestId,
+    claimId: params.claim.id,
+    rawClaim: params.claim.rawText,
+    createdAt: params.createdAt.toISOString(),
+    isKoreaRelated: params.refinement.isKoreaRelated,
+    koreaRelevanceReason: params.refinement.koreaRelevanceReason,
+    status: "searching",
+    currentStage: "relevance_and_signal_classification",
+    normalizedClaim: params.normalizedClaim,
+    claimLanguageCode: params.refinement.claimLanguageCode,
+    languageCode: params.refinement.claimLanguageCode,
+    coreClaim: params.refinement.coreClaim,
+    topicCountryCode: params.refinement.topicCountryCode,
+    countryDetectionReason: params.refinement.countryDetectionReason,
+    generatedQueries: params.generatedQueries,
+    sources: params.sources.map((source) => ({
+      id: source.id,
+      sourceType: source.sourceType,
+      publisherName: source.publisherName,
+      canonicalUrl: source.canonicalUrl,
+      originalUrl: source.originalUrl,
+      publishedAt: source.publishedAt?.toISOString() ?? null,
+      rawTitle: source.rawTitle,
+      rawSnippet: source.rawSnippet,
+      relevanceTier: source.relevanceTier ?? "reference",
+      relevanceReason: source.relevanceReason,
+      originQueryIds: parseOriginQueryIds(source.originQueryIds),
+      sourceCountryCode: source.sourceCountryCode,
+      retrievalBucket: source.retrievalBucket,
+      domainRegistryMatched: false,
+      stance: "unknown",
+    })),
+    evidenceSnippets: [],
+    searchedSourceCount: params.sources.length,
+    selectedSourceCount: 0,
+    discardedSourceCount: 0,
+    handoff: {
+      coreClaim: params.refinement.coreClaim,
+      sourceIds: [],
+      snippetIds: [],
+      insufficiencyReason: null,
+    },
+    result: null,
+  };
+}
+
 function parseJsonRecord(value: Prisma.JsonValue | null): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -733,7 +790,9 @@ export function mapStoredPreviewResponse(
     evidenceSignals: handoff.evidenceSignals,
   });
   const result =
-    reviewJob.status === "out_of_scope" ? null : assembledResult.result;
+    reviewJob.status === "out_of_scope" || reviewJob.status === "searching"
+      ? null
+      : assembledResult.result;
 
   return {
     reviewId: reviewJob.id,
@@ -779,9 +838,7 @@ export function mapStoredPreviewResponse(
       reviewJob.searchedSourceCount > 0
         ? reviewJob.searchedSourceCount
         : reviewJob.sources.length,
-    selectedSourceCount: reviewJob.sources.filter(
-      (source) => source.fetchStatus === "fetched",
-    ).length,
+    selectedSourceCount: handoff.sourceIds.length,
     discardedSourceCount: reviewJob.sources.filter(
       (source) => source.relevanceTier === "discard",
     ).length,

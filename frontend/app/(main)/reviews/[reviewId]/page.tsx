@@ -14,7 +14,10 @@ import UncertaintyCard from "@/components/reviews/UncertaintyCard";
 import VerdictHero from "@/components/reviews/VerdictHero";
 import AnalysisSummary from "@/components/reviews/AnalysisSummary";
 import { isReviewEntrySource } from "@/lib/reviews/navigation";
-import { getReviewTask } from "@/lib/reviews/task-store";
+import {
+  getReviewTask,
+  patchReviewTaskByReviewId,
+} from "@/lib/reviews/task-store";
 import { ReviewPreviewDetail, ReviewSourceCategory } from "@/lib/reviews/types";
 
 const FILTERS: Array<{ label: string; value: "all" | ReviewSourceCategory }> = [
@@ -23,6 +26,58 @@ const FILTERS: Array<{ label: string; value: "all" | ReviewSourceCategory }> = [
   { label: "언론", value: "press" },
   { label: "기타", value: "other" },
 ];
+
+function SignalClassificationSkeleton({
+  sourceCount,
+}: {
+  sourceCount: number;
+}) {
+  return (
+    <section className="space-y-4" aria-label="근거 신호 분류 진행 중">
+      <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0050cb]">
+              Signal Classification
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[#556070]">
+              {sourceCount}개 출처의 근거 신호를 분류하고 있습니다.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-bold text-[#0050cb]">
+            <span className="h-2 w-2 rounded-full bg-[#0050cb]" />
+            진행 중
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          <div className="skeleton-shimmer h-5 w-2/3 rounded-full" />
+          <div className="skeleton-shimmer h-5 w-full rounded-full" />
+          <div className="skeleton-shimmer h-5 w-4/5 rounded-full" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl border border-[#dfe4f0] bg-white p-5">
+          <div className="skeleton-shimmer h-4 w-20 rounded-full" />
+          <div className="mt-6 flex h-16 items-end gap-2">
+            <div className="skeleton-shimmer h-10 flex-1 rounded-t-sm" />
+            <div className="skeleton-shimmer h-16 flex-1 rounded-t-sm" />
+            <div className="skeleton-shimmer h-8 flex-1 rounded-t-sm" />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#dfe4f0] bg-white p-5">
+          <div className="skeleton-shimmer h-4 w-24 rounded-full" />
+          <div className="mt-7 space-y-3">
+            <div className="skeleton-shimmer mx-auto h-8 w-24 rounded-full" />
+            <div className="skeleton-shimmer mx-auto h-3 w-32 rounded-full" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function ReviewResultPage() {
   const params = useParams();
@@ -129,6 +184,33 @@ export default function ReviewResultPage() {
       });
   }, [isPendingReviewRoute, review, reviewId, router, searchParams]);
 
+  useEffect(() => {
+    if (isPendingReviewRoute || review?.status !== "searching") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      api.reviews
+        .getDetail(reviewId)
+        .then((response) => {
+          setReview(response);
+
+          if (response.status !== "searching") {
+            patchReviewTaskByReviewId(reviewId, {
+              status: response.status === "failed" ? "failed" : "succeeded",
+              previewStatus: response.status,
+              currentStage: response.currentStage,
+              selectedSourceCount: response.selectedSourceCount,
+              completedAt: new Date().toISOString(),
+            });
+          }
+        })
+        .catch(() => undefined);
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [isPendingReviewRoute, review?.status, reviewId]);
+
   if (isPendingReviewRoute) {
     if (pendingRouteErrorMessage) {
       return (
@@ -182,6 +264,8 @@ export default function ReviewResultPage() {
     review.analysisSummary !== null &&
     review.uncertaintySummary !== null &&
     review.resultMode !== null;
+  const isSignalClassificationPending =
+    !review.isOutOfScope && review.status === "searching";
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top,#f1f6ff_0%,#f8f9fc_32%,#f6f3fb_70%,#f5f1fb_100%)] px-4 py-5 sm:px-6 sm:py-6">
@@ -195,6 +279,32 @@ export default function ReviewResultPage() {
             currentStageLabel={review.currentStageLabel}
             pendingMessage={review.pendingMessage}
           />
+        ) : isSignalClassificationPending ? (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#0050cb]">
+                  출처 수집 완료
+                </span>
+                <span className="rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-bold text-[#0050cb]">
+                  {review.currentStageLabel}
+                </span>
+              </div>
+
+              <h1 className="text-[1.9rem] font-extrabold leading-tight tracking-[-0.04em] text-[#191b24] sm:text-[2.2rem]">
+                {review.claim}
+              </h1>
+
+              <div className="mt-6 rounded-xl bg-[#f8fafc] px-4 py-4 text-sm leading-6 text-[#475569]">
+                뉴스 검색 결과를 먼저 표시합니다. verdict와 근거 신호는 수집된
+                출처만 기준으로 분류되는 중입니다.
+              </div>
+            </div>
+
+            <p className="text-sm leading-6 text-[#6b7280]">
+              {review.pendingMessage}
+            </p>
+          </section>
         ) : (
           <section className="space-y-4">
             <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
@@ -234,15 +344,19 @@ export default function ReviewResultPage() {
           />
         ) : null}
 
-        <EvidenceGrid
-          searchedSourceCount={review.searchedSourceCount}
-          selectedSourceCount={review.selectedSourceCount}
-          agreementCount={review.agreementCount}
-          conflictCount={review.conflictCount}
-          contextCount={review.contextCount}
-          consensusLabel={review.consensusLabel}
-          sourceBreakdown={review.sourceBreakdown}
-        />
+        {isSignalClassificationPending ? (
+          <SignalClassificationSkeleton sourceCount={review.sources.length} />
+        ) : (
+          <EvidenceGrid
+            searchedSourceCount={review.searchedSourceCount}
+            selectedSourceCount={review.selectedSourceCount}
+            agreementCount={review.agreementCount}
+            conflictCount={review.conflictCount}
+            contextCount={review.contextCount}
+            consensusLabel={review.consensusLabel}
+            sourceBreakdown={review.sourceBreakdown}
+          />
+        )}
 
         {review.evidenceSnippets.length > 0 ? (
           <EvidenceSnippetList evidenceSnippets={review.evidenceSnippets} />

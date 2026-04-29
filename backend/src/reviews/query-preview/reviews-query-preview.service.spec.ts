@@ -32,6 +32,7 @@ describe("ReviewsQueryPreviewService", () => {
     ),
     resetQueryProcessingPreview: jest.fn().mockResolvedValue(undefined),
     persistQueryPreviewResult: jest.fn(),
+    persistSearchPreviewSources: jest.fn(),
     persistOutOfScopeReview: jest.fn().mockResolvedValue({
       insufficiencyReason:
         "뉴스성 또는 사실성 검토 지원 범위 밖 claim으로 기록되었습니다.",
@@ -51,6 +52,10 @@ describe("ReviewsQueryPreviewService", () => {
     }),
     recordHistoryEntry: jest.fn().mockResolvedValue(undefined),
   });
+  const flushPromises = () =>
+    new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
   it("빈 claim이면 입력 검증 예외를 던진다", async () => {
     const persistence = createPersistenceMock();
@@ -340,6 +345,275 @@ describe("ReviewsQueryPreviewService", () => {
         ]),
       }),
     );
+  });
+
+  it("async preview는 검색 완료 직후 source를 먼저 반환하고 background 분류를 이어간다", async () => {
+    const persistence = createPersistenceMock();
+    const refinement = {
+      claimLanguageCode: "ko",
+      coreClaim: "한국은행 기준금리 동결",
+      normalizedClaim: "한국은행이 기준금리를 동결했다",
+      claimType: "policy",
+      verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+      searchPlan: {
+        normalizedClaim: "한국은행이 기준금리를 동결했다",
+        claimType: "policy",
+        verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+        searchRoute: "korean_news",
+        queries: [
+          {
+            id: "sp1",
+            purpose: "claim_specific",
+            query: "한국은행 기준금리 동결",
+            priority: 1,
+          },
+        ],
+      },
+      generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+      searchRoute: "korean_news",
+      searchRouteReason: "한국 경제 뉴스 claim입니다.",
+      searchClaim: "한국은행 기준금리 동결",
+      searchQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+      topicCountryCode: "KR",
+      countryDetectionReason: "한국 이슈로 판단했습니다.",
+      isKoreaRelated: true,
+      koreaRelevanceReason: "한국 기관과 경제 정책이 포함되어 있습니다.",
+    };
+    const candidate = {
+      id: "c1",
+      sourceType: "news",
+      publisherName: "연합뉴스",
+      publishedAt: "2026-04-01T00:00:00.000Z",
+      canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+      originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+      rawTitle: "한국은행 기준금리 동결",
+      rawSnippet: "한국은행은 기준금리를 동결했다.",
+      normalizedHash: "hash-1",
+      originQueryIds: ["sp1"],
+      sourceCountryCode: "KR",
+      retrievalBucket: "familiar",
+      domainRegistryId: "kr-centrist-yna",
+    };
+    const createdSource = {
+      id: "source-1",
+      reviewJobId: "review-1",
+      sourceProvider: "naver-search",
+      sourceType: "news",
+      publisherName: "연합뉴스",
+      publishedAt: new Date("2026-04-01T00:00:00.000Z"),
+      canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+      originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+      rawTitle: "한국은행 기준금리 동결",
+      rawSnippet: "한국은행은 기준금리를 동결했다.",
+      normalizedHash: "hash-1",
+      fetchStatus: "pending",
+      contentText: null,
+      isDuplicate: false,
+      duplicateGroupKey: null,
+      originQueryIds: ["sp1"],
+      relevanceTier: "reference",
+      relevanceReason: "검색 결과 후보입니다. 근거 신호 분류가 진행 중입니다.",
+      sourceCountryCode: "KR",
+      retrievalBucket: "familiar",
+      domainRegistryId: null,
+    };
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue(refinement),
+      searchSources: jest.fn().mockResolvedValue([candidate]),
+      classifyRelevanceAndEvidenceSignals: jest.fn().mockResolvedValue({
+        relevanceCandidates: [
+          {
+            ...candidate,
+            relevanceTier: "primary",
+            relevanceReason: "claim을 직접 다루는 기사입니다.",
+          },
+        ],
+        evidenceSignals: [
+          {
+            sourceId: "c1",
+            snippetId: null,
+            stanceToClaim: "supports",
+            temporalRole: "current_status",
+            updateType: "confirmation",
+            currentAnswerImpact: "strengthens",
+            reason: "기준금리 동결을 확인합니다.",
+          },
+        ],
+      }),
+    } as unknown as ReviewsProvidersService;
+    persistence.persistSearchPreviewSources.mockResolvedValue([createdSource]);
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [createdSource],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: ["source-1"],
+      insufficiencyReason: null,
+      evidenceSignals: [],
+    });
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const result = await service.createQueryProcessingPreviewAsync("user-1", {
+      claim: "한국은행이 기준금리를 동결했다",
+      clientRequestId: "pending:review-1",
+    });
+    await flushPromises();
+
+    expect(result.status).toBe("searching");
+    expect(result.currentStage).toBe("relevance_and_signal_classification");
+    expect(result.sources).toHaveLength(1);
+    expect(result.result).toBeNull();
+    expect(persistence.persistSearchPreviewSources).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidates: [
+          expect.objectContaining({
+            id: "c1",
+            relevanceTier: "reference",
+          }),
+        ],
+      }),
+    );
+    expect(persistence.persistQueryPreviewResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        existingSources: [createdSource],
+        relevanceCandidates: [
+          expect.objectContaining({
+            id: "c1",
+            relevanceTier: "primary",
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("async background 분류 실패 시 failed로 기록하되 검색 source 저장은 유지한다", async () => {
+    const persistence = createPersistenceMock();
+    const loggerSpy = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        claimLanguageCode: "ko",
+        coreClaim: "한국은행 기준금리 동결",
+        normalizedClaim: "한국은행이 기준금리를 동결했다",
+        claimType: "policy",
+        verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+        searchPlan: {
+          normalizedClaim: "한국은행이 기준금리를 동결했다",
+          claimType: "policy",
+          verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
+          searchRoute: "korean_news",
+          queries: [
+            {
+              id: "sp1",
+              purpose: "claim_specific",
+              query: "한국은행 기준금리 동결",
+              priority: 1,
+            },
+          ],
+        },
+        generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+        searchRoute: "korean_news",
+        searchRouteReason: "한국 경제 뉴스 claim입니다.",
+        searchClaim: "한국은행 기준금리 동결",
+        searchQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+        topicCountryCode: "KR",
+        countryDetectionReason: "한국 이슈로 판단했습니다.",
+        isKoreaRelated: true,
+        koreaRelevanceReason: "한국 기관과 경제 정책이 포함되어 있습니다.",
+      }),
+      searchSources: jest.fn().mockResolvedValue([
+        {
+          id: "c1",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: null,
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "한국은행 기준금리 동결",
+          rawSnippet: "한국은행은 기준금리를 동결했다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["sp1"],
+          sourceCountryCode: "KR",
+          retrievalBucket: "familiar",
+          domainRegistryId: "kr-centrist-yna",
+        },
+      ]),
+      classifyRelevanceAndEvidenceSignals: jest
+        .fn()
+        .mockRejectedValue(new Error("classification failed")),
+    } as unknown as ReviewsProvidersService;
+    persistence.persistSearchPreviewSources.mockResolvedValue([
+      {
+        id: "source-1",
+        sourceType: "news",
+        publisherName: "연합뉴스",
+        publishedAt: null,
+        canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+        originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+        rawTitle: "한국은행 기준금리 동결",
+        rawSnippet: "한국은행은 기준금리를 동결했다.",
+        relevanceTier: "reference",
+        relevanceReason: "검색 결과 후보입니다. 근거 신호 분류가 진행 중입니다.",
+        originQueryIds: ["sp1"],
+        sourceCountryCode: "KR",
+        retrievalBucket: "familiar",
+      },
+    ]);
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    await service.createQueryProcessingPreviewAsync("user-1", {
+      claim: "한국은행이 기준금리를 동결했다",
+    });
+    await flushPromises();
+
+    expect(persistence.persistSearchPreviewSources).toHaveBeenCalledTimes(1);
+    expect(persistence.markReviewJobFailed).toHaveBeenCalledWith(
+      "review-1",
+      expect.any(Error),
+    );
+    loggerSpy.mockRestore();
+  });
+
+  it("async preview는 같은 clientRequestId의 진행 중 review를 중복 생성하지 않는다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.findQueryProcessingPreviewByClientRequestId.mockResolvedValue({
+      id: "review-1",
+      clientRequestId: "pending:review-1",
+      status: "searching",
+      currentStage: "relevance_and_signal_classification",
+      searchedSourceCount: 1,
+      lastErrorCode: null,
+      createdAt: new Date("2026-04-01T02:00:00.000Z"),
+      claim: {
+        id: "claim-1",
+        rawText: "한국은행이 기준금리를 동결했다",
+        normalizedText: "한국은행이 기준금리를 동결했다",
+      },
+      queryRefinement: null,
+      handoffPayload: null,
+      sources: [],
+      evidenceSnippets: [],
+    });
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      {} as never,
+    );
+
+    const result = await service.createQueryProcessingPreviewAsync("user-1", {
+      claim: "한국은행이 기준금리를 동결했다",
+      clientRequestId: "pending:review-1",
+    });
+
+    expect(result.reviewId).toBe("review-1");
+    expect(persistence.createClaimAndReviewJob).not.toHaveBeenCalled();
+    expect(persistence.resetQueryProcessingPreview).not.toHaveBeenCalled();
+    expect(persistence.persistSearchPreviewSources).not.toHaveBeenCalled();
   });
 
   it("해외뉴스 claim은 out_of_scope로 저장하고 source 수집을 건너뛴다", async () => {

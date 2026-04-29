@@ -48,6 +48,8 @@ export function getReviewStageLabel(stage: string): string {
       return "질의 정제 중";
     case "searching":
       return "출처 검색 중";
+    case "relevance_and_signal_classification":
+      return "근거 신호 분류 중";
     case "handoff_ready":
       return "근거 수집 완료";
     case "scope_checked":
@@ -264,6 +266,8 @@ export function mapReviewPreviewDetail(
       ? "현재 MVP는 한국 관련 claim만 검토합니다. 이 기록은 판단 없이 범위 확인 결과만 표시합니다."
       : detail.status === "failed"
       ? "임시 결과 생성이 중단되어 저장된 근거만 표시하고 있습니다."
+      : detail.status === "searching"
+      ? "출처 수집이 끝났고, 현재 수집된 출처 기준으로 근거 신호를 분류하고 있습니다."
       : "이 결과는 현재 수집된 출처 기준으로 계산된 임시 분석입니다.";
   const result = detail.result;
 

@@ -188,7 +188,7 @@ export const api = {
       clientRequestId?: string,
     ): Promise<ReviewPreviewDetail> => {
       const response = await apiRequest<ReviewPreviewDetailResponse>(
-        "/api/v1/reviews/query-processing-preview",
+        "/api/v1/reviews/query-processing-preview/async",
         {
           method: "POST",
           body: JSON.stringify({ claim, clientRequestId }),

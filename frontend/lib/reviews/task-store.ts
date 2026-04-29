@@ -242,6 +242,25 @@ function toSucceededTask(
   };
 }
 
+function toProcessingTask(
+  record: ReviewTaskRecord,
+  review: ReviewPreviewDetail,
+): ReviewTaskRecord {
+  return {
+    ...record,
+    clientRequestId: review.clientRequestId ?? record.clientRequestId ?? record.draftId,
+    status: "processing",
+    previewStatus: review.status,
+    currentStage: review.currentStage,
+    completedAt: null,
+    reviewId: review.reviewId,
+    reviewCreatedAt: review.createdAt,
+    selectedSourceCount: review.selectedSourceCount,
+    lastErrorCode: null,
+    errorMessage: null,
+  };
+}
+
 function toStoredFailedTask(
   record: ReviewTaskRecord,
   review: ReviewPreviewDetail,
@@ -365,6 +384,33 @@ export function patchReviewTask(
   }));
 }
 
+export function patchReviewTaskByReviewId(
+  reviewId: string,
+  updates: Partial<
+    Pick<
+      ReviewTaskRecord,
+      | "previewStatus"
+      | "currentStage"
+      | "selectedSourceCount"
+      | "lastErrorCode"
+      | "errorMessage"
+      | "status"
+      | "completedAt"
+    >
+  >,
+): void {
+  writeTaskRecords(
+    readTaskRecords().map((record) =>
+      record.reviewId === reviewId
+        ? {
+            ...record,
+            ...updates,
+          }
+        : record,
+    ),
+  );
+}
+
 export function removeReviewTask(draftId: string): void {
   writeTaskRecords(
     readTaskRecords().filter((record) => record.draftId !== draftId),
@@ -417,13 +463,22 @@ export function startReviewTask(draftId: string): Promise<void> {
   const request = (async () => {
     try {
       const review = await api.reviews.create(task.claim, draftId);
-  if (review.status === "failed") {
-    updateTaskRecord(draftId, (currentRecord) =>
-      toStoredFailedTask(currentRecord, review),
-    );
 
-    return;
-  }
+      if (review.status === "failed") {
+        updateTaskRecord(draftId, (currentRecord) =>
+          toStoredFailedTask(currentRecord, review),
+        );
+
+        return;
+      }
+
+      if (review.status === "searching") {
+        updateTaskRecord(draftId, (currentRecord) =>
+          toProcessingTask(currentRecord, review),
+        );
+
+        return;
+      }
 
       const succeededTask = updateTaskRecord(draftId, (currentRecord) =>
         toSucceededTask(currentRecord, review),

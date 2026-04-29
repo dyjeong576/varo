@@ -36,6 +36,7 @@ function LoadingContent() {
   const isSubmitting =
     task?.status === "pending" || task?.status === "submitting";
   const isCompleted = task?.status === "succeeded" && Boolean(task.reviewId);
+  const isProcessing = task?.status === "processing" && Boolean(task.reviewId);
   const isOutOfScope = task?.previewStatus === "out_of_scope";
 
   const activeStageIndex = useMemo(() => {
@@ -77,6 +78,12 @@ function LoadingContent() {
 
     return undefined;
   }, [draftId, router]);
+
+  useEffect(() => {
+    if (isProcessing && task?.reviewId) {
+      router.replace(`/reviews/${encodeURIComponent(task.reviewId)}`);
+    }
+  }, [isProcessing, router, task?.reviewId]);
 
   useEffect(() => {
     if (!isSubmitting || errorMessage) {
