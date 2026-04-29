@@ -27,7 +27,6 @@ export interface ReviewPreviewSourceResponse {
   relevanceTier: string;
   relevanceReason: string | null;
   originQueryIds: string[];
-  sourceCountryCode: string | null;
   retrievalBucket: string | null;
   domainRegistryMatched: boolean;
   stance: "support" | "conflict" | "context" | "unknown";
@@ -46,17 +45,12 @@ export interface ReviewPreviewDetailResponse {
   claimId: string;
   rawClaim: string;
   createdAt: string;
-  isKoreaRelated: boolean;
-  koreaRelevanceReason: string;
   status: string;
   currentStage: string;
   normalizedClaim: string;
-  languageCode: string;
-  claimLanguageCode: string;
   coreClaim: string;
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
-  generatedQueries: ReviewPreviewQueryArtifactResponse[];
+  generatedQueries: ReviewQueryArtifact[];
+
   sources: ReviewPreviewSourceResponse[];
   evidenceSnippets: ReviewPreviewEvidenceSnippetResponse[];
   searchedSourceCount: number;
@@ -132,7 +126,6 @@ export interface ReviewPreviewSource {
   relevanceLabel: string;
   relevanceReason: string | null;
   originQueryIds: string[];
-  sourceCountryCode: string | null;
   retrievalBucket: string | null;
   retrievalBucketLabel: string;
   domainRegistryMatched: boolean;
@@ -160,8 +153,6 @@ export interface ReviewPreviewDetail {
   normalizedClaim: string;
   createdAt: string;
   createdAtLabel: string;
-  isKoreaRelated: boolean;
-  koreaRelevanceReason: string;
   isOutOfScope: boolean;
   status: string;
   statusLabel: string;
@@ -170,10 +161,6 @@ export interface ReviewPreviewDetail {
   statusTone: "blue" | "slate" | "red";
   pendingMessage: string;
   coreClaim: string;
-  languageCode: string;
-  claimLanguageCode: string;
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
   generatedQueries: ReviewPreviewQueryArtifact[];
   sources: ReviewPreviewSource[];
   evidenceSnippets: ReviewPreviewEvidenceSnippet[];

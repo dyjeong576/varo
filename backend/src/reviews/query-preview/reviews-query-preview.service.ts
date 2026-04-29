@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ReviewJob, Source } from "@prisma/client";
+import { AppException } from "../../common/exceptions/app-exception";
 import { CreateReviewQueryProcessingPreviewDto } from "../dto/create-review-query-processing-preview.dto";
+import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
 import { ReviewQueryProcessingPreviewResponseDto } from "../dto/review-query-processing-preview-response.dto";
 import { ReviewsProvidersService } from "../reviews.providers.service";
 import {
@@ -13,16 +15,12 @@ import {
   getKoreanSearchDomainRegistry,
   normalizeClaimText,
 } from "../reviews.utils";
-import { mapPreviewResponse } from "./reviews-query-preview.mapper";
 import {
-  mapOutOfScopePreviewResponse,
-  mapSearchPreviewResponse,
+  mapOutOfScopePreviewResponse, mapPreviewResponse, mapSearchPreviewResponse,
   mapStoredPreviewResponse,
-  mapStoredPreviewSummary,
+  mapStoredPreviewSummary
 } from "./reviews-query-preview.mapper";
 import { ReviewsQueryPreviewPersistenceService } from "./reviews-query-preview.persistence.service";
-import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
-import { AppException } from "../../common/exceptions/app-exception";
 
 const RELEVANCE_LIMIT = 8;
 const PRIMARY_EXTRACTION_LIMIT = 5;
@@ -89,8 +87,8 @@ export class ReviewsQueryPreviewService {
       this.logStageDuration("query_refinement", refinementStartedAt, reviewJob.id);
       const generatedQueries = refinement.generatedQueries;
       const searchRoute =
-        refinement.searchRoute === "korean_news" ? "korean_news" : "unsupported";
-      const searchQueries =
+        refinement.searchRoute === "news" ? "news" : "unsupported";
+      const sourceQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
               id: query.id,
@@ -98,7 +96,7 @@ export class ReviewsQueryPreviewService {
               rank: query.priority,
               purpose: query.purpose,
             }))
-          : (refinement.searchQueries ?? refinement.generatedQueries);
+          : refinement.generatedQueries;
 
       if (searchRoute === "unsupported") {
         const persistedOutOfScope =
@@ -123,19 +121,15 @@ export class ReviewsQueryPreviewService {
       const sourceSearchStartedAt = Date.now();
       const initialCandidates = await this.providersService.searchSources({
         searchRoute,
-        queries: searchQueries,
+        queries: sourceQueries,
         coreClaim: refinement.coreClaim,
-        claimLanguageCode: refinement.claimLanguageCode,
-        topicCountryCode: refinement.topicCountryCode,
         domainRegistry: getKoreanSearchDomainRegistry(),
       });
       const relevanceStartedAt = Date.now();
       const relevanceSignalResult =
         await this.providersService.classifyRelevanceAndEvidenceSignals({
           coreClaim: refinement.coreClaim,
-          claimLanguageCode: refinement.claimLanguageCode,
           searchRoute,
-          topicCountryCode: refinement.topicCountryCode,
           searchPlan: refinement.searchPlan,
           candidates: deduplicateCandidates(initialCandidates).slice(0, RELEVANCE_LIMIT),
         });
@@ -239,8 +233,8 @@ export class ReviewsQueryPreviewService {
       this.logStageDuration("query_refinement", refinementStartedAt, reviewJob.id);
       const generatedQueries = refinement.generatedQueries;
       const searchRoute =
-        refinement.searchRoute === "korean_news" ? "korean_news" : "unsupported";
-      const searchQueries =
+        refinement.searchRoute === "news" ? "news" : "unsupported";
+      const sourceQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
               id: query.id,
@@ -248,7 +242,7 @@ export class ReviewsQueryPreviewService {
               rank: query.priority,
               purpose: query.purpose,
             }))
-          : (refinement.searchQueries ?? refinement.generatedQueries);
+          : refinement.generatedQueries;
 
       if (searchRoute === "unsupported") {
         const persistedOutOfScope =
@@ -272,10 +266,8 @@ export class ReviewsQueryPreviewService {
 
       const initialCandidates = await this.providersService.searchSources({
         searchRoute,
-        queries: searchQueries,
+        queries: sourceQueries,
         coreClaim: refinement.coreClaim,
-        claimLanguageCode: refinement.claimLanguageCode,
-        topicCountryCode: refinement.topicCountryCode,
         domainRegistry: getKoreanSearchDomainRegistry(),
       });
       const classificationCandidates = deduplicateCandidates(initialCandidates).slice(
@@ -352,9 +344,7 @@ export class ReviewsQueryPreviewService {
       const relevanceSignalResult =
         await this.providersService.classifyRelevanceAndEvidenceSignals({
           coreClaim: params.refinement.coreClaim,
-          claimLanguageCode: params.refinement.claimLanguageCode,
-          searchRoute: "korean_news",
-          topicCountryCode: params.refinement.topicCountryCode,
+          searchRoute: "news",
           searchPlan: params.refinement.searchPlan,
           candidates: params.candidates,
         });

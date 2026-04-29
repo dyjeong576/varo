@@ -136,7 +136,7 @@ export class ReviewsNaverClient {
 
     return {
       id: `naver-${queryId}-c${rank}`,
-      searchRoute: "korean_news",
+      searchRoute: "news",
       sourceProvider: "naver-search",
       sourceType: "news",
       publisherName: this.inferPublisherName(canonicalUrl),
@@ -148,7 +148,6 @@ export class ReviewsNaverClient {
       normalizedHash: buildNormalizedHash(canonicalUrl),
       originQueryIds: [queryId],
       originQueryPurposes: queryPurpose ? [queryPurpose] : [],
-      sourceCountryCode: "KR",
       retrievalBucket: "familiar",
       domainRegistryId: null,
     };

@@ -1,5 +1,5 @@
 import { EvidenceSnippet, Source } from "@prisma/client";
-import { EvidenceSignal, QueryPurpose, SearchPlan } from "../reviews.types";
+import { EvidenceSignal, QueryPurpose, ReviewClaimType, SearchPlan } from "../reviews.types";
 
 export type ReviewResultVerdict =
   | "Likely True"
@@ -21,6 +21,7 @@ interface ResultAssemblerInput {
   sources: Source[];
   evidenceSnippets: EvidenceSnippet[];
   insufficiencyReason: string | null;
+  claimType?: ReviewClaimType | null;
   searchPlan?: SearchPlan | null;
   evidenceSignals?: EvidenceSignal[];
 }
@@ -554,7 +555,7 @@ export function assembleReviewResult(
   input: ResultAssemblerInput,
 ): AssembledReviewResultPayload {
   const queryPurposesById = buildQueryPurposesById(input.searchPlan);
-  const isScheduledEvent = input.searchPlan?.claimType === "scheduled_event";
+  const isScheduledEvent = input.claimType === "scheduled_event";
   const signalBySourceId = buildSignalBySourceId(input.evidenceSignals);
   const sourceStances = input.sources.reduce<Record<string, ReviewSourceStance>>(
     (acc, source) => {

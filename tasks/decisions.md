@@ -48,7 +48,7 @@
 - query refinement와 relevance filtering의 OpenAI 모델은 모두 `gpt-5-mini`로 고정한다.
 - 인증 endpoint와 dev 테스트 endpoint는 같은 provider service 경로를 공유한다.
 - `real` 모드에서는 API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
-- `languageCode`는 claim 엔터티에 저장하지 않고, query refinement artifact와 preview API 응답에서만 유지한다.
+- `languageCode`는 2026-04-29 결정에 따라 query refinement artifact와 preview API 응답에서도 제거한다.
 
 ### Country-Aware Domain Routing
 - 이 결정의 MVP 검색 provider 범위는 2026-04-21 Search Provider Routing 결정으로 대체되었다.
@@ -63,7 +63,6 @@
 - 당시에는 국내 맥락이 없는 순수 해외 이슈를 검토하지 않고 `out_of_scope` review job으로 기록하기로 했다.
 - `out_of_scope`는 시스템 실패가 아니므로 `lastErrorCode`를 남기지 않고 verdict/result를 생성하지 않는 원칙은 유지한다.
 - 당시 source search는 KR `source_domain_registry`만 사용하며, 국가별 해외 verification routing과 domainless fallback search는 MVP 범위에서 제거하기로 했다.
-- `topicCountryCode`는 사용자 국가가 아니라 claim/context 기준의 주제 국가로 유지하며, domain routing에는 사용하지 않는다.
 - retrieval bucket은 기존 저장/표시 호환성을 위해 `familiar / verification`을 유지하되, 신규 MVP 검색에서는 `fallback` bucket을 생성하지 않는다.
 - KR social registry는 공식 인증 계정/원문 확인에 쓰이는 주요 플랫폼 도메인만 `familiar_social`로 등록하고, 익명 커뮤니티/개인 블로그/게시판 도메인은 registry에 넣지 않는다.
 
@@ -189,10 +188,9 @@
 ### Search Provider Routing
 - 2026-04-01의 Korea-Related Only MVP Scope 결정은 검색 범위 기준에서 대체한다.
 - 이 결정의 해외/글로벌 route 범위는 2026-04-28 최신 결정으로 대체되었다.
-- 신규 review 생성 기준 query refinement는 `search_route`를 `korean_news / unsupported` 중 하나로 판정한다.
-- `korean_news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
+- 신규 review 생성 기준 query refinement는 `search_route`를 `news / unsupported` 중 하나로 판정한다.
+- `news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
 - Tavily Search는 한국 뉴스 보조 검색 provider로 사용하고, Tavily Extract는 본문 추출 provider로 사용한다.
-- `search_route`는 검색 provider 분기의 authoritative field로 사용하고, `isKoreaRelated`는 UX/설명용 메타데이터로만 유지한다.
 - `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim에만 사용하며, `out_of_scope` review job으로 기록한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
 - `real` 모드에서는 Naver, Tavily, OpenAI API key 누락이나 provider 실패를 mock으로 숨기지 않고 명시적으로 실패시킨다.
@@ -236,8 +234,8 @@
 - 정치는 일반 정치 이슈까지 포함하되, 정치인 발언, 정당/정부 입장, 선거, 정책, 공약, 법안, 예산처럼 출처로 검증 가능한 claim에 한정한다.
 - 경제는 금리, 물가, 세금, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 출처로 검증 가능한 claim에 한정한다.
 - 의료, 연예, 스포츠, 개인 상담, 창작 요청, 순수 의견, 미래 예측, 투자 매수/매도 추천은 MVP 지원 범위 밖으로 처리한다.
-- 사용자는 입력 전에 도메인을 직접 선택하지 않고, query refinement가 `topic_domain`을 `politics / economy / unsupported` 중 하나로 자동 판정한다.
-- `topic_domain`은 제품 지원 도메인 판정, `search_route`는 검색 가능 여부 판정으로 별도 유지한다.
+- 사용자는 입력 전에 도메인을 직접 선택하지 않고, query refinement가 `search_route`를 판정한다.
+- `search_route`는 검색 가능 여부 및 도메인 판정을 담당한다.
 - DB schema, Prisma migration, 공개 API 응답 shape는 이번 결정으로 변경하지 않는다.
 
 ### Review Preview Latency Reduction
@@ -246,14 +244,14 @@
 - Tavily Search는 Naver 후보가 15건 미만일 때만 fallback으로 호출하며, timeout은 최대 8초로 제한한다.
 - relevance filtering과 evidence signal classification은 별도 OpenAI 호출로 나누지 않고 단일 structured output 호출로 처리한다.
 
-### Korea News Only With Tavily Search Fallback
+### News Only With Tavily Search Fallback
 - 2026-04-21 Search Provider Routing의 해외/글로벌 뉴스 route는 신규 생성 기준에서 사용하지 않는다.
-- MVP 검토 범위는 한국 관련 정치·경제 claim으로 고정한다.
-- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리하고, VARO가 현재 한국뉴스만 분석한다고 안내한다.
-- 신규 review 생성 기준 `search_route`는 `korean_news / unsupported`만 사용한다.
-- OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 한국 관련 정치·경제 뉴스성 claim이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
-- Tavily Search는 제거하지 않고 `korean_news`에서 Naver 후보가 부족할 때만 실행되는 한국 뉴스 보조 source search provider로 사용한다.
-- Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
+- MVP 검토 범위는 정치·경제 claim으로 고정한다.
+- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
+- 신규 review 생성 기준 `search_route`는 `news / unsupported`만 사용한다.
+- OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 정치·경제 뉴스성 claim이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
+- Tavily Search는 제거하지 않고 `news`에서 Naver 후보가 부족할 때만 실행되는 뉴스 보조 source search provider로 사용한다.
+- Tavily Search는 코드에 고정된 trusted news domain registry 기반 include domain으로 제한하고, 신뢰할 수 있는 출처로 확인되는 후보만 유지한다.
 - source별 수집 API는 `sources.source_provider`에 저장하고, DB 기반 `source_domain_registry` 테이블과 `sources.domain_registry_id`는 코드 고정 registry 전환에 따라 제거한다.
 - `TAVILY_API_KEY`, `TAVILY_SEARCH_TIMEOUT_MS`, `TAVILY_EXTRACT_TIMEOUT_MS` 설정을 유지한다.
 
@@ -266,3 +264,13 @@
 - 검색 직후 응답은 기존 detail 응답 shape를 유지하되 `status=searching`, `currentStage=relevance_and_signal_classification`, `result=null`, `sources[]`로 표현한다.
 - 별도 queue/worker는 도입하지 않고 단일 backend 인스턴스 전제의 in-process background promise로 처리한다.
 - DB schema와 Prisma migration은 변경하지 않는다.
+
+### Remove Claim Language Metadata
+- MVP는 한국뉴스 전용이므로 `claimLanguageCode`와 preview 응답의 `languageCode`를 제거한다.
+- OpenAI relevance/evidence signal 분류 입력에도 claim language field를 전달하지 않는다.
+- 한국 trusted domain registry는 언어 메타데이터 없이 국가와 source 역할만 유지한다.
+
+### Query Refinement Contract Simplification
+- `QueryRefinementResult`에서 `verificationGoal`, `searchClaim`, `searchQueries`를 제거한다.
+- `SearchPlan`은 중복 메타데이터 없이 `queries[]`만 유지한다.
+- `claimType`은 query refinement의 top-level field로만 유지하고, result assembly에는 별도 입력으로 전달한다.

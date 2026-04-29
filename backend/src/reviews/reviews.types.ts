@@ -1,6 +1,6 @@
 export type ReviewRelevanceTier = "primary" | "reference" | "discard";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
-export type SearchRoute = "korean_news" | "global_news" | "unsupported";
+export type SearchRoute = "news" | "unsupported";
 export type SearchProvider = "naver-search" | "tavily-search";
 export type SourcePoliticalLean =
   | "progressive"
@@ -48,8 +48,6 @@ export type EvidenceSignalImpact =
 export interface DomainRegistryEntry {
   id: string;
   domain: string;
-  countryCode: string;
-  languageCode: string | null;
   sourceKind: string;
   usageRole: string;
   priority: number;
@@ -73,10 +71,6 @@ export interface SearchPlanQueryArtifact {
 }
 
 export interface SearchPlan {
-  normalizedClaim: string;
-  claimType: ReviewClaimType;
-  verificationGoal: string;
-  searchRoute: SearchRoute;
   queries: SearchPlanQueryArtifact[];
 }
 
@@ -94,7 +88,6 @@ export interface SearchCandidate {
   normalizedHash: string;
   originQueryIds: string[];
   originQueryPurposes?: QueryPurpose[];
-  sourceCountryCode: string | null;
   retrievalBucket: RetrievalBucket;
   domainRegistryId: string | null;
   sourcePoliticalLean?: SourcePoliticalLean | null;
@@ -104,41 +97,26 @@ export interface SearchCandidate {
 }
 
 export interface QueryRefinementResult {
-  claimLanguageCode: string;
   coreClaim: string;
   normalizedClaim: string;
   claimType: ReviewClaimType;
-  verificationGoal: string;
   searchPlan: SearchPlan;
   generatedQueries: QueryArtifact[];
   searchRoute: SearchRoute;
   searchRouteReason: string;
-  searchClaim: string;
-  searchQueries: QueryArtifact[];
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
-  isKoreaRelated: boolean;
-  koreaRelevanceReason: string;
 }
 
 export interface SearchSourcesInput {
   searchRoute: SearchRoute;
   queries: QueryArtifact[];
   coreClaim: string;
-  claimLanguageCode: string;
-  topicCountryCode: string | null;
   domainRegistry: DomainRegistryEntry[];
 }
 
-export interface RelevanceFilteringInput {
+export interface RelevanceSignalClassificationInput {
   coreClaim: string;
-  claimLanguageCode: string;
   searchRoute: SearchRoute;
-  topicCountryCode: string | null;
   candidates: SearchCandidate[];
-}
-
-export interface RelevanceSignalClassificationInput extends RelevanceFilteringInput {
   searchPlan: SearchPlan | null;
 }
 
@@ -167,7 +145,6 @@ export interface EvidenceSignalSourceInput {
 
 export interface EvidenceSignalClassificationInput {
   coreClaim: string;
-  claimLanguageCode: string;
   searchPlan: SearchPlan | null;
   sources: EvidenceSignalSourceInput[];
 }

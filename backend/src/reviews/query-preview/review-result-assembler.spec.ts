@@ -21,7 +21,6 @@ function createSource(overrides: Partial<Source>): Source {
     originQueryIds: ["q1"],
     relevanceTier: "primary",
     relevanceReason: "핵심 근거",
-    sourceCountryCode: "US",
     retrievalBucket: "verification",
     ...overrides,
   } as Source;
@@ -42,10 +41,6 @@ function createSnippet(overrides: Partial<EvidenceSnippet>): EvidenceSnippet {
 
 function createSearchPlan(overrides: Partial<SearchPlan> = {}): SearchPlan {
   return {
-    normalizedClaim: "테슬라 로드스터 공개 일정",
-    claimType: "scheduled_event",
-    verificationGoal: "테슬라 로드스터 공개 일정의 현재 기준 사실성을 확인한다.",
-    searchRoute: "korean_news",
     queries: [
       { id: "q1", purpose: "claim_specific", query: "테슬라 로드스터 2026년 4월 공개", priority: 1 },
       { id: "q2", purpose: "current_state", query: "테슬라 로드스터 출시일", priority: 2 },
@@ -231,6 +226,7 @@ describe("assembleReviewResult", () => {
       sources,
       evidenceSnippets,
       insufficiencyReason: null,
+      claimType: "scheduled_event",
       searchPlan: createSearchPlan(),
     });
 
@@ -294,6 +290,7 @@ describe("assembleReviewResult", () => {
       sources,
       evidenceSnippets,
       insufficiencyReason: null,
+      claimType: "scheduled_event",
       searchPlan: createSearchPlan(),
       evidenceSignals: [
         {
@@ -352,7 +349,8 @@ describe("assembleReviewResult", () => {
         }),
       ],
       insufficiencyReason: null,
-      searchPlan: createSearchPlan({ searchRoute: "global_news" }),
+      claimType: "scheduled_event",
+      searchPlan: createSearchPlan(),
     });
 
     expect(result.sourceStances[source.id]).toBe("conflict");

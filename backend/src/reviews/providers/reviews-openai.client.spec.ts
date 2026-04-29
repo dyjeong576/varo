@@ -37,28 +37,15 @@ describe("ReviewsOpenAiClient", () => {
                 {
                   type: "output_text",
                   text: JSON.stringify({
-                    languageCode: "ko",
                     coreClaim: "트럼프의 관세 발표",
                     normalizedClaim: "트럼프가 관세를 발표했다",
                     claimType: "policy",
-                    verificationGoal:
-                      "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
                     searchRoute: "unsupported",
                     searchRouteReason:
                       "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다. VARO가 현재 한국 뉴스만 분석한다.",
                     searchPlan: {
-                      normalizedClaim: "트럼프가 관세를 발표했다",
-                      claimType: "policy",
-                      verificationGoal:
-                        "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
-                      searchRoute: "unsupported",
                       queries: [],
                     },
-                    topicCountryCode: "US",
-                    countryDetectionReason: "미국 이슈로 판단했습니다.",
-                    isKoreaRelated: false,
-                    koreaRelevanceReason:
-                      "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
                   }),
                 },
               ],
@@ -74,15 +61,10 @@ describe("ReviewsOpenAiClient", () => {
       "트럼프가 오늘 관세 발표했대",
     );
 
-    expect(result.topicCountryCode).toBeNull();
     expect(result.searchRoute).toBe("unsupported");
-    expect(result.searchClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.normalizedClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.claimType).toBe("policy");
     expect(result.searchPlan.queries).toEqual([]);
-    expect(result.searchQueries).toEqual([]);
-    expect(result.isKoreaRelated).toBe(false);
-    expect(result.koreaRelevanceReason).toBe("");
     expect(result.generatedQueries).toEqual([
       { id: "q1", text: "트럼프의 관세 발표", rank: 1 },
     ]);
@@ -93,9 +75,6 @@ describe("ReviewsOpenAiClient", () => {
       text: { verbosity: "low" },
       max_output_tokens: 1000,
     });
-    expect((global.fetch as jest.Mock).mock.calls[0]?.[1]?.body).toEqual(
-      expect.stringContaining("사용자가 연도·기간을 말하지 않았으면 특정 연도·기간을 만들지 말 것"),
-    );
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -109,19 +88,13 @@ describe("ReviewsOpenAiClient", () => {
                 {
                   type: "output_text",
                   text: JSON.stringify({
-                    languageCode: "ko",
                     coreClaim: "한국 기준금리 동결",
                     normalizedClaim: "한국은행이 기준금리를 동결했다",
                     claimType: "policy",
-                    verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
-                    searchRoute: "korean_news",
+                    searchRoute: "news",
                     searchRouteReason:
                       "한국 경제 정책 관련 뉴스성 claim입니다.",
                     searchPlan: {
-                      normalizedClaim: "한국은행이 기준금리를 동결했다",
-                      claimType: "policy",
-                      verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
-                      searchRoute: "korean_news",
                       queries: [
                         {
                           id: "sp1",
@@ -149,10 +122,6 @@ describe("ReviewsOpenAiClient", () => {
                         },
                       ],
                     },
-                    topicCountryCode: "KR",
-                    countryDetectionReason: "한국은행 기준금리 이슈입니다.",
-                    isKoreaRelated: true,
-                    koreaRelevanceReason: "한국 경제 정책이 직접 포함되어 있습니다.",
                   }),
                 },
               ],
@@ -181,7 +150,7 @@ describe("ReviewsOpenAiClient", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("claim의 관할과 장소가 한국 정치 맥락이면 korean_news route로 유지한다", async () => {
+  it("claim의 관할과 장소가 한국 정치 맥락이면 news route로 유지한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -194,7 +163,7 @@ describe("ReviewsOpenAiClient", () => {
                     coreClaim: "일론 머스크의 부산 국회의원 출마",
                     normalizedClaim: "일론 머스크가 부산에서 국회의원에 출마한다",
                     claimType: "scheduled_event",
-                    searchRoute: "korean_news",
+                    searchRoute: "news",
                     searchPlan: {
                       queries: [
                         {
@@ -238,13 +207,11 @@ describe("ReviewsOpenAiClient", () => {
       "일론머스크가 부산 국회의원 출마한다는게 사실이야?",
     );
 
-    expect(result.searchRoute).toBe("korean_news");
-    expect(result.isKoreaRelated).toBe(true);
-    expect(result.topicCountryCode).toBe("KR");
+    expect(result.searchRoute).toBe("news");
     expect(result.searchPlan.queries).toHaveLength(4);
   });
 
-  it("해외 기업명으로 시작해도 한국 시장 영향 claim이면 korean_news route로 유지한다", async () => {
+  it("해외 기업명으로 시작해도 한국 시장 영향 claim이면 news route로 유지한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -257,7 +224,7 @@ describe("ReviewsOpenAiClient", () => {
                     coreClaim: "해외 기업의 한국 서비스 종료",
                     normalizedClaim: "해외 기업이 한국에서 서비스를 종료한다",
                     claimType: "corporate_action",
-                    searchRoute: "korean_news",
+                    searchRoute: "news",
                     searchPlan: {
                       queries: [
                         {
@@ -301,9 +268,7 @@ describe("ReviewsOpenAiClient", () => {
       "어떤 해외 기업이 한국 서비스 접는다는 게 사실이야?",
     );
 
-    expect(result.searchRoute).toBe("korean_news");
-    expect(result.isKoreaRelated).toBe(true);
-    expect(result.topicCountryCode).toBe("KR");
+    expect(result.searchRoute).toBe("news");
   });
 
   it("structured output text를 evidence signal 결과로 변환한다", async () => {
@@ -338,12 +303,7 @@ describe("ReviewsOpenAiClient", () => {
     const client = new ReviewsOpenAiClient();
     const result = await client.classifyEvidenceSignals("openai-test-key", {
       coreClaim: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
-      claimLanguageCode: "ko",
       searchPlan: {
-        normalizedClaim: "테슬라 로드스터 2026년 4월 공개",
-        claimType: "scheduled_event",
-        verificationGoal: "현재 공개 일정 확인",
-        searchRoute: "global_news",
         queries: [
           { id: "q1", purpose: "claim_specific", query: "Tesla Roadster April 2026", priority: 1 },
           { id: "q2", purpose: "current_state", query: "Tesla Roadster current status", priority: 2 },
@@ -423,14 +383,12 @@ describe("ReviewsOpenAiClient", () => {
       "openai-test-key",
       {
         coreClaim: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
-        claimLanguageCode: "ko",
-        searchRoute: "korean_news",
-        topicCountryCode: "KR",
+        searchRoute: "news",
         searchPlan: null,
         candidates: [
           {
             id: "candidate-1",
-            searchRoute: "korean_news",
+            searchRoute: "news",
             sourceProvider: "naver-search",
             sourceType: "news",
             publisherName: "Reuters",
@@ -442,12 +400,11 @@ describe("ReviewsOpenAiClient", () => {
             normalizedHash: "hash-1",
             originQueryIds: ["q4"],
             retrievalBucket: "verification",
-            sourceCountryCode: "KR",
             domainRegistryId: "kr-verification",
           },
           {
             id: "candidate-2",
-            searchRoute: "korean_news",
+            searchRoute: "news",
             sourceProvider: "naver-search",
             sourceType: "news",
             publisherName: "한국경제",
@@ -459,7 +416,6 @@ describe("ReviewsOpenAiClient", () => {
             normalizedHash: "hash-2",
             originQueryIds: ["q1"],
             retrievalBucket: "familiar",
-            sourceCountryCode: "KR",
             domainRegistryId: "kr-familiar",
           },
         ],
@@ -486,7 +442,6 @@ describe("ReviewsOpenAiClient", () => {
     });
     expect(userPayload.candidates[0]).not.toHaveProperty("canonicalUrl");
     expect(userPayload.candidates[0]).not.toHaveProperty("retrievalBucket");
-    expect(userPayload.candidates[0]).not.toHaveProperty("sourceCountryCode");
     expect(result.evidenceSignals).toEqual([
       {
         sourceId: "candidate-1",

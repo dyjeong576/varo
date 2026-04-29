@@ -22,8 +22,6 @@ interface QueryContextDisclosureProps {
   discardedSourceCount: number;
   coreClaim: string;
   normalizedClaim: string;
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
   generatedQueries: { id: string; text: string; rank: number }[];
 }
 
@@ -116,8 +114,6 @@ export function QueryContextDisclosure({
   discardedSourceCount,
   coreClaim,
   normalizedClaim,
-  topicCountryCode,
-  countryDetectionReason,
   generatedQueries,
 }: QueryContextDisclosureProps) {
   return (
@@ -136,56 +132,44 @@ export function QueryContextDisclosure({
         </span>
       </summary>
 
-      <div className="mt-5 border-t border-[#edf1f7] pt-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-black tracking-[-0.03em] text-[#191b24]">
-              {coreClaim}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-[#6b7280]">
-              정규화 claim: <span className="font-medium text-[#191b24]">{normalizedClaim}</span>
-            </p>
-          </div>
-          <div className="rounded-full bg-[#f3f6fb] px-3 py-1.5 text-xs font-bold text-[#556070]">
-            {topicCountryCode ? ` · ${topicCountryCode}` : ""}
-          </div>
+      <div className="mt-5 border-t border-[#edf1f7] pt-5 space-y-4">
+        <div>
+          <h3 className="text-lg font-black tracking-[-0.03em] text-[#191b24]">
+            {coreClaim}
+          </h3>
+          <p className="mt-1.5 text-xs leading-5 text-[#8a94a6]">
+            정규화: <span className="text-[#556070]">{normalizedClaim}</span>
+          </p>
         </div>
 
-        <p className="mt-4 rounded-2xl bg-[#f7f9fc] px-4 py-3 text-sm leading-6 text-[#556070]">
-          {countryDetectionReason}
-        </p>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-[#eff5ff] px-3 py-1.5 text-xs font-semibold text-[#0050cb]">
-            검색 후보 {searchedSourceCount}건
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#6b7280]">
+          <span>
+            검색 후보 <span className="font-semibold text-[#0050cb]">{searchedSourceCount}</span>건
           </span>
-          <span className="rounded-full bg-[#eff5ff] px-3 py-1.5 text-xs font-semibold text-[#0050cb]">
-            선별 근거 {selectedSourceCount}건
+          <span className="text-[#d1d5db]">·</span>
+          <span>
+            선별 근거 <span className="font-semibold text-[#0050cb]">{selectedSourceCount}</span>건
           </span>
-          <span className="rounded-full bg-[#f6f7fb] px-3 py-1.5 text-xs font-semibold text-[#556070]">
-            제외 후보 {discardedSourceCount}건
-          </span>
-          <span className="rounded-full bg-[#f6f7fb] px-3 py-1.5 text-xs font-semibold text-[#556070]">
-            {topicCountryCode ? ` · ${topicCountryCode}` : ""}
+          <span className="text-[#d1d5db]">·</span>
+          <span>
+            제외 후보 <span className="font-semibold text-[#556070]">{discardedSourceCount}</span>건
           </span>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {generatedQueries.length > 0 ? (
-            generatedQueries.map((query) => (
+        {generatedQueries.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {generatedQueries.map((query) => (
               <span
                 key={query.id}
                 className="rounded-full border border-[#dce8ff] bg-[#fbfdff] px-3 py-1.5 text-xs font-medium text-[#334155]"
               >
                 Q{query.rank}. {query.text}
               </span>
-            ))
-          ) : (
-            <span className="text-sm text-[#6b7280]">
-              생성된 query가 아직 없습니다.
-            </span>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[#8a94a6]">생성된 query가 아직 없습니다.</p>
+        )}
       </div>
     </details>
   );

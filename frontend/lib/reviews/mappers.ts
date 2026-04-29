@@ -200,7 +200,6 @@ function mapSource(source: ReviewPreviewSourceResponse): ReviewPreviewSource {
     relevanceLabel: getRelevanceLabel(source.relevanceTier),
     relevanceReason: source.relevanceReason,
     originQueryIds: source.originQueryIds,
-    sourceCountryCode: source.sourceCountryCode,
     retrievalBucket: source.retrievalBucket,
     retrievalBucketLabel: getRetrievalBucketLabel(source.retrievalBucket),
     domainRegistryMatched: source.domainRegistryMatched,
@@ -263,7 +262,7 @@ export function mapReviewPreviewDetail(
   const evidenceSnippets = mapEvidenceSnippets(detail, sources);
   const pendingMessage =
     detail.status === "out_of_scope"
-      ? "현재 MVP는 한국 관련 claim만 검토합니다. 이 기록은 판단 없이 범위 확인 결과만 표시합니다."
+      ? "현재 지원 범위 밖 claim으로 기록되었습니다. 이 기록은 판단 없이 범위 확인 결과만 표시합니다."
       : detail.status === "failed"
       ? "임시 결과 생성이 중단되어 저장된 근거만 표시하고 있습니다."
       : detail.status === "searching"
@@ -279,8 +278,6 @@ export function mapReviewPreviewDetail(
     normalizedClaim: detail.normalizedClaim,
     createdAt: detail.createdAt,
     createdAtLabel: formatDateTime(detail.createdAt),
-    isKoreaRelated: detail.isKoreaRelated,
-    koreaRelevanceReason: detail.koreaRelevanceReason,
     isOutOfScope: detail.status === "out_of_scope",
     status: detail.status,
     statusLabel: getReviewStatusLabel(detail.status),
@@ -289,10 +286,6 @@ export function mapReviewPreviewDetail(
     statusTone: getReviewStatusTone(detail.status),
     pendingMessage,
     coreClaim: detail.coreClaim,
-    languageCode: detail.languageCode,
-    claimLanguageCode: detail.claimLanguageCode,
-    topicCountryCode: detail.topicCountryCode,
-    countryDetectionReason: detail.countryDetectionReason,
     generatedQueries: detail.generatedQueries,
     sources: sources.map((source) => {
       const evidenceSnippet = detail.evidenceSnippets.find(

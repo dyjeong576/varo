@@ -52,22 +52,13 @@ interface StoredReviewPreviewSummaryRecord {
 }
 
 interface QueryRefinementPayload {
-  claimLanguageCode: string;
-  languageCode: string;
   coreClaim: string;
   normalizedClaim: string;
   claimType: string;
-  verificationGoal: string;
   searchPlan: SearchPlan | null;
   generatedQueries: QueryArtifact[];
   searchRoute?: string;
   searchRouteReason?: string;
-  searchClaim?: string;
-  searchQueries?: QueryArtifact[];
-  topicCountryCode: string | null;
-  countryDetectionReason: string;
-  isKoreaRelated: boolean;
-  koreaRelevanceReason: string;
   searchProvider?: string;
 }
 
@@ -95,7 +86,7 @@ const REVIEW_CLAIM_TYPES = [
   "incident",
   "general_fact",
 ];
-const SEARCH_ROUTES = ["korean_news", "global_news", "unsupported"];
+const SEARCH_ROUTES = ["news", "unsupported"];
 const EVIDENCE_SIGNAL_STANCES: EvidenceSignalStance[] = [
   "supports",
   "contradicts",
@@ -154,7 +145,6 @@ export function buildSourceCreateInputs(
       originQueryIds: candidate.originQueryIds as Prisma.InputJsonValue,
       relevanceTier: candidate.relevanceTier ?? "discard",
       relevanceReason: candidate.relevanceReason ?? null,
-      sourceCountryCode: candidate.sourceCountryCode,
       retrievalBucket: candidate.retrievalBucket,
     };
   });
@@ -224,23 +214,14 @@ export function buildQueryRefinementPayload(
   generatedQueries: QueryArtifact[],
 ): Prisma.InputJsonValue {
   const searchRoute =
-    refinement.searchRoute ??
-    (refinement.isKoreaRelated ? "korean_news" : "unsupported");
-  const searchQueries = refinement.searchQueries ?? generatedQueries;
+    refinement.searchRoute ?? "unsupported";
   const searchProvider = buildSearchProvider(searchRoute);
 
   return {
-    claimLanguageCode: refinement.claimLanguageCode,
-    languageCode: refinement.claimLanguageCode,
     coreClaim: refinement.coreClaim,
     normalizedClaim: refinement.normalizedClaim,
     claimType: refinement.claimType,
-    verificationGoal: refinement.verificationGoal,
     searchPlan: {
-      normalizedClaim: refinement.searchPlan.normalizedClaim,
-      claimType: refinement.searchPlan.claimType,
-      verificationGoal: refinement.searchPlan.verificationGoal,
-      searchRoute: refinement.searchPlan.searchRoute,
       queries: refinement.searchPlan.queries.map((query) => ({
         id: query.id,
         purpose: query.purpose,
@@ -249,15 +230,9 @@ export function buildQueryRefinementPayload(
       })),
     },
     generatedQueries: generatedQueries.map(serializeQueryArtifact),
-    topicCountryCode: refinement.topicCountryCode,
-    countryDetectionReason: refinement.countryDetectionReason,
-    isKoreaRelated: refinement.isKoreaRelated,
-    koreaRelevanceReason: refinement.koreaRelevanceReason,
     searchRoute,
     searchRouteReason:
       refinement.searchRouteReason ?? "검색 route 판정 이유가 기록되지 않았습니다.",
-    searchClaim: refinement.searchClaim ?? refinement.coreClaim,
-    searchQueries: searchQueries.map(serializeQueryArtifact),
     searchProvider,
   } as Prisma.InputJsonValue;
 }
@@ -325,12 +300,8 @@ function buildEvidenceSummary(sourceId: string, sources: Source[]): string | nul
 }
 
 function buildSearchProvider(searchRoute: string): string | null {
-  if (searchRoute === "korean_news") {
+  if (searchRoute === "news") {
     return "naver-search";
-  }
-
-  if (searchRoute === "global_news") {
-    return "tavily-search";
   }
 
   return null;
@@ -357,6 +328,7 @@ export function mapPreviewResponse(params: {
     sources: params.sources,
     evidenceSnippets: params.evidenceSnippets,
     insufficiencyReason: params.insufficiencyReason,
+    claimType: params.refinement.claimType,
     searchPlan: params.refinement.searchPlan,
     evidenceSignals: params.evidenceSignals,
   });
@@ -367,16 +339,10 @@ export function mapPreviewResponse(params: {
     claimId: params.claim.id,
     rawClaim: params.claim.rawText,
     createdAt: params.createdAt.toISOString(),
-    isKoreaRelated: params.refinement.isKoreaRelated,
-    koreaRelevanceReason: params.refinement.koreaRelevanceReason,
     status: "partial",
     currentStage: "handoff_ready",
     normalizedClaim: params.normalizedClaim,
-    claimLanguageCode: params.refinement.claimLanguageCode,
-    languageCode: params.refinement.claimLanguageCode,
     coreClaim: params.refinement.coreClaim,
-    topicCountryCode: params.refinement.topicCountryCode,
-    countryDetectionReason: params.refinement.countryDetectionReason,
     generatedQueries: params.generatedQueries,
     sources: params.sources.map((source) => ({
       id: source.id,
@@ -390,7 +356,6 @@ export function mapPreviewResponse(params: {
       relevanceTier: source.relevanceTier ?? "discard",
       relevanceReason: source.relevanceReason,
       originQueryIds: parseOriginQueryIds(source.originQueryIds),
-      sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
       domainRegistryMatched: false,
       stance: assembledResult.sourceStances[source.id] ?? "unknown",
@@ -429,16 +394,10 @@ export function mapOutOfScopePreviewResponse(params: {
     claimId: params.claim.id,
     rawClaim: params.claim.rawText,
     createdAt: params.createdAt.toISOString(),
-    isKoreaRelated: params.refinement.isKoreaRelated,
-    koreaRelevanceReason: params.refinement.koreaRelevanceReason,
     status: "out_of_scope",
     currentStage: "scope_checked",
     normalizedClaim: params.normalizedClaim,
-    claimLanguageCode: params.refinement.claimLanguageCode,
-    languageCode: params.refinement.claimLanguageCode,
     coreClaim: params.refinement.coreClaim,
-    topicCountryCode: params.refinement.topicCountryCode,
-    countryDetectionReason: params.refinement.countryDetectionReason,
     generatedQueries: params.generatedQueries,
     sources: [],
     evidenceSnippets: [],
@@ -470,16 +429,10 @@ export function mapSearchPreviewResponse(params: {
     claimId: params.claim.id,
     rawClaim: params.claim.rawText,
     createdAt: params.createdAt.toISOString(),
-    isKoreaRelated: params.refinement.isKoreaRelated,
-    koreaRelevanceReason: params.refinement.koreaRelevanceReason,
     status: "searching",
     currentStage: "relevance_and_signal_classification",
     normalizedClaim: params.normalizedClaim,
-    claimLanguageCode: params.refinement.claimLanguageCode,
-    languageCode: params.refinement.claimLanguageCode,
     coreClaim: params.refinement.coreClaim,
-    topicCountryCode: params.refinement.topicCountryCode,
-    countryDetectionReason: params.refinement.countryDetectionReason,
     generatedQueries: params.generatedQueries,
     sources: params.sources.map((source) => ({
       id: source.id,
@@ -493,7 +446,6 @@ export function mapSearchPreviewResponse(params: {
       relevanceTier: source.relevanceTier ?? "reference",
       relevanceReason: source.relevanceReason,
       originQueryIds: parseOriginQueryIds(source.originQueryIds),
-      sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
       domainRegistryMatched: false,
       stance: "unknown",
@@ -565,8 +517,6 @@ function parseSearchPlan(value: unknown): SearchPlan | null {
   }
 
   const record = value as Record<string, unknown>;
-  const claimType = parseString(record.claimType);
-  const searchRoute = parseString(record.searchRoute);
   const queries = Array.isArray(record.queries)
     ? record.queries.flatMap((item) => {
         if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -591,18 +541,12 @@ function parseSearchPlan(value: unknown): SearchPlan | null {
     : [];
 
   if (
-    !REVIEW_CLAIM_TYPES.includes(claimType) ||
-    !SEARCH_ROUTES.includes(searchRoute) ||
     queries.length === 0
   ) {
     return null;
   }
 
   return {
-    normalizedClaim: parseString(record.normalizedClaim),
-    claimType: claimType as SearchPlan["claimType"],
-    verificationGoal: parseString(record.verificationGoal),
-    searchRoute: searchRoute as SearchPlan["searchRoute"],
     queries,
   };
 }
@@ -662,65 +606,32 @@ function parseQueryRefinementPayload(
 
   if (!payload) {
     return {
-      claimLanguageCode: "unknown",
-      languageCode: "unknown",
       coreClaim: normalizedClaim,
       normalizedClaim,
       claimType: "general_fact",
-      verificationGoal: "검증 목표 생성 전입니다.",
       searchPlan: null,
       generatedQueries: [],
       searchRoute: "unsupported",
       searchRouteReason: "검색 route 판정 전입니다.",
-      searchClaim: normalizedClaim,
-      searchQueries: [],
-      topicCountryCode: null,
-      countryDetectionReason: "주제 국가 판정 전입니다.",
-      isKoreaRelated: true,
-      koreaRelevanceReason: "한국 관련성 판정 전입니다.",
     };
   }
 
-  const claimLanguageCode = parseString(payload.claimLanguageCode, "unknown");
-  const isKoreaRelated = parseBoolean(payload.isKoreaRelated, true);
   const searchRoute = parseString(
     payload.searchRoute,
-    isKoreaRelated ? "korean_news" : "unsupported",
+    "unsupported",
   );
   const generatedQueries = parseGeneratedQueries(payload.generatedQueries);
-  const searchQueries = parseGeneratedQueries(payload.searchQueries);
 
   return {
-    claimLanguageCode,
-    languageCode: parseString(payload.languageCode, claimLanguageCode),
     coreClaim: parseString(payload.coreClaim, normalizedClaim),
     normalizedClaim: parseString(payload.normalizedClaim, normalizedClaim),
     claimType: parseString(payload.claimType, "general_fact"),
-    verificationGoal: parseString(
-      payload.verificationGoal,
-      "검증 목표가 기록되지 않았습니다.",
-    ),
     searchPlan: parseSearchPlan(payload.searchPlan),
     generatedQueries,
     searchRoute,
     searchRouteReason: parseString(
       payload.searchRouteReason,
       "검색 route 판정 전입니다.",
-    ),
-    searchClaim: parseString(
-      payload.searchClaim,
-      parseString(payload.coreClaim, normalizedClaim),
-    ),
-    searchQueries: searchQueries.length > 0 ? searchQueries : generatedQueries,
-    topicCountryCode: parseNullableString(payload.topicCountryCode),
-    countryDetectionReason: parseString(
-      payload.countryDetectionReason,
-      "주제 국가 판정 전입니다.",
-    ),
-    isKoreaRelated,
-    koreaRelevanceReason: parseString(
-      payload.koreaRelevanceReason,
-      "한국 관련성 판정 전입니다.",
     ),
   };
 }
@@ -786,6 +697,7 @@ export function mapStoredPreviewResponse(
     sources: reviewJob.sources,
     evidenceSnippets: reviewJob.evidenceSnippets,
     insufficiencyReason: handoff.insufficiencyReason,
+    claimType: refinement.claimType as QueryRefinementResult["claimType"],
     searchPlan: refinement.searchPlan,
     evidenceSignals: handoff.evidenceSignals,
   });
@@ -800,16 +712,10 @@ export function mapStoredPreviewResponse(
     claimId: reviewJob.claim.id,
     rawClaim: reviewJob.claim.rawText,
     createdAt: reviewJob.createdAt.toISOString(),
-    isKoreaRelated: refinement.isKoreaRelated,
-    koreaRelevanceReason: refinement.koreaRelevanceReason,
     status: reviewJob.status,
     currentStage: reviewJob.currentStage,
     normalizedClaim: reviewJob.claim.normalizedText,
-    claimLanguageCode: refinement.claimLanguageCode,
-    languageCode: refinement.languageCode,
     coreClaim: refinement.coreClaim,
-    topicCountryCode: refinement.topicCountryCode,
-    countryDetectionReason: refinement.countryDetectionReason,
     generatedQueries: refinement.generatedQueries,
     sources: reviewJob.sources.map((source) => ({
       id: source.id,
@@ -823,7 +729,6 @@ export function mapStoredPreviewResponse(
       relevanceTier: source.relevanceTier ?? "discard",
       relevanceReason: source.relevanceReason,
       originQueryIds: parseOriginQueryIds(source.originQueryIds),
-      sourceCountryCode: source.sourceCountryCode,
       retrievalBucket: source.retrievalBucket,
       domainRegistryMatched: false,
       stance: assembledResult.sourceStances[source.id] ?? "unknown",

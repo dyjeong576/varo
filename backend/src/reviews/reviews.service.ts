@@ -84,7 +84,6 @@ export class ReviewsService {
         relevanceReason:
           candidate.relevanceReason ?? "Naver 뉴스 검색 테스트 결과입니다.",
         originQueryIds: candidate.originQueryIds,
-        sourceCountryCode: candidate.sourceCountryCode,
         retrievalBucket: candidate.retrievalBucket,
         domainRegistryMatched: false,
         stance: "unknown",

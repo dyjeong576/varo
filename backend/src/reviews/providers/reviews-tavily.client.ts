@@ -10,7 +10,6 @@ import {
   buildCanonicalUrl,
   buildNormalizedHash,
   classifySourceType,
-  inferCountryCodeFromUrl,
   matchDomainRegistryEntry,
 } from "../reviews.utils";
 import { postJson } from "./reviews-provider-http";
@@ -211,11 +210,6 @@ export class ReviewsTavilyClient {
           normalizedHash: buildNormalizedHash(canonicalUrl),
           originQueryIds: [input.query.id],
           originQueryPurposes: input.query.purpose ? [input.query.purpose] : [],
-          sourceCountryCode:
-            registryMatch?.countryCode === "GLOBAL"
-              ? null
-              : (registryMatch?.countryCode ??
-                inferCountryCodeFromUrl(canonicalUrl)),
           retrievalBucket: input.bucket,
           domainRegistryId: null,
           sourcePoliticalLean: registryMatch?.politicalLean ?? null,

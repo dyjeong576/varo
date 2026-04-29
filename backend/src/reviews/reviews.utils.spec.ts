@@ -27,8 +27,6 @@ describe("reviews utils", () => {
       {
         id: "kr-news",
         domain: "yna.co.kr",
-        countryCode: "KR",
-        languageCode: "ko",
         sourceKind: "news_agency",
         usageRole: "familiar_news",
         priority: 10,
@@ -37,8 +35,6 @@ describe("reviews utils", () => {
       {
         id: "kr-social",
         domain: "youtube.com",
-        countryCode: "KR",
-        languageCode: null,
         sourceKind: "social_platform",
         usageRole: "familiar_social",
         priority: 20,
@@ -47,8 +43,6 @@ describe("reviews utils", () => {
       {
         id: "kr-official",
         domain: "*.go.kr",
-        countryCode: "KR",
-        languageCode: "ko",
         sourceKind: "government",
         usageRole: "verification_official",
         priority: 30,
@@ -57,8 +51,6 @@ describe("reviews utils", () => {
       {
         id: "us-social",
         domain: "facebook.com",
-        countryCode: "US",
-        languageCode: null,
         sourceKind: "social_platform",
         usageRole: "familiar_social",
         priority: 5,
@@ -85,7 +77,8 @@ describe("reviews utils", () => {
   it("중복 후보 병합 시 정치 성향 메타데이터를 유지한다", () => {
     const baseCandidate = {
       id: "c1",
-      searchRoute: "korean_news",
+      searchRoute: "news",
+
       sourceProvider: "naver-search",
       sourceType: "news",
       publisherName: "연합뉴스",
@@ -96,7 +89,6 @@ describe("reviews utils", () => {
       rawSnippet: null,
       normalizedHash: "hash-1",
       originQueryIds: ["q1"],
-      sourceCountryCode: "KR",
       retrievalBucket: "familiar",
       domainRegistryId: null,
     } satisfies SearchCandidate;

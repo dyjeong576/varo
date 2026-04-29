@@ -66,13 +66,6 @@ export class ReviewCandidateDto {
   originQueryIds!: string[];
 
   @ApiProperty({
-    description: "source가 속한 국가 코드",
-    example: "KR",
-    nullable: true,
-  })
-  sourceCountryCode!: string | null;
-
-  @ApiProperty({
     description: "이 source를 확보한 retrieval bucket",
     example: "verification",
     enum: ["familiar", "verification", "fallback"],
@@ -245,18 +238,6 @@ export class ReviewQueryProcessingPreviewResponseDto {
   })
   createdAt!: string;
 
-  @ApiProperty({
-    description: "MVP 기준 한국 관련 claim인지 여부",
-    example: true,
-  })
-  isKoreaRelated!: boolean;
-
-  @ApiProperty({
-    description: "한국 관련성 판단 이유",
-    example: "한국 시장 철수 여부를 다루는 claim이므로 한국 관련 이슈입니다.",
-  })
-  koreaRelevanceReason!: string;
-
   @ApiProperty({ description: "review 상태", example: "partial" })
   status!: string;
 
@@ -269,27 +250,8 @@ export class ReviewQueryProcessingPreviewResponseDto {
   })
   normalizedClaim!: string;
 
-  @ApiProperty({ description: "언어 코드", example: "ko" })
-  languageCode!: string;
-
-  @ApiProperty({ description: "claim 언어 코드", example: "ko" })
-  claimLanguageCode!: string;
-
   @ApiProperty({ description: "핵심 claim", example: "테슬라의 한국 시장 철수" })
   coreClaim!: string;
-
-  @ApiProperty({
-    description: "주제 국가 코드",
-    example: "US",
-    nullable: true,
-  })
-  topicCountryCode!: string | null;
-
-  @ApiProperty({
-    description: "주제 국가 판정 이유",
-    example: "미국 정치 고유명사가 확인되어 미국 이슈로 판단했습니다.",
-  })
-  countryDetectionReason!: string;
 
   @ApiProperty({ description: "생성된 query 목록", type: [ReviewQueryArtifactDto] })
   generatedQueries!: ReviewQueryArtifactDto[];

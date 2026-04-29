@@ -8,7 +8,7 @@ VARO(Verified Analysis, Reasoned Opinion)는 사용자가 뉴스, 기사, 온라
 
 MVP의 목적은 "진실을 판정"하는 것이 아니라, 사용자가 직접 판단할 수 있도록 근거와 맥락을 정리해 제공하는 것이다. 따라서 결과는 항상 수집된 출처 기준의 해석이어야 하며, 불확실성이 남아 있으면 이를 숨기지 않는다.
 
-이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하되, 검토 범위는 한국 관련 정치·경제 도메인의 사실성 claim으로 좁힌다. 한국 관련 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, 네이버 후보가 충분하지 않을 때만 Tavily Search를 한국 뉴스 보조 검색 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 해외/글로벌 뉴스 claim은 지원 범위 밖으로 안내한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
+이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하며, 검토 범위는 **한국 정치·경제** 도메인의 사실성 claim으로 고정한다. 한국 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, 네이버 후보가 충분하지 않을 때만 Tavily Search를 보조 검색 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 한국 정치·경제 범위를 벗어나는 claim은 지원 범위 밖으로 안내한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
 
 ## 2. Product Vision
 
@@ -36,7 +36,7 @@ VARO의 장기 비전은 사용자가 어떤 주장에 대해서도 "왜 이런 
 
 ### Primary User
 
-정치·경제 뉴스와 온라인 이슈를 자주 접하는 한국어 뉴스 소비자
+정치·경제 뉴스와 온라인 이슈를 자주 접하는 한국어 뉴스 소비자 (한국 정치·경제 뉴스 전용)
 
 특성:
 
@@ -89,8 +89,8 @@ MVP에서 포함하는 범위는 아래와 같다.
 
 MVP 기준 검토 가능 claim:
 
-- 한국 관련 정치·경제 뉴스성 claim
-- 정치인 발언, 정당/정부 입장, 정책, 공약, 법안, 예산, 세금, 물가, 금리, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 사실성 검토가 가능한 claim
+- 한국 정치·경제 뉴스성 claim
+- 한국 정치인 발언, 정당/정부 입장, 정책, 공약, 법안, 예산, 세금, 물가, 금리, 부동산, 기업 공식 발표, 공시, 경제 지표처럼 사실성 검토가 가능한 claim
 
 MVP 기준 현재 출처 범위:
 
@@ -104,7 +104,7 @@ MVP 기준 현재 출처 범위:
 
 - 완전한 다국어 지원
 - 뉴스성 또는 사실성 검토 대상이 아닌 일반 의견/상담/창작 요청
-- 해외/글로벌 뉴스 claim
+- 지원 범위 밖 뉴스 claim
 - 의료, 연예, 스포츠 등 정치·경제 밖의 도메인
 - 가치판단, 정쟁성 의견, 미래 예측, 투자 매수/매도 추천
 - 검색 provider로 근거 수집이 불가능한 claim에 대한 verdict 생성
@@ -134,10 +134,10 @@ MVP 기준 현재 출처 범위:
 ### 10.2 Source Collection
 
 - 시스템이 관련 `source`를 수집한다.
-- 현재 수집 범위는 Naver News Search와 필요 시 Tavily Search fallback으로 확인되는 한국 뉴스 source다.
+- 현재 수집 범위는 Naver News Search와 필요 시 Tavily Search fallback으로 확인되는 뉴스 source다.
 - 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, claim 검증 목적에 맞는 search plan을 생성한다.
 - 기본 검색 목적은 `claim_specific`, `current_state`, `primary_source`, `contradiction_or_update`로 구분한다.
-- 시스템은 한국 뉴스 검색에서 Naver News Search를 먼저 사용하고, 후보가 부족할 때만 Tavily Search fallback을 사용한다.
+- 시스템은 뉴스 검색에서 Naver News Search를 먼저 사용하고, 후보가 부족할 때만 Tavily Search fallback을 사용한다.
 
 ### 10.3 Evidence Preparation
 
@@ -162,9 +162,9 @@ MVP 기준 현재 출처 범위:
 
 - 사용자는 하나의 `claim`을 입력할 수 있어야 한다.
 - 시스템은 입력 후 검토 진행 상태를 보여줄 수 있어야 한다.
-- 시스템은 한국 관련 정치·경제 뉴스성 claim인지 자동 판정해야 한다.
+- 시스템은 정치·경제 뉴스성 claim인지 자동 판정해야 한다.
 - 시스템은 claim의 `search_route`를 판정하고, `unsupported`이면 verdict를 만들지 않고 지원 범위 밖 상태로 기록해야 한다.
-- 현재 구현에서 공개 API 기준 authoritative field는 `search_route`이며, 판정 이유는 `korea_relevance_reason`, `country_detection_reason`, `search_route_reason`으로 설명해야 한다.
+- 현재 구현에서 공개 API 기준 authoritative field는 `search_route`이며, 판정 이유는 `search_route_reason`으로 설명해야 한다.
 - 시스템은 `search_route`와 별도로 검증 목적별 `search_plan`을 생성해야 한다.
 - 시스템은 Naver 후보가 충분하면 Tavily를 호출하지 않아야 한다.
 - 사용자는 검토가 끝난 뒤 결과 페이지로 이동할 수 있어야 한다.
@@ -396,8 +396,8 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 
 ## 20. Recommended MVP Decisions
 
-- 초기 타깃은 정치·경제 뉴스를 소비하는 한국어 사용자로 둔다.
-- 한국 관련 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 provider로 사용한다.
+- 초기 타깃은 **한국 정치·경제 뉴스**를 소비하는 한국어 사용자로 둔다.
+- 한국 정치·경제 뉴스성 claim은 네이버 뉴스 검색 API를 기본 검색 provider로 사용한다.
 - Tavily Search는 Naver 후보가 부족할 때만 한국 뉴스 보조 검색 provider로 사용한다.
 - Tavily Extract는 후속 본문 추출 확장용으로 유지하되, 현재 preview 생성 경로에서는 사용하지 않는다.
 - 핵심 경험은 결과 페이지 중심으로 설계한다.

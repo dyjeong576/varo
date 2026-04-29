@@ -11,7 +11,6 @@ import {
   EvidenceSignal,
   EvidenceSignalClassificationInput,
   QueryRefinementResult,
-  RelevanceFilteringInput,
   RelevanceSignalClassificationInput,
   RelevanceSignalClassificationResult,
   SearchCandidate,
@@ -41,9 +40,9 @@ export class ReviewsProvidersService {
   }
 
   async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
-    const searchRoute = input.searchRoute ?? "korean_news";
+    const searchRoute = input.searchRoute ?? "news";
 
-    if (searchRoute === "korean_news") {
+    if (searchRoute === "news") {
       const clientId = this.getRequiredNaverClientId();
       const clientSecret = this.getRequiredNaverClientSecret();
       const timeoutMs = Math.min(this.getNaverSearchTimeoutMs(), NAVER_SEARCH_TIMEOUT_CAP_MS);
@@ -117,13 +116,6 @@ export class ReviewsProvidersService {
       start: input.start,
       sort: input.sort,
     });
-  }
-
-  async applyRelevanceFiltering(
-    input: RelevanceFilteringInput,
-  ): Promise<SearchCandidate[]> {
-    const apiKey = this.getRequiredOpenAiApiKey();
-    return this.openAiClient.applyRelevanceFiltering(apiKey, input);
   }
 
   async classifyEvidenceSignals(
@@ -230,10 +222,6 @@ export class ReviewsProvidersService {
       .filter((domain, index, domains) => domains.indexOf(domain) === index);
   }
 
-  private isKoreanTavilyCandidate(candidate: SearchCandidate): boolean {
-    return candidate.sourceCountryCode === "KR";
-  }
-
   private async searchTavilyFallbackSources(params: {
     apiKey: string;
     timeoutMs: number;
@@ -248,7 +236,7 @@ export class ReviewsProvidersService {
         includeDomains: this.buildKoreanTavilyIncludeDomains(params.input),
       });
 
-      return candidates.filter((candidate) => this.isKoreanTavilyCandidate(candidate));
+      return candidates;
     } catch (error) {
       this.logger.warn(
         `Tavily fallback source search skipped: ${

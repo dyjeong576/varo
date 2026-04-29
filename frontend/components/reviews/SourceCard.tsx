@@ -2,6 +2,7 @@ import { ReviewPreviewSource } from "@/lib/reviews/types";
 
 interface SourceCardProps {
   source: ReviewPreviewSource;
+  isClassifying?: boolean;
 }
 
 function getSourceIcon(sourceCategory: ReviewPreviewSource["sourceCategory"]): string {
@@ -50,7 +51,7 @@ function getSourceTone(source: ReviewPreviewSource): {
 /**
  * 개별 출처 정보 카드 컴포넌트
  */
-export default function SourceCard({ source }: SourceCardProps) {
+export default function SourceCard({ source, isClassifying = false }: SourceCardProps) {
   const tone = getSourceTone(source);
 
   return (
@@ -110,7 +111,7 @@ export default function SourceCard({ source }: SourceCardProps) {
               {source.retrievalBucketLabel}
             </span>
             {source.relevanceReason ? (
-              <span className="rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1">
+              <span className={`rounded-full border px-2.5 py-1 ${isClassifying ? "skeleton-shimmer border-[#dde3ef] text-[#556070]" : "border-[#e5e7eb] bg-white"}`}>
                 {source.relevanceReason}
               </span>
             ) : null}

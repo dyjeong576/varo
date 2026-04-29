@@ -118,7 +118,7 @@
 1. claim 접수와 `review_jobs` 생성
 2. claim understanding / scope gate / search planning
 3. `unsupported`이면 `out_of_scope` 저장 후 종료
-4. `korean_news`이면 Naver News Search 우선 검색
+4. `news`이면 Naver News Search 우선 검색
 5. Naver 후보가 15건 미만이면 Tavily Search fallback 호출
 6. canonical URL 기준 dedup 후 relevance와 evidence signal을 단일 OpenAI 호출로 분류
 7. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
@@ -150,13 +150,13 @@
 - 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
-- 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 한국 관련성 및 주제 국가 설명은 `is_korea_related`, `topic_country_code`, `korea_relevance_reason`, `search_route_reason`에 남긴다.
-- OpenAI는 먼저 scope gate에서 한국 관련 정치·경제 뉴스성 claim인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
+- 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 판정 이유는 `search_route_reason`에 남긴다.
+- OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 claim**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
-- 한국 관련 정치·경제 뉴스성 claim은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
-- 해외/글로벌 뉴스 claim은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
-- Tavily Search는 코드에 고정된 KR trusted news domain registry 기반 include domain으로 제한하고, 한국 출처로 확인되는 후보만 유지한다.
+- **한국 정치·경제 뉴스성 claim**은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
+- 한국 정치·경제를 벗어나는 해외/글로벌 뉴스 claim은 `unsupported/out_of_scope`로 처리한다.
+- Tavily Search는 코드에 고정된 한국 뉴스 도메인 레지스트리 기반 include domain으로 제한하고, 신뢰할 수 있는 출처로 확인되는 후보만 유지한다.
 
 ### 6.4 현재 API 책임
 
@@ -326,7 +326,7 @@
 
 ### 10.2 Naver News Search
 
-- 한국 정치·경제 뉴스성 claim의 source 후보 수집
+- **한국 정치·경제 뉴스성 claim**의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
 - search plan query별 상위 10개를 요청한다.
 - Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
@@ -336,8 +336,8 @@
 
 ### 10.3 Tavily Search / Extract
 
-- Tavily Search는 Naver 후보가 15건 미만일 때만 한국 뉴스 보조 source 후보 수집에 사용한다.
-- Tavily Search는 코드 고정 KR trusted news domain registry를 `include_domains`로 사용하고, `sourceCountryCode=KR` 후보만 유지한다.
+- Tavily Search는 Naver 후보가 15건 미만일 때만 **한국 뉴스** 보조 source 후보 수집에 사용한다.
+- Tavily Search는 코드 고정 **한국 뉴스 도메인 레지스트리**를 `include_domains`로 사용한다.
 - Tavily Search fallback timeout은 최대 8초로 제한한다.
 - Tavily Search 실패 또는 timeout은 전체 review 실패로 처리하지 않고, Naver 결과만으로 partial preview를 계속 만든다.
 - Tavily Extract는 env와 client가 남아 있지만 현재 query-processing preview 생성 경로에서는 호출하지 않는다.
@@ -436,7 +436,7 @@
 - trace id 발급
 - `environment=dev|prod` 태그 유지
 - review 완료율 / partial 비율 / 외부 provider 실패율 관측
-- review preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `resolve_user_country`, `query_refinement`, `source_search`, `relevance_and_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
+- review preview 단계별 소요시간 로그를 관측한다. 현재 단계명은 `query_refinement`, `source_search`, `relevance_and_signal_classification`, `persist_preview_result`, `total_preview_generation`이다.
 - 알림 생성 성공률, ranking 집계 지연, community mutation 실패율 관측
 
 ## 13. review 도메인 특별 원칙

@@ -175,7 +175,6 @@ describe("ReviewsService", () => {
           rawSnippet: "기사 설명",
           normalizedHash: "hash-1",
           originQueryIds: ["q1"],
-          sourceCountryCode: "KR",
           retrievalBucket: "familiar",
           domainRegistryId: null,
         },

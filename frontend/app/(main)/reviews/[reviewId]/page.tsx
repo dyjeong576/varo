@@ -322,14 +322,9 @@ export default function ReviewResultPage() {
               </h1>
 
               <div className="mt-6 rounded-xl bg-[#f8fafc] px-4 py-4 text-sm leading-6 text-[#475569]">
-                현재 MVP는 한국 관련 claim만 검토합니다. 이 claim은 판단 없이
-                지원 범위 밖으로 기록되었습니다.
+                현재 지원 범위 밖 claim으로 기록되었습니다. 이 기록은 판단 없이
+                범위 확인 결과만 표시합니다.
               </div>
-            </div>
-
-            <div className="rounded-xl border border-[#dfe4f0] bg-white p-5 text-sm leading-6 text-[#475569]">
-              <p className="font-bold text-[#191b24]">한국 관련성 판단 이유</p>
-              <p className="mt-2">{review.koreaRelevanceReason}</p>
             </div>
           </section>
         )}
@@ -395,7 +390,7 @@ export default function ReviewResultPage() {
               </div>
             ) : (
               filteredSources.map((source) => (
-                <SourceCard key={source.id} source={source} />
+                <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} />
               ))
             )}
           </div>
@@ -407,8 +402,6 @@ export default function ReviewResultPage() {
           discardedSourceCount={review.discardedSourceCount}
           coreClaim={review.coreClaim}
           normalizedClaim={review.normalizedClaim}
-          topicCountryCode={review.topicCountryCode}
-          countryDetectionReason={review.countryDetectionReason}
           generatedQueries={review.generatedQueries}
         />
 

@@ -210,16 +210,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
     const result = await service.persistSearchPreviewSources({
       reviewJob: { id: "review-1" },
       refinement: {
-        claimLanguageCode: "ko",
         coreClaim: "한국은행 기준금리 동결",
         normalizedClaim: "한국은행이 기준금리를 동결했다",
         claimType: "policy",
-        verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
         searchPlan: {
-          normalizedClaim: "한국은행이 기준금리를 동결했다",
-          claimType: "policy",
-          verificationGoal: "한국은행 기준금리 동결 여부를 확인한다.",
-          searchRoute: "korean_news",
           queries: [
             {
               id: "sp1",
@@ -230,20 +224,14 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           ],
         },
         generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
-        searchRoute: "korean_news",
+        searchRoute: "news",
         searchRouteReason: "한국 경제 뉴스 claim입니다.",
-        searchClaim: "한국은행 기준금리 동결",
-        searchQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
-        topicCountryCode: "KR",
-        countryDetectionReason: "한국 이슈로 판단했습니다.",
-        isKoreaRelated: true,
-        koreaRelevanceReason: "한국 기관과 경제 정책이 포함되어 있습니다.",
       },
       generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
       candidates: [
         {
           id: "c1",
-          searchRoute: "korean_news",
+          searchRoute: "news",
           sourceProvider: "naver-search",
           sourceType: "news",
           publisherName: "연합뉴스",
@@ -254,7 +242,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           rawSnippet: "한국은행은 기준금리를 동결했다.",
           normalizedHash: "hash-1",
           originQueryIds: ["sp1"],
-          sourceCountryCode: "KR",
           retrievalBucket: "familiar",
           domainRegistryId: null,
           relevanceTier: "reference",
@@ -290,18 +277,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       userId: "user-1",
       reviewJob: { id: "review-1" },
       refinement: {
-        claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         normalizedClaim: "트럼프가 관세를 발표했다",
         claimType: "policy",
-        verificationGoal:
-          "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
         searchPlan: {
-          normalizedClaim: "트럼프가 관세를 발표했다",
-          claimType: "policy",
-          verificationGoal:
-            "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
-          searchRoute: "global_news",
           queries: [
             {
               id: "sp1",
@@ -330,20 +309,14 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           ],
         },
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-        searchRoute: "global_news",
+        searchRoute: "unsupported",
         searchRouteReason: "미국 정책 발표를 다루는 해외 뉴스성 claim입니다.",
-        searchClaim: "Trump tariff announcement",
-        searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
-        topicCountryCode: "US",
-        countryDetectionReason: "미국 이슈로 판단했습니다.",
-        isKoreaRelated: true,
-        koreaRelevanceReason: "한국 시장에 대한 직접 영향이 포함되어 있습니다.",
       },
       generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
       relevanceCandidates: [
         {
           id: "c1",
-          searchRoute: "global_news",
+          searchRoute: "unsupported",
           sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "Reuters",
@@ -354,9 +327,8 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
           rawSnippet: "원문 검증 보도입니다.",
           normalizedHash: "hash-1",
           originQueryIds: ["q1"],
-          sourceCountryCode: "US",
           retrievalBucket: "verification",
-          domainRegistryId: "us-verification",
+          domainRegistryId: null,
           sourcePoliticalLean: "centrist",
           relevanceTier: "primary",
           relevanceReason: "원문 검증 source입니다.",
@@ -392,15 +364,11 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         searchedSourceCount: 1,
         processedSourceCount: 0,
         queryRefinement: expect.objectContaining({
-          searchRoute: "global_news",
-          searchProvider: "tavily-search",
-          searchClaim: "Trump tariff announcement",
+          searchRoute: "unsupported",
+          searchProvider: null,
           normalizedClaim: "트럼프가 관세를 발표했다",
           claimType: "policy",
-          verificationGoal:
-            "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
           searchPlan: expect.objectContaining({
-            searchRoute: "global_news",
             queries: expect.arrayContaining([
               expect.objectContaining({
                 purpose: "current_state",
@@ -408,7 +376,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
               }),
             ]),
           }),
-          searchQueries: [{ id: "q1", text: "Trump tariff announcement", rank: 1 }],
         }),
         handoffPayload: expect.objectContaining({
           sourcePoliticalLeans: {
@@ -479,18 +446,10 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
       userId: "user-1",
       reviewJob: { id: "review-1" },
       refinement: {
-        claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         normalizedClaim: "트럼프가 관세를 발표했다",
         claimType: "policy",
-        verificationGoal:
-          "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
         searchPlan: {
-          normalizedClaim: "트럼프가 관세를 발표했다",
-          claimType: "policy",
-          verificationGoal:
-            "현재 수집 가능한 출처 기준으로 트럼프의 관세 발표 여부와 최신 상태를 확인한다.",
-          searchRoute: "unsupported",
           queries: [
             {
               id: "sp1",
@@ -521,13 +480,6 @@ describe("ReviewsQueryPreviewPersistenceService", () => {
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
         searchRoute: "unsupported",
         searchRouteReason: "기사/공식 발표 검색만으로 검토하기 어려운 요청입니다.",
-        searchClaim: "트럼프의 관세 발표",
-        searchQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-        topicCountryCode: "US",
-        countryDetectionReason: "미국 이슈로 판단했습니다.",
-        isKoreaRelated: false,
-        koreaRelevanceReason:
-          "claim 자체에 한국 장소, 기관, 시장, 국내 영향이 없습니다.",
       },
       generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
     });

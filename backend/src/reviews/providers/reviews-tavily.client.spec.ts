@@ -38,7 +38,7 @@ describe("ReviewsTavilyClient", () => {
   const originalFetch = global.fetch;
   const extractCandidate = {
     id: "c1",
-    searchRoute: "global_news",
+    searchRoute: "unsupported",
     sourceProvider: "tavily-search",
     sourceType: "news",
     publisherName: "Reuters",
@@ -49,9 +49,8 @@ describe("ReviewsTavilyClient", () => {
     rawSnippet: "원문 검증 보도입니다.",
     normalizedHash: "hash-1",
     originQueryIds: ["q1"],
-    sourceCountryCode: "US",
     retrievalBucket: "verification",
-    domainRegistryId: "us-verification",
+    domainRegistryId: null,
   } satisfies SearchCandidate;
 
   afterEach(() => {

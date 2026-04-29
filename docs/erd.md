@@ -211,7 +211,7 @@ erDiagram
 ## 4. 서비스 데이터 흐름
 1. 사용자가 로그인하면 `users`, `user_profiles`, `sessions`가 서비스 계정 축을 구성한다.
 2. 사용자가 질문을 제출하면 `claims`와 `review_jobs`가 생성된다.
-3. 분석 과정에서 `search_route=korean_news`이면 Naver provider가 먼저 호출되고, Naver 후보가 부족할 때만 Tavily fallback provider가 호출된다.
+3. 분석 과정에서 `search_route=news`이면 Naver provider가 먼저 호출되고, Naver 후보가 부족할 때만 Tavily fallback provider가 호출된다.
 4. relevance/evidence signal 통합 분류 이후 `sources`와 `handoff_payload.evidenceSignals[]`가 저장된다. 현재 preview 생성 경로에서는 본문 추출을 호출하지 않으므로 `evidence_snippets`는 비어 있을 수 있다.
 5. 현재 프론트는 `handoff_ready` 상태의 review preview detail과 `rule_based_preview` 파생 결과를 우선 소비한다.
 6. preview가 준비되면 `user_history`와 `notifications`가 갱신된다. `review_results` 저장은 final interpretation 단계 확장용이다.

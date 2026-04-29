@@ -16,15 +16,13 @@ import {
   QueryRefinementResult,
   SearchCandidate,
 } from "../reviews.types";
-import { normalizeCountryCode } from "../reviews.utils";
 import {
   buildCompletedReviewJobUpdate,
-  buildEvidenceSnippetCreateInputs,
   buildHandoffPayload,
   buildHandoffSourceIds,
   buildInsufficiencyReason,
   buildQueryRefinementPayload,
-  buildSourceCreateInputs,
+  buildSourceCreateInputs
 } from "./reviews-query-preview.mapper";
 
 interface PersistQueryPreviewResultInput {

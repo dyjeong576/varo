@@ -12,7 +12,6 @@ import {
   EvidenceSignalUpdateType,
   QueryRefinementResult,
   ReviewClaimType,
-  RelevanceFilteringInput,
   RelevanceSignalClassificationInput,
   RelevanceSignalClassificationResult,
   ReviewRelevanceTier,
@@ -27,7 +26,7 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
-const SEARCH_ROUTES: SearchRoute[] = ["korean_news", "unsupported"];
+const SEARCH_ROUTES: SearchRoute[] = ["news", "unsupported"];
 const CLAIM_TYPES: ReviewClaimType[] = [
   "scheduled_event",
   "current_status",
@@ -97,16 +96,6 @@ interface OpenAiRequestOptions {
   maxOutputTokens?: number;
 }
 
-interface OpenAiRelevanceDecision {
-  candidateId: string;
-  relevanceTier: ReviewRelevanceTier;
-  relevanceReason: string;
-}
-
-interface OpenAiRelevancePayload {
-  decisions: OpenAiRelevanceDecision[];
-}
-
 interface OpenAiEvidenceSignalDecision {
   sourceId: string;
   stanceToClaim: EvidenceSignalStance;
@@ -120,7 +109,10 @@ interface OpenAiEvidenceSignalPayload {
   signals: OpenAiEvidenceSignalDecision[];
 }
 
-interface OpenAiRelevanceSignalDecision extends OpenAiRelevanceDecision {
+interface OpenAiRelevanceSignalDecision {
+  candidateId: string;
+  relevanceTier: ReviewRelevanceTier;
+  relevanceReason: string;
   stanceToClaim: EvidenceSignalStance;
   temporalRole: EvidenceSignalTemporalRole;
   updateType: EvidenceSignalUpdateType;
@@ -206,13 +198,13 @@ export class ReviewsOpenAiClient {
 - normalizedClaim: 검증 가능한 형태로 정규화한 주장
 - claimType: scheduled_event | current_status | statistic | quote | policy | corporate_action | incident | general_fact
 - searchRoute:
-  - korean_news: 한국 정치·경제 뉴스성 claim (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
+  - news: 한국 정치·경제 뉴스성 claim (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
   - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천·순수 의견·미래 예측
 - route는 인물/기업의 국적보다 claim이 다루는 사건·제도·영향의 관할, 장소, 시장을 우선해 판정.
-- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 claim이면 korean_news.
+- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 claim이면 news.
 
 ## searchPlan.queries
-korean_news면 정확히 4개, unsupported면 빈 배열.
+news면 정확히 4개, unsupported면 빈 배열.
 
 네이버 뉴스 검색 쿼리 원칙:
 - 기사 제목에 실제로 등장할 법한 핵심 키워드 조합
@@ -243,147 +235,35 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
     const claimType = CLAIM_TYPES.includes(payload.claimType)
       ? payload.claimType
       : "general_fact";
-    const searchRoute = payload.searchRoute === "korean_news" ? "korean_news" : "unsupported";
+    const searchRoute = payload.searchRoute === "news" ? "news" : "unsupported";
 
     let searchPlan: SearchPlan;
     let generatedQueries: QueryArtifact[];
-    let searchQueries: QueryArtifact[];
 
     if (searchRoute === "unsupported") {
       searchPlan = {
-        normalizedClaim,
-        claimType,
-        verificationGoal: coreClaim,
-        searchRoute: "unsupported",
         queries: [],
       };
       generatedQueries = [{ id: "q1", text: coreClaim, rank: 1 }];
-      searchQueries = [];
     } else {
       searchPlan = this.normalizeSearchPlan(payload, {
         normalizedClaim,
-        claimType,
-        verificationGoal: coreClaim,
-        searchRoute,
         fallbackQueries: [normalizedClaim, coreClaim, rawClaim],
       });
-      searchQueries = this.toSearchQueryArtifacts(searchPlan.queries);
-      generatedQueries = searchQueries.slice(0, 3);
+      generatedQueries = this.toSearchQueryArtifacts(searchPlan.queries).slice(0, 3);
     }
 
     const result: QueryRefinementResult = {
-      claimLanguageCode: "ko",
       coreClaim,
       normalizedClaim,
       claimType,
-      verificationGoal: coreClaim,
       searchPlan,
       generatedQueries,
       searchRoute,
       searchRouteReason: "",
-      searchClaim: normalizedClaim,
-      searchQueries,
-      topicCountryCode: searchRoute === "korean_news" ? "KR" : null,
-      countryDetectionReason: "",
-      isKoreaRelated: searchRoute === "korean_news",
-      koreaRelevanceReason: "",
     };
 
     return result;
-  }
-
-  async applyRelevanceFiltering(
-    apiKey: string,
-    input: RelevanceFilteringInput,
-  ): Promise<SearchCandidate[]> {
-    const payload =
-      await this.requestStructuredOutput<OpenAiRelevancePayload>(
-        apiKey,
-        {
-          name: "review_source_relevance",
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["decisions"],
-            properties: {
-              decisions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["candidateId", "relevanceTier", "relevanceReason"],
-                  properties: {
-                    candidateId: { type: "string" },
-                    relevanceTier: {
-                      type: "string",
-                      enum: ["primary", "reference", "discard"],
-                    },
-                    relevanceReason: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-        },
-        [
-          {
-            role: "system",
-            content:
-              "당신은 VARO 뉴스 근거 수집 relevance filter입니다. search route, provider, core claim, 기사 제목, snippet, 출처 유형, retrieval bucket, source country를 보고 extraction 이전 단계에서 source를 분류하세요. primary는 직접 검증 근거, reference는 보조 가치가 있는 source, discard는 관련성이 부족한 source입니다.",
-          },
-          {
-            role: "user",
-            content: JSON.stringify(
-              {
-                coreClaim: input.coreClaim,
-                claimLanguageCode: input.claimLanguageCode,
-                searchRoute: input.searchRoute,
-                topicCountryCode: input.topicCountryCode,
-                candidates: input.candidates.map((candidate) => ({
-                  candidateId: candidate.id,
-                  searchRoute: candidate.searchRoute,
-                  sourceProvider: candidate.sourceProvider,
-                  title: candidate.rawTitle,
-                  snippet: candidate.rawSnippet,
-                  originQueryIds: candidate.originQueryIds,
-                  originQueryPurposes: candidate.originQueryPurposes ?? [],
-                  publisherName: candidate.publisherName,
-                  sourceType: candidate.sourceType,
-                  canonicalUrl: candidate.canonicalUrl,
-                  retrievalBucket: candidate.retrievalBucket,
-                  sourceCountryCode: candidate.sourceCountryCode,
-                })),
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        "관련성 필터링 요청에 실패했습니다.",
-      );
-
-    if (!this.isValidRelevancePayload(payload, input.candidates)) {
-      throw new AppException(
-        APP_ERROR_CODES.LLM_SCHEMA_ERROR,
-        "관련성 필터링 결과가 요구 형식을 충족하지 않습니다.",
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-
-    const decisions = new Map(
-      payload.decisions.map((decision) => [decision.candidateId, decision]),
-    );
-
-    return input.candidates.map((candidate) => {
-      const decision = decisions.get(candidate.id);
-
-      return {
-        ...candidate,
-        relevanceTier: decision?.relevanceTier ?? "discard",
-        relevanceReason:
-          decision?.relevanceReason ?? "관련성 판정 결과가 누락되었습니다.",
-      };
-    });
   }
 
   async classifyRelevanceAndEvidenceSignals(
@@ -463,7 +343,6 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
             role: "user",
             content: JSON.stringify({
               coreClaim: input.coreClaim,
-              claimLanguageCode: input.claimLanguageCode,
               candidates: input.candidates.map((candidate) => ({
                 candidateId: candidate.id,
                 title: candidate.rawTitle,
@@ -601,7 +480,6 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
             content: JSON.stringify(
               {
                 coreClaim: input.coreClaim,
-                claimLanguageCode: input.claimLanguageCode,
                 searchPlan: input.searchPlan,
                 sources: input.sources,
               },
@@ -640,9 +518,6 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
     payload: OpenAiQueryRefinementPayload,
     fallback: {
       normalizedClaim: string;
-      claimType: ReviewClaimType;
-      verificationGoal: string;
-      searchRoute: SearchRoute;
       fallbackQueries: string[];
     },
   ): SearchPlan {
@@ -699,10 +574,6 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
     });
 
     return {
-      normalizedClaim: fallback.normalizedClaim,
-      claimType: fallback.claimType,
-      verificationGoal: fallback.verificationGoal,
-      searchRoute: fallback.searchRoute,
       queries: queries.sort((left, right) => left.priority - right.priority),
     };
   }
@@ -882,40 +753,6 @@ korean_news면 정확히 4개, unsupported면 빈 배열.
     }
 
     return null;
-  }
-
-  private isValidRelevancePayload(
-    payload: OpenAiRelevancePayload,
-    candidates: SearchCandidate[],
-  ): payload is OpenAiRelevancePayload {
-    if (!payload || !Array.isArray(payload.decisions)) {
-      return false;
-    }
-
-    const candidateIds = new Set(candidates.map((candidate) => candidate.id));
-    const seenIds = new Set<string>();
-
-    for (const decision of payload.decisions) {
-      if (
-        !decision ||
-        typeof decision.candidateId !== "string" ||
-        typeof decision.relevanceReason !== "string" ||
-        !["primary", "reference", "discard"].includes(decision.relevanceTier)
-      ) {
-        return false;
-      }
-
-      if (
-        !candidateIds.has(decision.candidateId) ||
-        seenIds.has(decision.candidateId)
-      ) {
-        return false;
-      }
-
-      seenIds.add(decision.candidateId);
-    }
-
-    return true;
   }
 
   private isValidRelevanceSignalPayload(

@@ -124,7 +124,6 @@ model Source {
   originQueryIds   Json?                @map("origin_query_ids")
   relevanceTier    String?              @map("relevance_tier")
   relevanceReason  String?              @map("relevance_reason")
-  sourceCountryCode String?             @map("source_country_code")
   retrievalBucket  String?              @map("retrieval_bucket")
   reviewJob        ReviewJob            @relation(fields: [reviewJobId], references: [id], onDelete: Cascade)
   evidenceSnippets EvidenceSnippet[]

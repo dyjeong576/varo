@@ -70,7 +70,6 @@ describe("ReviewsNaverClient", () => {
         rawSnippet: "테슬라가 한국 사업을 유지한다는 설명 & 추가 맥락입니다.",
         originQueryIds: ["q2"],
         originQueryPurposes: ["claim_specific"],
-        sourceCountryCode: "KR",
         retrievalBucket: "familiar",
         domainRegistryId: null,
       }),

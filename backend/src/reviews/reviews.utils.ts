@@ -163,8 +163,6 @@ export function getKoreanSearchDomainRegistry(): DomainRegistryEntry[] {
   return KOREAN_TRUSTED_NEWS_DOMAINS.map((entry) => ({
     id: entry.id,
     domain: entry.domain,
-    countryCode: "KR",
-    languageCode: "ko",
     sourceKind: "news_media",
     usageRole: "familiar_news",
     priority: entry.priority,
@@ -222,7 +220,6 @@ export function deduplicateCandidates(candidates: SearchCandidate[]): SearchCand
       rawSnippet: existing.rawSnippet ?? candidate.rawSnippet,
       publisherName: existing.publisherName ?? candidate.publisherName,
       publishedAt: existing.publishedAt ?? candidate.publishedAt,
-      sourceCountryCode: existing.sourceCountryCode ?? candidate.sourceCountryCode,
       domainRegistryId: existing.domainRegistryId ?? candidate.domainRegistryId,
       sourcePoliticalLean: existing.sourcePoliticalLean ?? candidate.sourcePoliticalLean,
       retrievalBucket: pickPreferredBucket(existing.retrievalBucket, candidate.retrievalBucket),
@@ -272,70 +269,14 @@ export function buildMockCoreClaim(normalizedClaim: string): string {
     .trim();
 }
 
-export function buildMockQueries(coreClaim: string, languageCode: string): QueryArtifact[] {
+export function buildMockQueries(coreClaim: string): QueryArtifact[] {
   const fallbackClaim = coreClaim || "검토 대상 주장";
-
-  if (languageCode === "ko") {
-    return [
-      { id: "q1", text: fallbackClaim, rank: 1 },
-      { id: "q2", text: `${fallbackClaim} 공식 발표`, rank: 2 },
-      { id: "q3", text: `${fallbackClaim} 정정 해명`, rank: 3 },
-    ];
-  }
 
   return [
     { id: "q1", text: fallbackClaim, rank: 1 },
-    { id: "q2", text: `${fallbackClaim} official statement`, rank: 2 },
-    { id: "q3", text: `${fallbackClaim} correction response`, rank: 3 },
+    { id: "q2", text: `${fallbackClaim} 공식 발표`, rank: 2 },
+    { id: "q3", text: `${fallbackClaim} 정정 해명`, rank: 3 },
   ];
-}
-
-export function normalizeCountryCode(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized) {
-    return null;
-  }
-
-  const mappedCodes: Record<string, string> = {
-    kr: "KR",
-    korea: "KR",
-    "south korea": "KR",
-    "republic of korea": "KR",
-    한국: "KR",
-    대한민국: "KR",
-    us: "US",
-    usa: "US",
-    "united states": "US",
-    america: "US",
-    미국: "US",
-    jp: "JP",
-    japan: "JP",
-    일본: "JP",
-    cn: "CN",
-    china: "CN",
-    중국: "CN",
-    gb: "GB",
-    uk: "GB",
-    "united kingdom": "GB",
-    영국: "GB",
-    global: "GLOBAL",
-    international: "GLOBAL",
-  };
-
-  if (mappedCodes[normalized]) {
-    return mappedCodes[normalized];
-  }
-
-  if (/^[a-z]{2}$/i.test(normalized)) {
-    return normalized.toUpperCase();
-  }
-
-  return null;
 }
 
 export function extractHostname(url: string): string | null {
@@ -368,36 +309,6 @@ export function matchesDomainPattern(
   return hostname === normalizedPattern;
 }
 
-export function inferCountryCodeFromUrl(url: string): string | null {
-  const hostname = extractHostname(url);
-
-  if (!hostname) {
-    return null;
-  }
-
-  if (hostname.endsWith(".kr")) {
-    return "KR";
-  }
-
-  if (hostname.endsWith(".jp")) {
-    return "JP";
-  }
-
-  if (hostname.endsWith(".cn")) {
-    return "CN";
-  }
-
-  if (hostname.endsWith(".uk")) {
-    return "GB";
-  }
-
-  if (hostname.endsWith(".gov") || hostname.endsWith(".mil")) {
-    return "US";
-  }
-
-  return null;
-}
-
 export function matchDomainRegistryEntry(
   url: string,
   registry: DomainRegistryEntry[],
@@ -410,17 +321,7 @@ export function matchDomainRegistryEntry(
 
   const matched = registry
     .filter((entry) => entry.isActive && matchesDomainPattern(hostname, entry.domain))
-    .sort((left, right) => {
-      if (left.countryCode === "GLOBAL" && right.countryCode !== "GLOBAL") {
-        return 1;
-      }
-
-      if (left.countryCode !== "GLOBAL" && right.countryCode === "GLOBAL") {
-        return -1;
-      }
-
-      return left.priority - right.priority;
-    });
+    .sort((left, right) => left.priority - right.priority);
 
   return matched[0] ?? null;
 }
@@ -483,8 +384,7 @@ export function selectDomainsForBucket(
     .filter(
       (entry) =>
         entry.isActive &&
-        criteria.usageRoles.includes(entry.usageRole) &&
-        criteria.countryCodes.includes(entry.countryCode),
+        criteria.usageRoles.includes(entry.usageRole),
     )
     .sort((left, right) => left.priority - right.priority)
     .map((entry) => entry.domain)
@@ -495,14 +395,12 @@ function buildDomainSelectionCriteria(
   bucket: "familiar" | "verification",
 ): {
   usageRoles: string[];
-  countryCodes: string[];
 } {
   return {
     usageRoles:
       bucket === "familiar"
         ? ["familiar_news"]
         : ["verification_news"],
-    countryCodes: ["KR"],
   };
 }
 
