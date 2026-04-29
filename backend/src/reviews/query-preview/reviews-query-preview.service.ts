@@ -131,7 +131,7 @@ export class ReviewsQueryPreviewService {
           coreClaim: refinement.coreClaim,
           searchRoute,
           searchPlan: refinement.searchPlan,
-          candidates: deduplicateCandidates(initialCandidates).slice(0, RELEVANCE_LIMIT),
+          candidates: this.selectClassificationCandidates(initialCandidates, sourceQueries),
         });
       this.logStageDuration(
         "relevance_and_signal_classification",
@@ -270,9 +270,9 @@ export class ReviewsQueryPreviewService {
         coreClaim: refinement.coreClaim,
         domainRegistry: getKoreanSearchDomainRegistry(),
       });
-      const classificationCandidates = deduplicateCandidates(initialCandidates).slice(
-        0,
-        RELEVANCE_LIMIT,
+      const classificationCandidates = this.selectClassificationCandidates(
+        initialCandidates,
+        sourceQueries,
       );
       const previewCandidates = classificationCandidates.map((candidate) => ({
         ...candidate,
@@ -381,6 +381,59 @@ export class ReviewsQueryPreviewService {
       );
       await this.persistenceService.markReviewJobFailed(params.reviewJob.id, error);
     }
+  }
+
+  private selectClassificationCandidates(
+    candidates: SearchCandidate[],
+    sourceQueries: QueryArtifact[],
+  ): SearchCandidate[] {
+    const dedupedCandidates = deduplicateCandidates(candidates);
+    const sourceQueryIds = sourceQueries.map((query) => query.id);
+    const selectedCandidates: SearchCandidate[] = [];
+    const selectedCandidateUrls = new Set<string>();
+
+    while (selectedCandidates.length < RELEVANCE_LIMIT) {
+      let addedInRound = false;
+
+      for (const queryId of sourceQueryIds) {
+        if (selectedCandidates.length >= RELEVANCE_LIMIT) {
+          break;
+        }
+
+        const candidate = dedupedCandidates.find(
+          (dedupedCandidate) =>
+            !selectedCandidateUrls.has(dedupedCandidate.canonicalUrl) &&
+            dedupedCandidate.originQueryIds.includes(queryId),
+        );
+
+        if (!candidate) {
+          continue;
+        }
+
+        selectedCandidates.push(candidate);
+        selectedCandidateUrls.add(candidate.canonicalUrl);
+        addedInRound = true;
+      }
+
+      if (!addedInRound) {
+        break;
+      }
+    }
+
+    if (selectedCandidates.length < RELEVANCE_LIMIT) {
+      for (const candidate of dedupedCandidates) {
+        if (selectedCandidates.length >= RELEVANCE_LIMIT) {
+          break;
+        }
+
+        if (!selectedCandidateUrls.has(candidate.canonicalUrl)) {
+          selectedCandidates.push(candidate);
+          selectedCandidateUrls.add(candidate.canonicalUrl);
+        }
+      }
+    }
+
+    return selectedCandidates;
   }
 
   async listQueryProcessingPreviews(

@@ -317,6 +317,113 @@ describe("ReviewsQueryPreviewService", () => {
     );
   });
 
+  it("분류 후보 제한은 첫 검색 쿼리 결과만 자르지 않고 쿼리별로 분산한다", async () => {
+    const persistence = createPersistenceMock();
+    const searchPlanQueries = [
+      {
+        id: "sp1",
+        purpose: "claim_specific",
+        query: "한국은행 기준금리 동결",
+        priority: 1,
+      },
+      {
+        id: "sp2",
+        purpose: "current_state",
+        query: "한국은행 기준금리 최신",
+        priority: 2,
+      },
+      {
+        id: "sp3",
+        purpose: "primary_source",
+        query: "한국은행 기준금리 보도자료",
+        priority: 3,
+      },
+      {
+        id: "sp4",
+        purpose: "contradiction_or_update",
+        query: "한국은행 기준금리 동결 정정",
+        priority: 4,
+      },
+    ] as const;
+    const makeCandidate = (queryId: string, index: number) => ({
+      id: `${queryId}-c${index}`,
+      searchRoute: "news",
+      sourceProvider: "naver-search",
+      sourceType: "news",
+      publisherName: "연합뉴스",
+      publishedAt: null,
+      canonicalUrl: `https://www.yna.co.kr/view/${queryId}-${index}`,
+      originalUrl: `https://www.yna.co.kr/view/${queryId}-${index}`,
+      rawTitle: `${queryId} 기사 ${index}`,
+      rawSnippet: `${queryId} 기사 ${index} 스니펫`,
+      normalizedHash: `${queryId}-hash-${index}`,
+      originQueryIds: [queryId],
+      retrievalBucket: "familiar",
+      domainRegistryId: null,
+    });
+    const initialCandidates = [
+      ...Array.from({ length: 10 }, (_, index) => makeCandidate("sp1", index + 1)),
+      makeCandidate("sp2", 1),
+      makeCandidate("sp3", 1),
+      makeCandidate("sp4", 1),
+    ];
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        coreClaim: "한국은행 기준금리 동결",
+        normalizedClaim: "한국은행이 기준금리를 동결했다",
+        claimType: "policy",
+        searchPlan: {
+          queries: searchPlanQueries,
+        },
+        generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
+        searchRoute: "news",
+        searchRouteReason: "한국 경제 뉴스 claim입니다.",
+      }),
+      searchSources: jest.fn().mockResolvedValue(initialCandidates),
+      classifyRelevanceAndEvidenceSignals: jest
+        .fn()
+        .mockImplementation(async ({ candidates }) => ({
+          relevanceCandidates: candidates.map((candidate: Record<string, unknown>) => ({
+            ...candidate,
+            relevanceTier: "reference",
+            relevanceReason: "검색 후보입니다.",
+          })),
+          evidenceSignals: [],
+        })),
+    } as unknown as ReviewsProvidersService;
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: [],
+      insufficiencyReason: null,
+      evidenceSignals: [],
+    });
+    const service = new ReviewsQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    await service.createQueryProcessingPreview("user-1", {
+      claim: "한국은행이 기준금리를 동결했다",
+    });
+
+    const candidates =
+      (providers.classifyRelevanceAndEvidenceSignals as jest.Mock).mock.calls[0][0]
+        .candidates;
+    expect(candidates).toHaveLength(8);
+    expect(candidates.map((candidate: { id: string }) => candidate.id)).toEqual([
+      "sp1-c1",
+      "sp2-c1",
+      "sp3-c1",
+      "sp4-c1",
+      "sp1-c2",
+      "sp1-c3",
+      "sp1-c4",
+      "sp1-c5",
+    ]);
+  });
+
   it("async preview는 검색 완료 직후 source를 먼저 반환하고 background 분류를 이어간다", async () => {
     const persistence = createPersistenceMock();
     const refinement = {
