@@ -7,6 +7,7 @@ import {
   ReviewPreviewSummary,
   ReviewPreviewSummaryResponse,
 } from "@/lib/reviews/types";
+import { getSourcePoliticalLeanBadge } from "./source-political-lean";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   month: "short",
@@ -183,9 +184,13 @@ function getConsensusLabel(
 }
 
 function mapSource(source: ReviewPreviewSourceResponse): ReviewPreviewSource {
+  const politicalLeanBadge = getSourcePoliticalLeanBadge(source);
+
   return {
     id: source.id,
     publisherName: source.publisherName ?? "출처명 미상",
+    politicalLeanLabel: politicalLeanBadge.label,
+    politicalLeanClassName: politicalLeanBadge.className,
     title: source.rawTitle,
     sourceType: source.sourceType,
     sourceTypeLabel: getSourceTypeLabel(source.sourceType),

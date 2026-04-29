@@ -114,6 +114,8 @@ export interface ReviewPreviewQueryArtifact {
 export interface ReviewPreviewSource {
   id: string;
   publisherName: string;
+  politicalLeanLabel: string;
+  politicalLeanClassName: string;
   title: string;
   sourceType: string;
   sourceTypeLabel: string;

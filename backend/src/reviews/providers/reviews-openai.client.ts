@@ -26,6 +26,7 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
+const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 2400;
 const SEARCH_ROUTES: SearchRoute[] = ["news", "unsupported"];
 const CLAIM_TYPES: ReviewClaimType[] = [
   "scheduled_event",
@@ -332,7 +333,7 @@ news면 정확히 4개, unsupported면 빈 배열.
             role: "system",
             content: `뉴스 소스의 관련성(relevanceTier) 및 증거 신호(Evidence Signal)를 분류하세요.
 
-1. Relevance: primary(직접 근거), reference(보조), discard(무관) 중 선택. 사유는 40자 이내.
+1. Relevance: primary(직접 근거), reference(보조), discard(무관) 중 선택. 사유는 60자 이내.
 2. Signal: core claim에 대한 stance(지지/반박 등), 시점 역할(예정/현황/최신), 업데이트 유형, 임팩트를 판정합니다.
 3. 규칙:
    - 사실 여부 결론을 내리지 말고 '소스의 역할'만 기술하세요.
@@ -356,6 +357,11 @@ news면 정확히 4개, unsupported면 빈 배열.
           },
         ],
         "관련성 및 evidence signal 분류 요청에 실패했습니다.",
+        {
+          reasoningEffort: "minimal",
+          textVerbosity: "low",
+          maxOutputTokens: RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS,
+        },
       );
 
     if (!this.isValidRelevanceSignalPayload(payload, input.candidates)) {

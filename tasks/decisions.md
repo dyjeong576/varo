@@ -274,3 +274,10 @@
 - `QueryRefinementResult`에서 `verificationGoal`, `searchClaim`, `searchQueries`를 제거한다.
 - `SearchPlan`은 중복 메타데이터 없이 `queries[]`만 유지한다.
 - `claimType`은 query refinement의 top-level field로만 유지하고, result assembly에는 별도 입력으로 전달한다.
+
+### Source Political Lean Badge
+- 결과 페이지 source card에는 `style.txt` 기준 뉴스사 성향 배지를 표시한다.
+- 화면 표시 성향은 `진보 / 보수 / 중도 / 기타` 4개 라벨로 제한하고, 진보는 파란색, 보수는 빨간색, 중도와 기타는 회색 계열로 표시한다.
+- 경제지는 `style.txt`의 3분류 기준을 따르며, 기타/정부/미분류 출처는 `기타`로 표시한다.
+- 성향 배지는 출처 맥락을 돕는 보조 메타데이터이며, verdict 또는 출처 신뢰도 점수로 사용하지 않는다.
+- 이번 변경은 공개 API 응답 shape, DB schema, Prisma migration을 변경하지 않는다.

@@ -5,30 +5,13 @@ interface SourceCardProps {
   isClassifying?: boolean;
 }
 
-function getSourceIcon(sourceCategory: ReviewPreviewSource["sourceCategory"]): string {
-  switch (sourceCategory) {
-    case "official":
-      return "verified";
-    case "press":
-      return "newspaper";
-    case "social":
-      return "forum";
-    case "analysis":
-      return "analytics";
-    default:
-      return "public";
-  }
-}
-
 function getSourceTone(source: ReviewPreviewSource): {
   container: string;
-  icon: string;
   badge: string;
 } {
   if (source.stance === "conflict") {
     return {
       container: "border-[#fde3df] bg-[#fff8f7]",
-      icon: "bg-[#ffe8e4] text-[#ba1a1a]",
       badge: "bg-[#ffe8e4] text-[#ba1a1a]",
     };
   }
@@ -36,14 +19,12 @@ function getSourceTone(source: ReviewPreviewSource): {
   if (source.stance === "support") {
     return {
       container: "border-[#dbe8ff] bg-white",
-      icon: "bg-[#eef5ff] text-[#0050cb]",
       badge: "bg-[#eef5ff] text-[#0050cb]",
     };
   }
 
   return {
     container: "border-[#e8ecf4] bg-white",
-    icon: "bg-[#f5f7fb] text-[#7b8798]",
     badge: "bg-[#f3f5f9] text-[#7b8798]",
   };
 }
@@ -60,9 +41,12 @@ export default function SourceCard({ source, isClassifying = false }: SourceCard
     >
       <div className="flex items-start gap-4">
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tone.icon}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-black ${source.politicalLeanClassName}`}
+          aria-label={`뉴스사 성향: ${source.politicalLeanLabel}`}
         >
-          <span className="material-symbols-outlined">{getSourceIcon(source.sourceCategory)}</span>
+          <span className="leading-none">
+            {source.politicalLeanLabel}
+          </span>
         </div>
 
         <div className="min-w-0 flex-1">
