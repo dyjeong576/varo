@@ -52,7 +52,6 @@
 
 ### Country-Aware Domain Routing
 - 이 결정의 MVP 검색 provider 범위는 2026-04-21 Search Provider Routing 결정으로 대체되었다.
-- review query processing은 언어와 별도로 `topicCountryCode` / `topicScope`를 LLM이 판정한다.
 - 당시 설계에서는 국가별 trusted domain registry를 DB로 관리하고, Tavily `include_domains`로 familiar / verification pass를 분리하기로 했다.
 - 한국 사용자에게는 한국 familiar domain을 우선 제공하되, 해외 이슈에서는 verification source 확보를 우선한다.
 - retrieval bucket은 `familiar / verification / fallback` 3단계로 고정한다.

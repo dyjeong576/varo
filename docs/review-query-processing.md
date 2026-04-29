@@ -57,20 +57,19 @@ Provider 전략은 아래로 고정한다.
 
 - OpenAI가 단일 호출로 claim 이해, 지원 범위 판정, 검색 계획 생성을 동시에 수행한다.
 - 판정 결과 `search_route=unsupported`이면 검색하지 않고 `out_of_scope`로 종료한다.
-- OpenAI가 생성하는 아티팩트는 `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, 목적별 `search_plan`, `search_route`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route_reason`, `is_korea_related`, `korea_relevance_reason`이다.
+- OpenAI가 생성하는 아티팩트는 `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, 목적별 `search_plan`, `search_route`, `topic_country_code`, `country_detection_reason`, `search_route_reason`, `is_korea_related`, `korea_relevance_reason`이다.
 - 생성 규칙은 아래를 따른다.
   - 원문 언어를 유지한다.
   - 구어체를 제거한다.
   - 고유명사, 날짜, 수치가 있으면 claim 구조화에는 보존하되, 검색 질의가 해당 표현에만 갇히지 않도록 한다.
   - 사용자 발화 키워드가 아니라 검증 목적에 맞는 검색 질의로 변환한다.
-- `search_plan.queries[]`의 기본 purpose는 아래 4개로 고정한다.
+- `search_plan.queries[]`의 기본 purpose는 아래 3개로 고정한다.
   - `claim_specific`: 사용자가 말한 claim 자체가 어떤 출처에서 나왔는지 확인한다.
   - `current_state`: 현재 기준 상태 또는 최신 보도를 확인한다.
   - `primary_source`: 공식 발표, 원문, 공시, 기관 문서 등 1차 출처를 찾는다.
-  - `contradiction_or_update`: 반박, 정정, 변경, 취소, 업데이트 신호를 찾는다.
-- `korean_news` route의 쿼리 작성 원칙: 기사 제목에 실제로 등장할 법한 핵심 키워드 조합을 사용한다. 인물명·직책·기관명은 한국어 전체 이름으로 정확히 작성하고, 10~20자 이내 단문 키워드 조합으로 조사와 접속어를 최소화한다. 4개 쿼리 간 핵심 키워드 중복을 최소화해 서로 다른 각도를 커버한다.
+- `korean_news` route의 쿼리 작성 원칙: 기사 제목에 실제로 등장할 법한 핵심 키워드 조합을 사용한다. 인물명·직책·기관명은 한국어 전체 이름으로 정확히 작성하고, 10~20자 이내 단문 키워드 조합으로 조사와 접속어를 최소화한다. 3개 쿼리 간 핵심 키워드 중복을 최소화해 서로 다른 각도를 커버한다.
 - `topic_country_code`는 언어 또는 사용자 프로필 국가가 아니라 claim 의미 기준의 중심 국가를 판정한다.
-- 정치·경제 지원 범위 판정은 현재 공개 API 필드로 별도 `topic_domain`을 내보내지 않고, `search_route`, `is_korea_related`, `topic_scope`, `search_route_reason`에 반영한다.
+- 정치·경제 지원 범위 판정은 현재 공개 API 필드로 별도 `topic_domain`을 내보내지 않고, `search_route`, `is_korea_related`, `search_route_reason`에 반영한다.
 - `search_route`는 신규 생성 기준 아래 2개 중 하나로 고정한다.
   - `korean_news`: 한국 정치·경제 뉴스성 claim이며 Naver News Search를 기본 검색으로 사용한다.
   - `unsupported`: 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 claim이다.
@@ -111,8 +110,8 @@ type SearchPlan = {
 ### 4. Source Search
 
 - Review API는 `search_route`에 따라 검색 provider를 선택한다.
-  - `korean_news`: Naver News Search API를 먼저 호출한다. Naver 후보가 15건 이상이면 Tavily Search를 호출하지 않는다.
-  - Naver 후보가 15건 미만이면 코드에 고정된 KR trusted news domain registry 기반 Tavily Search를 fallback으로 호출한다.
+  - `korean_news`: Naver News Search API를 먼저 호출한다. Naver 후보가 8건 이상이면 Tavily Search를 호출하지 않는다.
+  - Naver 후보가 8건 미만이면 코드에 고정된 KR trusted news domain registry 기반 Tavily Search를 fallback으로 호출한다.
   - `unsupported`: 검색하지 않고 `out_of_scope`로 종료한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화한다.
 - Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
@@ -132,7 +131,7 @@ type SearchPlan = {
 ### 6. Relevance and Evidence Signal Classification
 
 - OpenAI는 각 candidate의 제목, snippet, `core_claim`, query purpose를 입력으로 받아 해당 source가 검토 대상 주장과 관련 있는지 판정한다.
-- relevance 입력에는 `topic_scope`, `topic_country_code`, `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`도 포함한다.
+- relevance 입력에는 `topic_country_code`, `search_route`, `source_provider`, `retrieval_bucket`, `source_country_code`도 포함한다.
 - relevance 출력은 아래 3단계 모델로 고정한다.
   - `primary`: claim 검토에 직접적인 source
   - `reference`: 보조 가치가 있는 source
@@ -199,12 +198,12 @@ sequenceDiagram
             ReviewAPI->>Naver: news.json 검색
             Naver-->>ReviewAPI: title / description / originallink / link / pubDate 반환
         end
-        alt Naver 후보가 15건 미만
+        alt Naver 후보가 8건 미만
             ReviewAPI->>Tavily: KR include_domains 기반 fallback search
             Tavily-->>ReviewAPI: 한국 source 후보 반환
         end
         ReviewAPI->>ReviewAPI: 결과 병합 / canonical URL 정규화 / 중복 제거 / provider metadata 부여
-        ReviewAPI->>RelevanceSignalClassifier: route + query purpose + provider metadata 기반 relevance / signal 분류 요청
+        ReviewAPI->>RelevanceSignalClassifier: route + query purpose + provider metadata 기반 relevance / signal 분류 요청 (상한 8개)
         RelevanceSignalClassifier-->>ReviewAPI: primary / reference / discard + reason + evidenceSignals 반환
         ReviewAPI->>DB: relevance / origin_query_ids / query purpose / searchRoute / sourceProvider 저장
         ReviewAPI->>DB: sources / handoff_payload / audit 저장
@@ -260,7 +259,7 @@ sequenceDiagram
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
 | Claim Intake | `raw claim` | 기본 정규화된 claim |
-| Claim Understanding, Scope Gate, and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `search_plan` (4개 purpose별 쿼리 포함), `topic_scope`, `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason`, `is_korea_related`, `korea_relevance_reason` |
+| Claim Understanding, Scope Gate, and Search Planning | 정규화 claim | `core_claim`, `normalized_claim`, `claim_type`, `verification_goal`, `search_plan` (4개 purpose별 쿼리 포함), `topic_country_code`, `country_detection_reason`, `search_route`, `search_route_reason`, `is_korea_related`, `korea_relevance_reason` |
 | Source Search | `search_plan.queries[]`, `search_route` | title, snippet, canonical URL, publisher metadata, provider metadata를 포함한 search candidates |
 | Candidate Normalization and Deduplication | search candidates | canonical URL 기준 candidate pool, source별 `origin_query_ids[]`, origin query purpose |
 | Relevance and Evidence Signal Classification | `core_claim`, title, snippet, candidate metadata, query purpose, route/provider/country metadata | source별 `relevance_tier`, `relevance_reason`, `origin_query_ids[]`, origin query purpose, source-level evidence signal |
@@ -281,7 +280,6 @@ sequenceDiagram
 - `claim_language_code`
 - `generated_queries`
 - `search_plan`
-- `topic_scope`
 - `topic_country_code`
 - `country_detection_reason`
 - `user_country_code`
@@ -309,13 +307,13 @@ sequenceDiagram
 
 이 설계는 구현 variance와 latency, cost 폭주를 막기 위해 아래 상한을 전제로 한다.
 
-- query 수: 기본 4개 purpose를 포함하되 provider별 상한은 구현에서 제한
+- query 수: 기본 3개 purpose를 포함하되 provider별 상한은 구현에서 제한
 - Naver query당 검색 결과: 상위 10개
 - Tavily fallback query당 검색 결과: 상위 5개
-- Tavily fallback 호출 조건: Naver 후보 15건 미만
+- Tavily fallback 호출 조건: Naver 후보 8건 미만
 - Naver 검색 timeout: 최대 8초
 - Tavily fallback timeout: 최대 8초
-- relevance/evidence signal 통합 분류 대상: 최대 15개
+- relevance/evidence signal 통합 분류 대상: 최대 8개
 - evidence signal 저장 대상: `discard`가 아니고 raw snippet이 있는 source 최대 8개
 
 ## 실패/예외 처리 원칙

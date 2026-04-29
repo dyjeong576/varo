@@ -175,7 +175,7 @@
 | `source_country_code` | varchar(16) nullable | source 국가 코드 |
 | `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
 
-`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. 한국 정치·경제 뉴스는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, claim 이해 기반 `normalized_claim`, `claim_type`, `verification_goal`, 목적별 `search_plan`, `topic_scope`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason`을 함께 보존한다.
+`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. 한국 정치·경제 뉴스는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, claim 이해 기반 `normalized_claim`, `claim_type`, `verification_goal`, 목적별 `search_plan`, `topic_country_code`, `country_detection_reason`, `is_korea_related`, `korea_relevance_reason`을 함께 보존한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |

@@ -64,7 +64,6 @@ interface QueryRefinementPayload {
   searchRouteReason?: string;
   searchClaim?: string;
   searchQueries?: QueryArtifact[];
-  topicScope: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
   isKoreaRelated: boolean;
@@ -250,7 +249,6 @@ export function buildQueryRefinementPayload(
       })),
     },
     generatedQueries: generatedQueries.map(serializeQueryArtifact),
-    topicScope: refinement.topicScope,
     topicCountryCode: refinement.topicCountryCode,
     countryDetectionReason: refinement.countryDetectionReason,
     isKoreaRelated: refinement.isKoreaRelated,
@@ -377,7 +375,6 @@ export function mapPreviewResponse(params: {
     claimLanguageCode: params.refinement.claimLanguageCode,
     languageCode: params.refinement.claimLanguageCode,
     coreClaim: params.refinement.coreClaim,
-    topicScope: params.refinement.topicScope,
     topicCountryCode: params.refinement.topicCountryCode,
     countryDetectionReason: params.refinement.countryDetectionReason,
     generatedQueries: params.generatedQueries,
@@ -440,7 +437,6 @@ export function mapOutOfScopePreviewResponse(params: {
     claimLanguageCode: params.refinement.claimLanguageCode,
     languageCode: params.refinement.claimLanguageCode,
     coreClaim: params.refinement.coreClaim,
-    topicScope: params.refinement.topicScope,
     topicCountryCode: params.refinement.topicCountryCode,
     countryDetectionReason: params.refinement.countryDetectionReason,
     generatedQueries: params.generatedQueries,
@@ -621,7 +617,6 @@ function parseQueryRefinementPayload(
       searchRouteReason: "검색 route 판정 전입니다.",
       searchClaim: normalizedClaim,
       searchQueries: [],
-      topicScope: "unknown",
       topicCountryCode: null,
       countryDetectionReason: "주제 국가 판정 전입니다.",
       isKoreaRelated: true,
@@ -660,7 +655,6 @@ function parseQueryRefinementPayload(
       parseString(payload.coreClaim, normalizedClaim),
     ),
     searchQueries: searchQueries.length > 0 ? searchQueries : generatedQueries,
-    topicScope: parseString(payload.topicScope, "unknown"),
     topicCountryCode: parseNullableString(payload.topicCountryCode),
     countryDetectionReason: parseString(
       payload.countryDetectionReason,
@@ -755,7 +749,6 @@ export function mapStoredPreviewResponse(
     claimLanguageCode: refinement.claimLanguageCode,
     languageCode: refinement.languageCode,
     coreClaim: refinement.coreClaim,
-    topicScope: refinement.topicScope,
     topicCountryCode: refinement.topicCountryCode,
     countryDetectionReason: refinement.countryDetectionReason,
     generatedQueries: refinement.generatedQueries,

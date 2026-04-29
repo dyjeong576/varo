@@ -279,13 +279,6 @@ export class ReviewQueryProcessingPreviewResponseDto {
   coreClaim!: string;
 
   @ApiProperty({
-    description: "주제 범위",
-    example: "foreign",
-    enum: ["domestic", "foreign", "multi_country", "unknown"],
-  })
-  topicScope!: string;
-
-  @ApiProperty({
     description: "주제 국가 코드",
     example: "US",
     nullable: true,

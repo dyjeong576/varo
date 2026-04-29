@@ -17,7 +17,6 @@ describe("ReviewsController (e2e)", () => {
         claimLanguageCode: "ko",
         languageCode: "ko",
         coreClaim: "테슬라의 한국 시장 철수",
-        topicScope: "domestic",
         topicCountryCode: "KR",
         countryDetectionReason: "한국 관련 표현이 확인되어 국내 이슈로 판단했습니다.",
         generatedQueries: [
@@ -75,7 +74,6 @@ describe("ReviewsController (e2e)", () => {
         claimLanguageCode: "ko",
         languageCode: "ko",
         coreClaim: "테슬라의 한국 시장 철수",
-        topicScope: "domestic",
         topicCountryCode: "KR",
         countryDetectionReason: "한국 관련 표현이 확인되어 국내 이슈로 판단했습니다.",
         generatedQueries: [],
@@ -231,7 +229,6 @@ describe("ReviewsController (e2e)", () => {
         claimLanguageCode: "ko",
         languageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         generatedQueries: [],

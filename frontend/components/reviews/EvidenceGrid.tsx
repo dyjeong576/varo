@@ -22,7 +22,6 @@ interface QueryContextDisclosureProps {
   discardedSourceCount: number;
   coreClaim: string;
   normalizedClaim: string;
-  topicScopeLabel: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
   generatedQueries: { id: string; text: string; rank: number }[];
@@ -117,7 +116,6 @@ export function QueryContextDisclosure({
   discardedSourceCount,
   coreClaim,
   normalizedClaim,
-  topicScopeLabel,
   topicCountryCode,
   countryDetectionReason,
   generatedQueries,
@@ -149,7 +147,6 @@ export function QueryContextDisclosure({
             </p>
           </div>
           <div className="rounded-full bg-[#f3f6fb] px-3 py-1.5 text-xs font-bold text-[#556070]">
-            {topicScopeLabel}
             {topicCountryCode ? ` · ${topicCountryCode}` : ""}
           </div>
         </div>
@@ -169,7 +166,6 @@ export function QueryContextDisclosure({
             제외 후보 {discardedSourceCount}건
           </span>
           <span className="rounded-full bg-[#f6f7fb] px-3 py-1.5 text-xs font-semibold text-[#556070]">
-            범위 {topicScopeLabel}
             {topicCountryCode ? ` · ${topicCountryCode}` : ""}
           </span>
         </div>

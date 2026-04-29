@@ -76,10 +76,6 @@ export class ReviewsProvidersService {
         );
       }
 
-      this.logger.log(
-        `review source search naver completed in ${Date.now() - startedAt}ms; candidates=${naverResults.length}`,
-      );
-
       if (naverResults.length >= NAVER_SUFFICIENT_SOURCE_COUNT) {
         return naverResults;
       }

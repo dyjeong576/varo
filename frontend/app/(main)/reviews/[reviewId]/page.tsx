@@ -293,7 +293,6 @@ export default function ReviewResultPage() {
           discardedSourceCount={review.discardedSourceCount}
           coreClaim={review.coreClaim}
           normalizedClaim={review.normalizedClaim}
-          topicScopeLabel={review.topicScopeLabel}
           topicCountryCode={review.topicCountryCode}
           countryDetectionReason={review.countryDetectionReason}
           generatedQueries={review.generatedQueries}

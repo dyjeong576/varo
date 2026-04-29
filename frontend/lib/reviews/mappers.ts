@@ -149,19 +149,6 @@ function getRetrievalBucketLabel(retrievalBucket: string | null): string {
   }
 }
 
-function getTopicScopeLabel(topicScope: string): string {
-  switch (topicScope) {
-    case "domestic":
-      return "국내 이슈";
-    case "foreign":
-      return "해외 이슈";
-    case "multi_country":
-      return "다중 국가 이슈";
-    default:
-      return "범위 판정 전";
-  }
-}
-
 type ReviewResultResponse = NonNullable<ReviewPreviewDetailResponse["result"]>;
 
 function getVerdictLabel(verdict: ReviewResultResponse["verdict"]): string {
@@ -300,8 +287,6 @@ export function mapReviewPreviewDetail(
     coreClaim: detail.coreClaim,
     languageCode: detail.languageCode,
     claimLanguageCode: detail.claimLanguageCode,
-    topicScope: detail.topicScope,
-    topicScopeLabel: getTopicScopeLabel(detail.topicScope),
     topicCountryCode: detail.topicCountryCode,
     countryDetectionReason: detail.countryDetectionReason,
     generatedQueries: detail.generatedQueries,

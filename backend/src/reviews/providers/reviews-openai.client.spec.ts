@@ -54,7 +54,6 @@ describe("ReviewsOpenAiClient", () => {
                       searchRoute: "unsupported",
                       queries: [],
                     },
-                    topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason: "미국 이슈로 판단했습니다.",
                     isKoreaRelated: false,
@@ -75,7 +74,7 @@ describe("ReviewsOpenAiClient", () => {
       "트럼프가 오늘 관세 발표했대",
     );
 
-    expect(result.topicCountryCode).toBe("US");
+    expect(result.topicCountryCode).toBeNull();
     expect(result.searchRoute).toBe("unsupported");
     expect(result.searchClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.normalizedClaim).toBe("트럼프가 관세를 발표했다");
@@ -83,7 +82,7 @@ describe("ReviewsOpenAiClient", () => {
     expect(result.searchPlan.queries).toEqual([]);
     expect(result.searchQueries).toEqual([]);
     expect(result.isKoreaRelated).toBe(false);
-    expect(result.koreaRelevanceReason).toContain("한국");
+    expect(result.koreaRelevanceReason).toBe("");
     expect(result.generatedQueries).toEqual([
       { id: "q1", text: "트럼프의 관세 발표", rank: 1 },
     ]);
@@ -140,7 +139,6 @@ describe("ReviewsOpenAiClient", () => {
                         },
                       ],
                     },
-                    topicScope: "domestic",
                     topicCountryCode: "KR",
                     countryDetectionReason: "한국은행 기준금리 이슈입니다.",
                     isKoreaRelated: true,
@@ -293,7 +291,6 @@ describe("ReviewsOpenAiClient", () => {
         claimLanguageCode: "ko",
         searchRoute: "korean_news",
         topicCountryCode: "KR",
-        topicScope: "domestic",
         searchPlan: null,
         candidates: [
           {

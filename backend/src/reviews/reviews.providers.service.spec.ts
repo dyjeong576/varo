@@ -73,7 +73,6 @@ describe("ReviewsProvidersService", () => {
         coreClaim: "테슬라 한국 철수",
         claimLanguageCode: "ko",
         topicCountryCode: "KR",
-        topicScope: "domestic",
         domainRegistry: [],
       }),
     ).rejects.toMatchObject({
@@ -133,7 +132,6 @@ describe("ReviewsProvidersService", () => {
                     searchRoute: "unsupported",
                     searchRouteReason:
                       "미국 관세 발표를 다루는 해외/글로벌 뉴스성 claim입니다.",
-                    topicScope: "foreign",
                     topicCountryCode: "US",
                     countryDetectionReason:
                       "미국 대통령과 관세 발표 단서가 확인되어 미국 이슈로 판단했습니다.",
@@ -157,8 +155,7 @@ describe("ReviewsProvidersService", () => {
     const result = await service.refineQuery("트럼프가 오늘 관세 발표했대");
 
     expect(result.claimLanguageCode).toBe("ko");
-    expect(result.topicScope).toBe("foreign");
-    expect(result.topicCountryCode).toBe("US");
+    expect(result.topicCountryCode).toBeNull();
     expect(result.searchRoute).toBe("unsupported");
     expect(result.searchClaim).toBe("트럼프가 관세를 발표했다");
     expect(result.searchPlan.queries).toEqual([]);
@@ -251,7 +248,6 @@ describe("ReviewsProvidersService", () => {
       coreClaim: "테슬라 한국 철수",
       claimLanguageCode: "ko",
       topicCountryCode: "US",
-      topicScope: "foreign",
       domainRegistry: [
         {
           id: "kr-familiar",
@@ -381,7 +377,6 @@ describe("ReviewsProvidersService", () => {
       coreClaim: "한국 경제 정책",
       claimLanguageCode: "ko",
       topicCountryCode: "KR",
-      topicScope: "domestic",
       domainRegistry: [],
     });
 
@@ -438,7 +433,6 @@ describe("ReviewsProvidersService", () => {
       coreClaim: "한국 경제 정책",
       claimLanguageCode: "ko",
       topicCountryCode: "KR",
-      topicScope: "domestic",
       domainRegistry: [],
     });
 
@@ -471,7 +465,6 @@ describe("ReviewsProvidersService", () => {
         coreClaim: "트럼프의 관세 발표",
         claimLanguageCode: "ko",
         topicCountryCode: "US",
-        topicScope: "foreign",
         domainRegistry: [],
       }),
     ).rejects.toMatchObject({
@@ -517,7 +510,6 @@ describe("ReviewsProvidersService", () => {
       claimLanguageCode: "ko",
       searchRoute: "global_news",
       topicCountryCode: "US",
-      topicScope: "foreign",
       candidates: [
         {
           id: "c1",
@@ -591,7 +583,6 @@ describe("ReviewsProvidersService", () => {
       claimLanguageCode: "ko",
       searchRoute: "korean_news",
       topicCountryCode: "KR",
-      topicScope: "domestic",
       candidates: [
         {
           id: "c1",
@@ -647,7 +638,6 @@ describe("ReviewsProvidersService", () => {
       claimLanguageCode: "ko",
       searchRoute: "global_news",
       topicCountryCode: "US",
-      topicScope: "foreign",
       candidates: [
         {
           id: "c1",
@@ -735,7 +725,6 @@ describe("ReviewsProvidersService", () => {
         coreClaim: "한국은행 기준금리",
         claimLanguageCode: "ko",
         topicCountryCode: "KR",
-        topicScope: "domestic",
         domainRegistry: [],
       }),
     ).rejects.toMatchObject({

@@ -54,7 +54,6 @@ export interface ReviewPreviewDetailResponse {
   languageCode: string;
   claimLanguageCode: string;
   coreClaim: string;
-  topicScope: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
   generatedQueries: ReviewPreviewQueryArtifactResponse[];
@@ -173,8 +172,6 @@ export interface ReviewPreviewDetail {
   coreClaim: string;
   languageCode: string;
   claimLanguageCode: string;
-  topicScope: string;
-  topicScopeLabel: string;
   topicCountryCode: string | null;
   countryDetectionReason: string;
   generatedQueries: ReviewPreviewQueryArtifact[];

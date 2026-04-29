@@ -150,7 +150,7 @@
 - 요약 문장 자체는 DB에 저장하지 않고, `review_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
-- 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 한국 관련성 및 주제 범위 설명은 `is_korea_related`, `topic_scope`, `topic_country_code`, `korea_relevance_reason`, `search_route_reason`에 남긴다.
+- 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 한국 관련성 및 주제 국가 설명은 `is_korea_related`, `topic_country_code`, `korea_relevance_reason`, `search_route_reason`에 남긴다.
 - OpenAI는 먼저 scope gate에서 한국 관련 정치·경제 뉴스성 claim인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 claim은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.

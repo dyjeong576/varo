@@ -125,7 +125,6 @@ describe("ReviewsQueryPreviewService", () => {
           { id: "q2", text: "Trump tariff announcement", rank: 2 },
           { id: "q3", text: "미국 관세 정책 발표", rank: 3 },
         ],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason:
           "미국 대통령과 관세 정책 단서가 확인되어 미국 이슈로 판단했습니다.",
@@ -271,7 +270,6 @@ describe("ReviewsQueryPreviewService", () => {
     expect(result.rawClaim).toBe("트럼프가 오늘 관세 발표했대");
     expect(result.createdAt).toBe("2026-04-01T02:00:00.000Z");
     expect(result.claimLanguageCode).toBe("ko");
-    expect(result.topicScope).toBe("foreign");
     expect(result.topicCountryCode).toBe("US");
     expect(result.countryDetectionReason).toContain("미국");
     expect(result.generatedQueries).toHaveLength(3);
@@ -401,7 +399,6 @@ describe("ReviewsQueryPreviewService", () => {
           { id: "q2", text: "US tariff policy announcement", rank: 2 },
           { id: "q3", text: "Trump tariff update", rank: 3 },
         ],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: false,
@@ -459,7 +456,6 @@ describe("ReviewsQueryPreviewService", () => {
           languageCode: "ko",
           coreClaim: "트럼프의 관세 발표",
           generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-          topicScope: "foreign",
           topicCountryCode: "US",
           countryDetectionReason: "미국 이슈로 판단했습니다.",
           isKoreaRelated: true,
@@ -486,7 +482,6 @@ describe("ReviewsQueryPreviewService", () => {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: true,
@@ -555,7 +550,6 @@ describe("ReviewsQueryPreviewService", () => {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: true,
@@ -618,7 +612,6 @@ describe("ReviewsQueryPreviewService", () => {
         claimLanguageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: true,
@@ -707,7 +700,6 @@ describe("ReviewsQueryPreviewService", () => {
         languageCode: "ko",
         coreClaim: "트럼프의 관세 발표",
         generatedQueries: [{ id: "q1", text: "트럼프 관세 발표", rank: 1 }],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: true,
@@ -795,7 +787,6 @@ describe("ReviewsQueryPreviewService", () => {
           { id: "q2", text: "미국 관세 정책", rank: 2 },
           { id: "q3", text: "Trump tariff", rank: 3 },
         ],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: false,
@@ -854,7 +845,6 @@ describe("ReviewsQueryPreviewService", () => {
           { id: "q2", text: "Trump tariff announcement", rank: 2 },
           { id: "q3", text: "미국 관세 정책 발표", rank: 3 },
         ],
-        topicScope: "foreign",
         topicCountryCode: "US",
         countryDetectionReason: "미국 이슈로 판단했습니다.",
         isKoreaRelated: true,

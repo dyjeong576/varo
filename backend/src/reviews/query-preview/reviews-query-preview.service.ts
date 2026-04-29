@@ -17,7 +17,7 @@ import { ReviewsQueryPreviewPersistenceService } from "./reviews-query-preview.p
 import { ReviewPreviewSummaryResponseDto } from "../dto/review-preview-summary-response.dto";
 import { AppException } from "../../common/exceptions/app-exception";
 
-const RELEVANCE_LIMIT = 15;
+const RELEVANCE_LIMIT = 8;
 const PRIMARY_EXTRACTION_LIMIT = 5;
 const REFERENCE_PROMOTION_LIMIT = 3;
 
@@ -120,10 +120,8 @@ export class ReviewsQueryPreviewService {
         coreClaim: refinement.coreClaim,
         claimLanguageCode: refinement.claimLanguageCode,
         topicCountryCode: refinement.topicCountryCode,
-        topicScope: refinement.topicScope,
         domainRegistry: getKoreanSearchDomainRegistry(),
       });
-      this.logStageDuration("source_search", sourceSearchStartedAt, reviewJob.id);
       const relevanceStartedAt = Date.now();
       const relevanceSignalResult =
         await this.providersService.classifyRelevanceAndEvidenceSignals({
@@ -131,7 +129,6 @@ export class ReviewsQueryPreviewService {
           claimLanguageCode: refinement.claimLanguageCode,
           searchRoute,
           topicCountryCode: refinement.topicCountryCode,
-          topicScope: refinement.topicScope,
           searchPlan: refinement.searchPlan,
           candidates: deduplicateCandidates(initialCandidates).slice(0, RELEVANCE_LIMIT),
         });
@@ -156,8 +153,6 @@ export class ReviewsQueryPreviewService {
           evidenceSignals,
           primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
         });
-      this.logStageDuration("persist_preview_result", persistStartedAt, reviewJob.id);
-      this.logStageDuration("total_preview_generation", startedAt, reviewJob.id);
 
       return mapPreviewResponse({
         reviewJob,
