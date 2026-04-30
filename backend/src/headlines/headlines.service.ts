@@ -651,12 +651,12 @@ export class HeadlinesService {
       clusters.push({
         sortIndex: clusters.length,
         eventName: article.title,
-        eventSummary: "RSS 제목 기준으로 별도 사건으로 보존했습니다.",
+        eventSummary: "",
         commonFacts: [],
-        uncertainty: "분석 응답에서 기존 사건 묶음에 포함되지 않아 단일 기사 사건으로 보존했습니다.",
+        uncertainty: null,
         items: [{
           articleId: article.id,
-          expressionSummary: "RSS 제목 기준으로 별도 사건으로 보존했습니다.",
+          expressionSummary: "",
           emphasis: null,
           framing: null,
         }],

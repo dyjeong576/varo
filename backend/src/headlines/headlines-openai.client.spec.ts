@@ -80,6 +80,8 @@ describe("HeadlinesOpenAiClient", () => {
     expect(systemPrompt).toContain("2~3문장의 개요 문단");
     expect(systemPrompt).toContain("\"- \"로 시작하는 핵심 bullet 3~5개");
     expect(systemPrompt).toContain("매체별 표현 차이");
+    expect(systemPrompt).toContain("최종 화면 문구");
+    expect(systemPrompt).toContain("데이터 처리 과정");
     expect(systemPrompt).toContain("범위 축소를 요청하는 것은 엄격히 금지");
   });
 
@@ -150,7 +152,7 @@ describe("HeadlinesOpenAiClient", () => {
     const client = new HeadlinesOpenAiClient();
     const result = await client.analyzeHeadlines("openai-test-key", "2026-04-30", "politics", []);
 
-    expect(result.summary).toContain("수집된 RSS 제목을 기준으로");
+    expect(result.summary).toContain("오늘 수집된 헤드라인");
     expect(result.summary).not.toContain("계속 진행");
   });
 });

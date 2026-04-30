@@ -23,6 +23,20 @@ function getKstDateKey(): string {
   }).format(new Date());
 }
 
+function clampHeadlineDate(value: string): string {
+  const maxHeadlineDate = getKstDateKey();
+
+  if (value < MIN_HEADLINE_DATE) {
+    return MIN_HEADLINE_DATE;
+  }
+
+  if (value > maxHeadlineDate) {
+    return maxHeadlineDate;
+  }
+
+  return value;
+}
+
 function getPublisherCategory(
   publisher: HeadlinesTodayResponse["publishers"][number],
 ): HeadlineCategory {
@@ -32,6 +46,7 @@ function getPublisherCategory(
 export function HeadlinesPageClient() {
   const router = useRouter();
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const maxHeadlineDate = getKstDateKey();
   const [activeCategory, setActiveCategory] = useState<HeadlineCategory>("politics");
   const [selectedDate, setSelectedDate] = useState(getKstDateKey);
   const [dateInput, setDateInput] = useState(getKstDateKey);
@@ -105,7 +120,7 @@ export function HeadlinesPageClient() {
   }
 
   function handleDateChange(value: string) {
-    const nextDate = value < MIN_HEADLINE_DATE ? MIN_HEADLINE_DATE : value;
+    const nextDate = clampHeadlineDate(value);
     setDateInput(nextDate);
     setSelectedDate(nextDate);
   }
@@ -159,6 +174,7 @@ export function HeadlinesPageClient() {
             ref={dateInputRef}
             type="date"
             min={MIN_HEADLINE_DATE}
+            max={maxHeadlineDate}
             value={dateInput}
             onChange={(e) => handleDateChange(e.target.value)}
             className="sr-only"

@@ -38,9 +38,11 @@ function CoverageBadge({ covered, total, articleCount }: { covered: number; tota
 function PublisherCell({
   publisher,
   items,
+  showExpressionSummary,
 }: {
   publisher: (typeof PUBLISHER_ORDER)[number];
   items: HeadlineClusterItem[];
+  showExpressionSummary: boolean;
 }) {
   if (items.length === 0) {
     return (
@@ -73,7 +75,7 @@ function PublisherCell({
               </p>
               <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-on-surface-variant" />
             </a>
-            {item.expressionSummary && (
+            {showExpressionSummary && item.expressionSummary && (
               <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.expressionSummary}</p>
             )}
           </div>
@@ -97,6 +99,7 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
     itemsByBaseKey.set(baseKey, [...(itemsByBaseKey.get(baseKey) ?? []), item]);
   }
   const coveredPublisherCount = PUBLISHER_ORDER.filter((pub) => (itemsByBaseKey.get(pub.baseKey) ?? []).length > 0).length;
+  const isSinglePublisherEvent = coveredPublisherCount === 1;
 
   return (
     <div className="rounded-2xl bg-white shadow-sm">
@@ -107,7 +110,9 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
       >
         <div className="min-w-0 flex-1">
           <h3 className="font-bold text-foreground">{cluster.eventName}</h3>
-          <p className="mt-0.5 line-clamp-1 text-sm text-on-surface-variant">{cluster.eventSummary}</p>
+          {!isSinglePublisherEvent && cluster.eventSummary && (
+            <p className="mt-0.5 line-clamp-1 text-sm text-on-surface-variant">{cluster.eventSummary}</p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-0.5">
           <CoverageBadge covered={coveredPublisherCount} total={PUBLISHER_ORDER.length} articleCount={cluster.items.length} />
@@ -121,7 +126,12 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
         <div className="space-y-4 border-t border-gray-100 px-5 pb-5 pt-4">
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
             {PUBLISHER_ORDER.map((pub) => (
-              <PublisherCell key={pub.baseKey} publisher={pub} items={itemsByBaseKey.get(pub.baseKey) ?? []} />
+              <PublisherCell
+                key={pub.baseKey}
+                publisher={pub}
+                items={itemsByBaseKey.get(pub.baseKey) ?? []}
+                showExpressionSummary={!isSinglePublisherEvent}
+              />
             ))}
           </div>
 
@@ -141,7 +151,7 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
             </div>
           )}
 
-          {cluster.uncertainty && (
+          {!isSinglePublisherEvent && cluster.uncertainty && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">※ {cluster.uncertainty}</p>
           )}
         </div>
