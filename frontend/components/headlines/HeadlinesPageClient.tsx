@@ -166,7 +166,7 @@ export function HeadlinesPageClient() {
           <button
             type="button"
             onClick={openDatePicker}
-            className="rounded-full bg-primary px-3 py-1 font-semibold text-white shadow-sm"
+            className="cursor-pointer rounded-full bg-primary px-3 py-1 font-semibold text-white shadow-sm"
           >
             날짜 검색
           </button>
@@ -187,7 +187,7 @@ export function HeadlinesPageClient() {
         <button
           type="button"
           onClick={() => setActiveCategory("politics")}
-          className={`h-10 rounded-lg text-sm font-semibold transition-colors ${
+          className={`h-10 cursor-pointer rounded-lg text-sm font-semibold transition-colors ${
             activeCategory === "politics" ? "bg-primary text-white" : "text-on-surface-variant"
           }`}
         >
@@ -196,7 +196,7 @@ export function HeadlinesPageClient() {
         <button
           type="button"
           onClick={() => setActiveCategory("economy")}
-          className={`h-10 rounded-lg text-sm font-semibold transition-colors ${
+          className={`h-10 cursor-pointer rounded-lg text-sm font-semibold transition-colors ${
             activeCategory === "economy" ? "bg-primary text-white" : "text-on-surface-variant"
           }`}
         >
@@ -258,7 +258,7 @@ function HeadlinePublisherTable({
                     href={publisher.feedUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container-low"
+                    className="cursor-pointer rounded-full p-1 text-on-surface-variant hover:bg-surface-container-low"
                     aria-label={`${publisher.publisherName} RSS 열기`}
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -276,7 +276,7 @@ function HeadlinePublisherTable({
                 return (
                   <td key={publisher.publisherKey} className="px-4 py-4 align-top">
                     {article ? (
-                      <a href={article.url} target="_blank" rel="noreferrer" className="block">
+                      <a href={article.url} target="_blank" rel="noreferrer" className="block cursor-pointer">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="line-clamp-3 text-sm font-semibold leading-6 text-foreground">
                             {article.title}

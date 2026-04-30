@@ -66,7 +66,7 @@ export default function HomePage() {
           검증된 데이터를 통해 세상의 궁금증을 해결합니다
         </p>
         <p className="text-[13px] text-gray-500 break-keep leading-relaxed max-w-[90%]">
-          VARO는 복잡한 정보를 구조화된 인사이트로 정리해, 빠르고 정확한 판단을 돕습니다.
+          VARO는 뉴스를 바탕으로 핵심만 깔끔하게 정리해 드려서, 쉽고 빠르게 상황을 이해하고 판단할 수 있도록 도와드립니다.
         </p>
         <div className="mt-5 inline-flex max-w-[92%] items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-3.5 py-2 text-[12px] font-bold leading-snug text-blue-700 shadow-[0_6px_20px_rgba(37,99,235,0.08)]">
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -84,7 +84,7 @@ export default function HomePage() {
               value={check}
               onChange={(e) => setCheck(e.target.value)}
               disabled={isSubmitting}
-              placeholder="검증하고 싶은 소문, 뉴스, 주장을 입력하세요..."
+              placeholder="한국 정책·경제 이슈에 대해 사실 확인을 도와드립니다."
               className="w-full rounded-3xl bg-transparent px-5 py-5 min-h-[140px] resize-none text-[15px] text-gray-800 placeholder:text-gray-400 focus:outline-none"
             />
             <button

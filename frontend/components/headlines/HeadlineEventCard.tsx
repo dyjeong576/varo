@@ -69,7 +69,7 @@ function PublisherCell({
       <div className="mt-2 space-y-3">
         {items.map((item) => (
           <div key={item.articleId ?? item.articleUrl}>
-            <a href={item.articleUrl} target="_blank" rel="noreferrer" className="group flex items-start gap-1">
+            <a href={item.articleUrl} target="_blank" rel="noreferrer" className="group flex cursor-pointer items-start gap-1">
               <p className="line-clamp-3 text-xs font-semibold leading-5 text-foreground group-hover:text-primary">
                 {item.articleTitle}
               </p>
@@ -106,7 +106,7 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-start gap-3 px-5 py-4 text-left"
+        className="flex w-full cursor-pointer items-start gap-3 px-5 py-4 text-left"
       >
         <div className="min-w-0 flex-1">
           <h3 className="font-bold text-foreground">{cluster.eventName}</h3>
