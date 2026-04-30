@@ -114,7 +114,7 @@ describe("AnswersQueryPreviewService", () => {
           { id: "q2", text: "Trump tariff announcement", rank: 2 },
           { id: "q3", text: "미국 관세 정책 발표", rank: 3 },
         ],
-        searchRoute: "news",
+        searchRoute: "supported",
         searchRouteReason: "한국 시장 영향이 직접 포함된 한국 뉴스성 check입니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([
@@ -281,7 +281,7 @@ describe("AnswersQueryPreviewService", () => {
     );
     expect(providers.searchSources).toHaveBeenCalledWith(
       expect.objectContaining({
-        searchRoute: "news",
+        searchRoute: "supported",
         queries: [
           {
             id: "sp1",
@@ -347,7 +347,7 @@ describe("AnswersQueryPreviewService", () => {
     ] as const;
     const makeCandidate = (queryId: string, index: number) => ({
       id: `${queryId}-c${index}`,
-      searchRoute: "news",
+      searchRoute: "supported",
       sourceProvider: "naver-search",
       sourceType: "news",
       publisherName: "연합뉴스",
@@ -376,7 +376,7 @@ describe("AnswersQueryPreviewService", () => {
           queries: searchPlanQueries,
         },
         generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
-        searchRoute: "news",
+        searchRoute: "supported",
         searchRouteReason: "한국 경제 뉴스 check입니다.",
       }),
       searchSources: jest.fn().mockResolvedValue(initialCandidates),
@@ -441,7 +441,7 @@ describe("AnswersQueryPreviewService", () => {
         ],
       },
       generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
-      searchRoute: "news",
+      searchRoute: "supported",
       searchRouteReason: "한국 경제 뉴스 check입니다.",
       };    const candidate = {
       id: "c1",
@@ -571,7 +571,7 @@ describe("AnswersQueryPreviewService", () => {
           ],
         },
         generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
-        searchRoute: "news",
+        searchRoute: "supported",
         searchRouteReason: "한국 경제 뉴스 check입니다.",
       }),
       searchSources: jest.fn().mockResolvedValue([

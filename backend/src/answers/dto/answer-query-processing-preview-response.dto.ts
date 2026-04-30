@@ -176,14 +176,14 @@ export class AnswerAnalysisResultDto {
   consensusLevel!: string;
 
   @ApiProperty({
-    description: "결과 화면용 해석 요약",
+    description: "OpenAI structured output으로 생성한 결과 화면용 해석 요약",
     example:
       "수집된 출처 기준으로는 이 주장을 지지하는 근거가 더 우세합니다. verification 성격의 source가 포함돼 있어 현재 단계 기준 신뢰도는 비교적 높습니다.",
   })
   analysisSummary!: string;
 
   @ApiProperty({
-    description: "결과 화면용 uncertainty 요약",
+    description: "OpenAI structured output으로 생성한 결과 화면용 uncertainty 요약",
     example:
       "현재 결과는 interpretation 단계 이전에 생성된 임시 분석입니다. 추가 source 확보 여부에 따라 해석 강도가 달라질 수 있습니다.",
   })

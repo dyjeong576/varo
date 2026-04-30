@@ -491,7 +491,7 @@ export function startAnswerTask(draftId: string): Promise<void> {
       const errorMessage =
         error instanceof ApiClientError
           ? error.message
-          : "리뷰 preview 생성에 실패했습니다.";
+          : "answer preview 생성에 실패했습니다.";
 
       updateTaskRecord(draftId, (currentRecord) =>
         toFailedTask(currentRecord, errorMessage),

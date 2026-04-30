@@ -188,8 +188,8 @@
 ### Search Provider Routing
 - 2026-04-01의 Korea-Related Only MVP Scope 결정은 검색 범위 기준에서 대체한다.
 - 이 결정의 해외/글로벌 route 범위는 2026-04-28 최신 결정으로 대체되었다.
-- 신규 answer 생성 기준 query refinement는 `search_route`를 `news / unsupported` 중 하나로 판정한다.
-- `news` route는 Naver News Search API를 기본 검색 provider로 사용한다.
+- 신규 answer 생성 기준 query refinement는 `search_route`를 `supported / unsupported` 중 하나로 판정한다.
+- `supported` route는 Naver News Search API를 기본 검색 provider로 사용한다.
 - Tavily Search는 한국 뉴스 보조 검색 provider로 사용하고, Tavily Extract는 본문 추출 provider로 사용한다.
 - `unsupported` route는 뉴스성 또는 사실성 검토 대상이 아니거나 provider로 근거 수집이 불가능한 check에만 사용하며, `out_of_scope` answer job으로 기록한다.
 - 네이버 뉴스 검색 결과는 `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화하고, evidence snippet 생성을 위한 본문 확보는 기존 source fetch/extraction 계층에서 처리한다.
@@ -208,16 +208,26 @@
 ## 2026-04-27
 
 ### Answer Summary Copy
-- `rule_based_preview`의 `analysisSummary`는 신규 LLM 호출 없이 기존 source, evidence snippet, source stance, search plan purpose를 기반으로 생성한다.
+- 이 결정은 2026-04-30의 OpenAI Answer Summary 결정으로 대체되었다.
+- 당시 `rule_based_preview`의 `analysisSummary`는 신규 LLM 호출 없이 기존 source, evidence snippet, source stance, search plan purpose를 기반으로 생성하기로 했다.
 - summary는 지지/충돌/맥락 카운트 나열보다 사용자 질문에 대한 직접 답변, 최신 업데이트 신호, 공식 출처 여부, 남은 불확실성을 우선 설명한다.
 - API 응답 shape, DB schema, Prisma migration은 변경하지 않는다.
 
 ### Evidence Signal Consensus
-- 요약 문장은 DB에 저장하지 않는다.
+- 이 결정의 요약 문장 저장 방식은 2026-04-30의 OpenAI Answer Summary 결정으로 대체되었다.
 - OpenAI는 answer 생성 시점에 source/evidence별 signal만 structured output으로 분류한다.
 - `EvidenceSnippet.stance`에는 UI/호환용 `support`, `conflict`, `context`, `unknown` 값을 저장하고, 상세 signal은 `answer_jobs.handoff_payload.evidenceSignals[]`에 저장한다.
-- `/answers/:answerId` 조회 시에는 OpenAI를 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`, `analysisSummary`를 계산한다.
+- `/answers/:answerId` 조회 시에는 OpenAI를 호출하지 않고 저장된 signal과 source trace로 `sourceStances`, `consensusLevel`을 계산한다.
 - scheduled event에서 최신 `latest_update/current_status` signal이 `weakens` 또는 `overrides`이면 과거 support가 많아도 합의성을 낮게 표시한다.
+
+## 2026-04-30
+
+### OpenAI Answer Summary
+- answer result 화면의 `analysisSummary`, `uncertaintySummary`, `uncertaintyItems`는 규칙 기반 문장 조립 대신 OpenAI structured output으로 생성한다.
+- summary 생성은 relevance / evidence signal 분류와 같은 OpenAI 호출에서 함께 처리한다.
+- 생성된 summary는 `answer_jobs.handoff_payload.answerSummary`에 저장하고, `/answers/:answerId` 조회 시 OpenAI를 다시 호출하지 않는다.
+- `sourceStances`, `verdict`, `confidenceScore`, `consensusLevel`, count, source breakdown은 기존 API 계약 유지를 위해 서버에서 파생한다.
+- DB schema와 API 응답 shape는 변경하지 않는다.
 
 ## 2026-04-28
 
@@ -239,7 +249,7 @@
 - DB schema, Prisma migration, 공개 API 응답 shape는 이번 결정으로 변경하지 않는다.
 
 ### Answer Preview Latency Reduction
-- Naver News Search는 query별 상위 10개를 병렬로 요청하되, timeout은 코드에서 최대 8초로 제한한다.
+- Naver News Search는 query별 상위 8개를 병렬로 요청하되, timeout은 코드에서 최대 8초로 제한한다.
 - 일부 Naver query가 실패해도 성공한 query 결과가 있으면 전체 answer를 실패시키지 않고 partial source pool로 계속 진행한다.
 - Tavily Search는 Naver 후보가 15건 미만일 때만 fallback으로 호출하며, timeout은 최대 8초로 제한한다.
 - relevance filtering과 evidence signal classification은 별도 OpenAI 호출로 나누지 않고 단일 structured output 호출로 처리한다.
@@ -248,9 +258,9 @@
 - 2026-04-21 Search Provider Routing의 해외/글로벌 뉴스 route는 신규 생성 기준에서 사용하지 않는다.
 - MVP 검토 범위는 정치·경제 check으로 고정한다.
 - 해외/글로벌 뉴스 check은 정치·경제 주제라도 `unsupported/out_of_scope`로 처리한다.
-- 신규 answer 생성 기준 `search_route`는 `news / unsupported`만 사용한다.
+- 신규 answer 생성 기준 `search_route`는 `supported / unsupported`만 사용한다.
 - OpenAI는 query refinement 전에 scope gate를 먼저 수행하고, 정치·경제 뉴스성 check이 아니면 search plan/query 생성을 생략한 뒤 `out_of_scope`로 저장한다.
-- Tavily Search는 제거하지 않고 `news`에서 Naver 후보가 부족할 때만 실행되는 뉴스 보조 source search provider로 사용한다.
+- Tavily Search는 제거하지 않고 `supported`에서 Naver 후보가 부족할 때만 실행되는 뉴스 보조 source search provider로 사용한다.
 - Tavily Search는 코드에 고정된 trusted news domain registry 기반 include domain으로 제한하고, 신뢰할 수 있는 출처로 확인되는 후보만 유지한다.
 - source별 수집 API는 `sources.source_provider`에 저장하고, DB 기반 `source_domain_registry` 테이블과 `sources.domain_registry_id`는 코드 고정 registry 전환에 따라 제거한다.
 - `TAVILY_API_KEY`, `TAVILY_SEARCH_TIMEOUT_MS`, `TAVILY_EXTRACT_TIMEOUT_MS` 설정을 유지한다.
@@ -283,6 +293,13 @@
 - 이번 변경은 공개 API 응답 shape, DB schema, Prisma migration을 변경하지 않는다.
 
 ## 2026-04-30
+
+### Query Refinement Answer Type
+- `search_route` 값에서 `news`를 제거하고 신규 answer 생성 기준 `supported / unsupported`만 사용한다.
+- 한국 정치·경제 뉴스성 check은 `supported`, 지원 범위 밖 check은 `unsupported/out_of_scope`로 처리한다.
+- query refinement는 `answerType`을 함께 반환하며 값은 `short_answer / descriptive_answer`로 제한한다.
+- `answerType`은 답변 표현 방식 분류용이며 source search provider 선택에는 사용하지 않는다.
+- Naver News Search는 query별 `display=8`, `sort=sim`으로 요청한다.
 
 ### Check/Answer Naming Migration
 - 제품 및 코드 용어에서 검토 대상 입력 단위는 `check`, 검토 결과 단위는 `answer`로 통일한다.

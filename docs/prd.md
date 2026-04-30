@@ -147,7 +147,7 @@ MVP 기준 현재 출처 범위:
 
 ### 10.4 Structured Answer Result
 
-- 수집된 출처와 evidence signal만 기반으로 `rule_based_preview` result를 생성한다.
+- 수집된 출처와 evidence signal을 기반으로 preview result를 생성하고, 핵심 해석과 불확실성 summary는 OpenAI structured output으로 만든다.
 - 결과에는 verdict, 핵심 해석, 불확실성이 포함된다.
 
 ### 10.5 Source Comparison
@@ -165,6 +165,7 @@ MVP 기준 현재 출처 범위:
 - 시스템은 정치·경제 뉴스성 check인지 자동 판정해야 한다.
 - 시스템은 check의 `search_route`를 판정하고, `unsupported`이면 verdict를 만들지 않고 지원 범위 밖 상태로 기록해야 한다.
 - 현재 구현에서 공개 API 기준 authoritative field는 `search_route`이며, 판정 이유는 `search_route_reason`으로 설명해야 한다.
+- 시스템은 query refinement에서 `answerType`을 `short_answer` 또는 `descriptive_answer`로 분류해야 한다.
 - 시스템은 `search_route`와 별도로 검증 목적별 `search_plan`을 생성해야 한다.
 - 시스템은 Naver 후보가 충분하면 Tavily를 호출하지 않아야 한다.
 - 사용자는 검토가 끝난 뒤 결과 페이지로 이동할 수 있어야 한다.

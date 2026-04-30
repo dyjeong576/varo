@@ -1,7 +1,8 @@
 export type AnswerRelevanceTier = "primary" | "reference" | "discard";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
-export type SearchRoute = "news" | "unsupported";
+export type SearchRoute = "supported" | "unsupported";
 export type SearchProvider = "naver-search" | "tavily-search";
+export type AnswerResponseType = "short_answer" | "descriptive_answer";
 export type SourcePoliticalLean =
   | "progressive"
   | "centrist"
@@ -100,6 +101,7 @@ export interface QueryRefinementResult {
   coreCheck: string;
   normalizedCheck: string;
   checkType: AnswerCheckType;
+  answerType: AnswerResponseType;
   searchPlan: SearchPlan;
   generatedQueries: QueryArtifact[];
   searchRoute: SearchRoute;
@@ -123,6 +125,7 @@ export interface RelevanceSignalClassificationInput {
 export interface RelevanceSignalClassificationResult {
   relevanceCandidates: SearchCandidate[];
   evidenceSignals: EvidenceSignal[];
+  answerSummary?: AnswerGeneratedSummary | null;
 }
 
 export interface ExtractedSource {
@@ -157,4 +160,10 @@ export interface EvidenceSignal {
   updateType: EvidenceSignalUpdateType;
   currentAnswerImpact: EvidenceSignalImpact;
   reason: string;
+}
+
+export interface AnswerGeneratedSummary {
+  analysisSummary: string;
+  uncertaintySummary: string;
+  uncertaintyItems: string[];
 }

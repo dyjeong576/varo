@@ -136,7 +136,7 @@ export class AnswersNaverClient {
 
     return {
       id: `naver-${queryId}-c${rank}`,
-      searchRoute: "news",
+      searchRoute: "supported",
       sourceProvider: "naver-search",
       sourceType: "news",
       publisherName: this.inferPublisherName(canonicalUrl),

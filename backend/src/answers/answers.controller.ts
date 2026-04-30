@@ -36,7 +36,7 @@ import { AnswerReopenResponseDto } from "./dto/answer-reopen-response.dto";
 import { AnswerPreviewSummaryResponseDto } from "./dto/answer-preview-summary-response.dto";
 import { AnswersService } from "./answers.service";
 
-@ApiTags("리뷰 / 질의 처리")
+@ApiTags("answer / 질의 처리")
 @Controller("answers")
 export class AnswersController {
   constructor(

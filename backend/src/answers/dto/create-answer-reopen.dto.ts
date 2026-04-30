@@ -6,7 +6,7 @@ export type AnswerReopenSource = (typeof ANSWER_REOPEN_SOURCES)[number];
 
 export class CreateAnswerReopenDto {
   @ApiProperty({
-    description: "리뷰 재진입 source",
+    description: "answer 재진입 source",
     enum: ANSWER_REOPEN_SOURCES,
     example: "popular",
   })

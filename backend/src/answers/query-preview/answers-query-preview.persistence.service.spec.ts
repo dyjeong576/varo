@@ -213,6 +213,7 @@ describe("AnswersQueryPreviewPersistenceService", () => {
         coreCheck: "한국은행 기준금리 동결",
         normalizedCheck: "한국은행이 기준금리를 동결했다",
         checkType: "policy",
+        answerType: "short_answer",
         searchPlan: {
           queries: [
             {
@@ -224,14 +225,14 @@ describe("AnswersQueryPreviewPersistenceService", () => {
           ],
         },
         generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
-        searchRoute: "news",
+        searchRoute: "supported",
         searchRouteReason: "한국 경제 뉴스 check입니다.",
       },
       generatedQueries: [{ id: "q1", text: "한국은행 기준금리 동결", rank: 1 }],
       candidates: [
         {
           id: "c1",
-          searchRoute: "news",
+          searchRoute: "supported",
           sourceProvider: "naver-search",
           sourceType: "news",
           publisherName: "연합뉴스",
@@ -280,6 +281,7 @@ describe("AnswersQueryPreviewPersistenceService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
+        answerType: "descriptive_answer",
         searchPlan: {
           queries: [
             {
@@ -449,6 +451,7 @@ describe("AnswersQueryPreviewPersistenceService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
+        answerType: "descriptive_answer",
         searchPlan: {
           queries: [
             {

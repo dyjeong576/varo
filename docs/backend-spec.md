@@ -37,9 +37,9 @@
 
 - check 접수
 - source 검색과 수집
-- relevance와 evidence signal 통합 분류
+- relevance, evidence signal, summary 통합 생성
 - preview detail 생성
-- preview artifact 기반 `rule_based_preview` 결과 계산
+- 저장된 summary와 preview artifact 기반 결과 계산
 - answer 상태 조회
 
 ### 3.4 Community
@@ -120,10 +120,10 @@
 3. `unsupported`이면 `out_of_scope` 저장 후 종료
 4. `news`이면 Naver News Search 우선 검색
 5. Naver 후보가 15건 미만이면 Tavily Search fallback 호출
-6. canonical URL 기준 dedup 후 relevance와 evidence signal을 단일 OpenAI 호출로 분류
+6. canonical URL 기준 dedup 후 relevance, evidence signal, summary를 단일 OpenAI 호출로 생성
 7. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
-8. source와 `handoff_payload.evidenceSignals[]` 저장
-9. preview artifact 기반 `rule_based_preview` 결과 계산
+8. source, `handoff_payload.evidenceSignals[]`, `handoff_payload.answerSummary` 저장
+9. 저장된 summary와 preview artifact 기반 결과 계산
 10. 완료 알림 생성
 11. history 반영
 12. 인기 집계 입력 반영
@@ -145,13 +145,14 @@
 
 - 결과는 `check`, `evidence`, `interpretation`, `uncertainty`를 분리한다.
 - verdict는 기사 수나 단순 agreement score가 아니라 evidence 구조와 query purpose별 근거 성격을 바탕으로 계산한다.
-- 결과 화면용 summary는 내부 카운트 나열이 아니라 사용자 질문에 직접 답하는 문장으로 작성하고, 최신 출처, 업데이트/정정 신호, 공식 출처 여부, 남은 불확실성을 함께 설명한다.
-- OpenAI는 answer 생성 시점에 relevance와 evidence signal을 단일 structured output 호출로 구조화하며, 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`, `analysisSummary`는 저장된 source와 signal trace를 기준으로 백엔드가 계산한다.
-- 요약 문장 자체는 DB에 저장하지 않고, `answer_jobs.handoff_payload.evidenceSignals[]`를 계산 입력으로 유지한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
+- 결과 화면용 summary는 OpenAI structured output으로 생성하고, 내부 카운트 나열이 아니라 사용자 질문에 직접 답하는 문장으로 작성한다.
+- OpenAI는 answer 생성 시점에 relevance, evidence signal, summary를 단일 structured output 호출로 구조화한다.
+- 생성 응답과 조회 시점의 `consensusLevel`, `sourceStances`는 저장된 source와 signal trace를 기준으로 백엔드가 계산하고, summary는 `answer_jobs.handoff_payload.answerSummary` 저장값을 우선 사용한다. 현재 preview 경로에서는 본문 추출을 하지 않으므로 `evidence_snippets` row가 없을 수 있다.
 - 동일 오보 재인용은 dedup 대상이다.
 - source와 snippet까지 추적 가능해야 한다.
 - 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 판정 이유는 `search_route_reason`에 남긴다.
 - OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 check**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
+- OpenAI는 답변 형태를 `answerType=short_answer/descriptive_answer`로 함께 분류한다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 check은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - **한국 정치·경제 뉴스성 check**은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
@@ -161,7 +162,7 @@
 ### 6.4 현재 API 책임
 
 - `POST /api/v1/answers/query-processing-preview` 요청 안에서 동기적으로 preview 파이프라인을 실행한다.
-- search provider 호출, relevance와 evidence signal 통합 분류, source/handoff 저장을 처리한다.
+- search provider 호출, relevance/evidence signal/summary 통합 생성, source/handoff 저장을 처리한다.
 - source fetch / 본문 추출과 OpenAI structured final interpretation 저장은 현재 preview 경로에서 수행하지 않는다.
 - 단계별 소요시간은 backend logger에 남긴다.
 
@@ -328,7 +329,7 @@
 
 - **한국 정치·경제 뉴스성 check**의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
-- search plan query별 상위 10개를 요청한다.
+- search plan query별 상위 8개를 요청한다.
 - Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
 - Naver 후보가 15건 이상이면 Tavily Search fallback을 호출하지 않는다.
 - `dev`에서는 mock 가능
@@ -346,9 +347,9 @@
 
 ### 10.4 OpenAI Structured Outputs
 
-- answer 도메인의 query refinement, relevance와 evidence signal 통합 분류
+- answer 도메인의 query refinement, relevance/evidence signal/summary 통합 생성
 - 입력에 없는 사실을 생성하지 않도록 제한
-- relevance/evidence signal 통합 분류는 사실 결론을 내리지 않고, source/raw snippet이 현재 질문에 대해 `supports`, `contradicts`, `updates`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
+- relevance/evidence signal 분류는 사실 결론을 내리지 않고, source/raw snippet이 현재 질문에 대해 `supports`, `contradicts`, `updates`, `context`, `unknown` 중 어떤 역할을 하는지와 최신 변경/연기 신호 여부만 구조화한다.
 - structured final interpretation 생성은 현재 preview 경로가 아니라 후속 확장 범위다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용

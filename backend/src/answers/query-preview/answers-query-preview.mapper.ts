@@ -6,6 +6,7 @@ import {
   EvidenceSignalStance,
   EvidenceSignalTemporalRole,
   EvidenceSignalUpdateType,
+  AnswerGeneratedSummary,
   ExtractedSource,
   QueryPurpose,
   QueryArtifact,
@@ -55,6 +56,7 @@ interface QueryRefinementPayload {
   coreCheck: string;
   normalizedCheck: string;
   checkType: string;
+  answerType: string;
   searchPlan: SearchPlan | null;
   generatedQueries: QueryArtifact[];
   searchRoute?: string;
@@ -68,6 +70,7 @@ interface HandoffPayload {
   snippetIds: string[];
   insufficiencyReason: string | null;
   evidenceSignals: EvidenceSignal[];
+  answerSummary: AnswerGeneratedSummary | null;
 }
 
 const QUERY_PURPOSES: QueryPurpose[] = [
@@ -86,7 +89,6 @@ const ANSWER_CHECK_TYPES = [
   "incident",
   "general_fact",
 ];
-const SEARCH_ROUTES = ["news", "unsupported"];
 const EVIDENCE_SIGNAL_STANCES: EvidenceSignalStance[] = [
   "supports",
   "contradicts",
@@ -221,6 +223,7 @@ export function buildQueryRefinementPayload(
     coreCheck: refinement.coreCheck,
     normalizedCheck: refinement.normalizedCheck,
     checkType: refinement.checkType,
+    answerType: refinement.answerType,
     searchPlan: {
       queries: refinement.searchPlan.queries.map((query) => ({
         id: query.id,
@@ -253,6 +256,7 @@ export function buildHandoffPayload(
   insufficiencyReason: string | null,
   evidenceSignals: EvidenceSignal[] = [],
   sourcePoliticalLeans: Record<string, SourcePoliticalLean> = {},
+  answerSummary: AnswerGeneratedSummary | null = null,
 ): Prisma.InputJsonValue {
   return {
     coreCheck,
@@ -261,6 +265,7 @@ export function buildHandoffPayload(
     insufficiencyReason,
     evidenceSignals,
     sourcePoliticalLeans,
+    answerSummary,
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -300,7 +305,7 @@ function buildEvidenceSummary(sourceId: string, sources: Source[]): string | nul
 }
 
 function buildSearchProvider(searchRoute: string): string | null {
-  if (searchRoute === "news") {
+  if (searchRoute === "supported" || searchRoute === "news") {
     return "naver-search";
   }
 
@@ -321,6 +326,7 @@ export function mapPreviewResponse(params: {
   handoffSourceIds: string[];
   insufficiencyReason: string | null;
   evidenceSignals?: EvidenceSignal[];
+  answerSummary?: AnswerGeneratedSummary | null;
 }): AnswerQueryProcessingPreviewResponseDto {
   const assembledResult = assembleAnswerResult({
     coreCheck: params.refinement.coreCheck,
@@ -331,6 +337,7 @@ export function mapPreviewResponse(params: {
     checkType: params.refinement.checkType,
     searchPlan: params.refinement.searchPlan,
     evidenceSignals: params.evidenceSignals,
+    answerSummary: params.answerSummary,
   });
 
   return {
@@ -598,6 +605,27 @@ function parseEvidenceSignals(value: unknown): EvidenceSignal[] {
   });
 }
 
+function parseAnswerSummary(value: unknown): AnswerGeneratedSummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const analysisSummary = parseString(record.analysisSummary);
+  const uncertaintySummary = parseString(record.uncertaintySummary);
+  const uncertaintyItems = parseStringArray(record.uncertaintyItems).slice(0, 3);
+
+  if (!analysisSummary || !uncertaintySummary) {
+    return null;
+  }
+
+  return {
+    analysisSummary,
+    uncertaintySummary,
+    uncertaintyItems,
+  };
+}
+
 function parseQueryRefinementPayload(
   value: Prisma.JsonValue | null,
   normalizedCheck: string,
@@ -609,6 +637,7 @@ function parseQueryRefinementPayload(
       coreCheck: normalizedCheck,
       normalizedCheck,
       checkType: "general_fact",
+      answerType: "descriptive_answer",
       searchPlan: null,
       generatedQueries: [],
       searchRoute: "unsupported",
@@ -616,16 +645,15 @@ function parseQueryRefinementPayload(
     };
   }
 
-  const searchRoute = parseString(
-    payload.searchRoute,
-    "unsupported",
-  );
+  const rawSearchRoute = parseString(payload.searchRoute, "unsupported");
+  const searchRoute = rawSearchRoute === "news" ? "supported" : rawSearchRoute;
   const generatedQueries = parseGeneratedQueries(payload.generatedQueries);
 
   return {
     coreCheck: parseString(payload.coreCheck, normalizedCheck),
     normalizedCheck: parseString(payload.normalizedCheck, normalizedCheck),
     checkType: parseString(payload.checkType, "general_fact"),
+    answerType: parseString(payload.answerType, "descriptive_answer"),
     searchPlan: parseSearchPlan(payload.searchPlan),
     generatedQueries,
     searchRoute,
@@ -650,6 +678,7 @@ function parseHandoffPayload(
       snippetIds: evidenceSnippets.map((snippet) => snippet.id),
       insufficiencyReason: null,
       evidenceSignals: [],
+      answerSummary: null,
     };
   }
 
@@ -659,6 +688,7 @@ function parseHandoffPayload(
     snippetIds: parseStringArray(payload.snippetIds),
     insufficiencyReason: parseNullableString(payload.insufficiencyReason),
     evidenceSignals: parseEvidenceSignals(payload.evidenceSignals),
+    answerSummary: parseAnswerSummary(payload.answerSummary),
   };
 }
 
@@ -700,6 +730,7 @@ export function mapStoredPreviewResponse(
     checkType: refinement.checkType as QueryRefinementResult["checkType"],
     searchPlan: refinement.searchPlan,
     evidenceSignals: handoff.evidenceSignals,
+    answerSummary: handoff.answerSummary,
   });
   const result =
     answerJob.status === "out_of_scope" || answerJob.status === "searching"

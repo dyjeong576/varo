@@ -91,7 +91,8 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "한국 기준금리 동결",
                     normalizedCheck: "한국은행이 기준금리를 동결했다",
                     checkType: "policy",
-                    searchRoute: "news",
+                    answerType: "short_answer",
+                    searchRoute: "supported",
                     searchRouteReason:
                       "한국 경제 정책 관련 뉴스성 check입니다.",
                     searchPlan: {
@@ -143,6 +144,7 @@ describe("AnswersOpenAiClient", () => {
       "primary_source",
       "contradiction_or_update",
     ]);
+    expect(result.answerType).toBe("short_answer");
     // sp2는 check_specific 중복이므로 버려지고 current_state는 fallback 쿼리(coreCheck, index=1)로 채워진다
     expect(result.searchPlan.queries[1]?.query).toBe(
       "한국 기준금리 동결",
@@ -150,7 +152,7 @@ describe("AnswersOpenAiClient", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("check의 관할과 장소가 한국 정치 맥락이면 news route로 유지한다", async () => {
+  it("check의 관할과 장소가 한국 정치 맥락이면 supported route로 유지한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -163,7 +165,7 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "일론 머스크의 부산 국회의원 출마",
                     normalizedCheck: "일론 머스크가 부산에서 국회의원에 출마한다",
                     checkType: "scheduled_event",
-                    searchRoute: "news",
+                    searchRoute: "supported",
                     searchPlan: {
                       queries: [
                         {
@@ -207,11 +209,11 @@ describe("AnswersOpenAiClient", () => {
       "일론머스크가 부산 국회의원 출마한다는게 사실이야?",
     );
 
-    expect(result.searchRoute).toBe("news");
+    expect(result.searchRoute).toBe("supported");
     expect(result.searchPlan.queries).toHaveLength(4);
   });
 
-  it("해외 기업명으로 시작해도 한국 시장 영향 check이면 news route로 유지한다", async () => {
+  it("해외 기업명으로 시작해도 한국 시장 영향 check이면 supported route로 유지한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
         jsonData: {
@@ -224,7 +226,7 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "해외 기업의 한국 서비스 종료",
                     normalizedCheck: "해외 기업이 한국에서 서비스를 종료한다",
                     checkType: "corporate_action",
-                    searchRoute: "news",
+                    searchRoute: "supported",
                     searchPlan: {
                       queries: [
                         {
@@ -268,7 +270,7 @@ describe("AnswersOpenAiClient", () => {
       "어떤 해외 기업이 한국 서비스 접는다는 게 사실이야?",
     );
 
-    expect(result.searchRoute).toBe("news");
+    expect(result.searchRoute).toBe("supported");
   });
 
   it("structured output text를 evidence signal 결과로 변환한다", async () => {
@@ -369,6 +371,13 @@ describe("AnswersOpenAiClient", () => {
                         currentAnswerImpact: "neutral",
                       },
                     ],
+                    answerSummary: {
+                      analysisSummary:
+                        "수집된 출처 기준으로는 최신 보도에서 일정 연기 신호가 확인됩니다.",
+                      uncertaintySummary:
+                        "공식 원문 확인 여부에 따라 해석이 달라질 수 있습니다.",
+                      uncertaintyItems: ["검색 결과 스니펫 중심의 검토입니다."],
+                    },
                   }),
                 },
               ],
@@ -383,12 +392,12 @@ describe("AnswersOpenAiClient", () => {
       "openai-test-key",
       {
         coreCheck: "테슬라가 2026년 4월에 로드스터 차량을 공개한다",
-        searchRoute: "news",
+        searchRoute: "supported",
         searchPlan: null,
         candidates: [
           {
             id: "candidate-1",
-            searchRoute: "news",
+            searchRoute: "supported",
             sourceProvider: "naver-search",
             sourceType: "news",
             publisherName: "Reuters",
@@ -404,7 +413,7 @@ describe("AnswersOpenAiClient", () => {
           },
           {
             id: "candidate-2",
-            searchRoute: "news",
+            searchRoute: "supported",
             sourceProvider: "naver-search",
             sourceType: "news",
             publisherName: "한국경제",
@@ -453,5 +462,6 @@ describe("AnswersOpenAiClient", () => {
         reason: "최신 연기 보도입니다.",
       },
     ]);
+    expect(result.answerSummary?.analysisSummary).toContain("최신 보도");
   });
 });

@@ -77,7 +77,7 @@ describe("answers utils", () => {
   it("중복 후보 병합 시 정치 성향 메타데이터를 유지한다", () => {
     const baseCandidate = {
       id: "c1",
-      searchRoute: "news",
+      searchRoute: "supported",
 
       sourceProvider: "naver-search",
       sourceType: "news",

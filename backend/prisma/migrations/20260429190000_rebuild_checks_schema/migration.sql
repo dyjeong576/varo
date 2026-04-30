@@ -1,0 +1,4 @@
+-- Historical local migration placeholder.
+-- This migration had already been applied to the local development database
+-- before the check/answer split was finalized. The follow-up migration
+-- 20260430090000_rename_claim_review_to_check_answer normalizes that shape.

@@ -12,6 +12,7 @@ import { NotificationsService } from "../../notifications/notifications.service"
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   EvidenceSignal,
+  AnswerGeneratedSummary,
   QueryArtifact,
   QueryRefinementResult,
   SearchCandidate,
@@ -32,6 +33,7 @@ interface PersistQueryPreviewResultInput {
   generatedQueries: QueryArtifact[];
   relevanceCandidates: SearchCandidate[];
   evidenceSignals?: EvidenceSignal[];
+  answerSummary?: AnswerGeneratedSummary | null;
   primaryExtractionLimit: number;
   existingSources?: Source[];
 }
@@ -50,6 +52,7 @@ export interface PersistedQueryPreviewArtifacts {
   handoffSourceIds: string[];
   insufficiencyReason: string | null;
   evidenceSignals: EvidenceSignal[];
+  answerSummary: AnswerGeneratedSummary | null;
 }
 
 export interface PersistedOutOfScopeAnswer {
@@ -234,7 +237,7 @@ export class AnswersQueryPreviewPersistenceService {
     if (!answerJob) {
       throw new AppException(
         APP_ERROR_CODES.NOT_FOUND,
-        "리뷰를 찾을 수 없습니다.",
+        "answer를 찾을 수 없습니다.",
         HttpStatus.NOT_FOUND,
       );
     }
@@ -261,7 +264,7 @@ export class AnswersQueryPreviewPersistenceService {
       if (!answerJob) {
         throw new AppException(
           APP_ERROR_CODES.NOT_FOUND,
-          "리뷰를 찾을 수 없습니다.",
+          "answer를 찾을 수 없습니다.",
           HttpStatus.NOT_FOUND,
         );
       }
@@ -324,7 +327,7 @@ export class AnswersQueryPreviewPersistenceService {
     if (!answerJob || !answerJob.handoffPayload) {
       throw new AppException(
         APP_ERROR_CODES.NOT_FOUND,
-        "리뷰를 찾을 수 없습니다.",
+        "answer를 찾을 수 없습니다.",
         HttpStatus.NOT_FOUND,
       );
     }
@@ -426,6 +429,7 @@ export class AnswersQueryPreviewPersistenceService {
       insufficiencyReason,
       evidenceSignals,
       sourcePoliticalLeans,
+      input.answerSummary ?? null,
     );
 
     await this.prisma.answerJob.update(
@@ -456,6 +460,7 @@ export class AnswersQueryPreviewPersistenceService {
       handoffSourceIds,
       insufficiencyReason,
       evidenceSignals,
+      answerSummary: input.answerSummary ?? null,
     };
   }
 

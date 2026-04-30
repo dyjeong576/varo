@@ -87,7 +87,7 @@ export class AnswersQueryPreviewService {
       this.logStageDuration("query_refinement", refinementStartedAt, answerJob.id);
       const generatedQueries = refinement.generatedQueries;
       const searchRoute =
-        refinement.searchRoute === "news" ? "news" : "unsupported";
+        refinement.searchRoute === "unsupported" ? "unsupported" : "supported";
       const sourceQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
@@ -152,6 +152,7 @@ export class AnswersQueryPreviewService {
           generatedQueries,
           relevanceCandidates,
           evidenceSignals,
+          answerSummary: relevanceSignalResult.answerSummary ?? null,
           primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
         });
 
@@ -169,6 +170,7 @@ export class AnswersQueryPreviewService {
         handoffSourceIds: persistedArtifacts.handoffSourceIds,
         insufficiencyReason: persistedArtifacts.insufficiencyReason,
         evidenceSignals: persistedArtifacts.evidenceSignals,
+        answerSummary: persistedArtifacts.answerSummary,
       });
     } catch (error) {
       this.logger.error(
@@ -233,7 +235,7 @@ export class AnswersQueryPreviewService {
       this.logStageDuration("query_refinement", refinementStartedAt, answerJob.id);
       const generatedQueries = refinement.generatedQueries;
       const searchRoute =
-        refinement.searchRoute === "news" ? "news" : "unsupported";
+        refinement.searchRoute === "unsupported" ? "unsupported" : "supported";
       const sourceQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
@@ -344,7 +346,7 @@ export class AnswersQueryPreviewService {
       const relevanceSignalResult =
         await this.providersService.classifyRelevanceAndEvidenceSignals({
           coreCheck: params.refinement.coreCheck,
-          searchRoute: "news",
+          searchRoute: params.refinement.searchRoute,
           searchPlan: params.refinement.searchPlan,
           candidates: params.candidates,
         });
@@ -365,6 +367,7 @@ export class AnswersQueryPreviewService {
         generatedQueries: params.generatedQueries,
         relevanceCandidates: relevanceSignalResult.relevanceCandidates,
         evidenceSignals,
+        answerSummary: relevanceSignalResult.answerSummary ?? null,
         primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
         existingSources: params.existingSources,
       });

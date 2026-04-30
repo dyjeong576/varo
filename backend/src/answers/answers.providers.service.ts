@@ -18,7 +18,7 @@ import {
 } from "./answers.types";
 import { selectDomainsForBucket } from "./answers.utils";
 
-const NAVER_SEARCH_DISPLAY = 10;
+const NAVER_SEARCH_DISPLAY = 8;
 const NAVER_SUFFICIENT_SOURCE_COUNT = 15;
 const NAVER_SEARCH_TIMEOUT_CAP_MS = 8000;
 const TAVILY_FALLBACK_SOFT_TIMEOUT_MS = 8000;
@@ -40,9 +40,9 @@ export class AnswersProvidersService {
   }
 
   async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
-    const searchRoute = input.searchRoute ?? "news";
+    const searchRoute = input.searchRoute ?? "supported";
 
-    if (searchRoute === "news") {
+    if (searchRoute === "supported") {
       const clientId = this.getRequiredNaverClientId();
       const clientSecret = this.getRequiredNaverClientSecret();
       const timeoutMs = Math.min(this.getNaverSearchTimeoutMs(), NAVER_SEARCH_TIMEOUT_CAP_MS);

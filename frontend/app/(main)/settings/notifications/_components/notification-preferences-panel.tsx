@@ -23,7 +23,7 @@ const preferenceItems: PreferenceItem[] = [
   {
     key: "answerCompleted",
     title: "answer 완료 알림",
-    description: "요청한 리뷰가 준비되면 알림 목록과 상단 배지로 알려드려요.",
+    description: "요청한 answer가 준비되면 알림 목록과 상단 배지로 알려드려요.",
     icon: BellRing,
   },
   {

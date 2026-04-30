@@ -68,7 +68,7 @@ describe("AnswersProvidersService", () => {
 
     await expect(
       service.searchSources({
-        searchRoute: "news",
+        searchRoute: "supported",
         queries: [{ id: "q1", text: "테슬라 한국 철수", rank: 1 }],
         coreCheck: "테슬라 한국 철수",
         domainRegistry: [],
@@ -118,6 +118,7 @@ describe("AnswersProvidersService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
+        answerType: "descriptive_answer",
         searchPlan: { queries: [] },
         generatedQueries: [],
         searchRoute: "unsupported",
@@ -134,13 +135,13 @@ describe("AnswersProvidersService", () => {
     expect(result.coreCheck).toBe("트럼프의 관세 발표");
   });
 
-  it("searchSources는 searchRoute가 news이면 Naver 검색 후 필요시 TavilyFallback을 호출한다", async () => {
+  it("searchSources는 searchRoute가 supported이면 Naver 검색 후 필요시 TavilyFallback을 호출한다", async () => {
     const naverSpy = jest
       .spyOn(AnswersNaverClient.prototype, "searchNews")
       .mockResolvedValue([
         {
           id: "naver-q2-c1",
-          searchRoute: "news",
+          searchRoute: "supported",
           sourceProvider: "naver-search",
           sourceType: "news",
           publisherName: "yna.co.kr",
@@ -160,7 +161,7 @@ describe("AnswersProvidersService", () => {
       .mockResolvedValue([
         {
           id: "q2-fallback-c1",
-          searchRoute: "news",
+          searchRoute: "supported",
           sourceProvider: "tavily-search",
           sourceType: "news",
           publisherName: "yna.co.kr",
@@ -183,7 +184,7 @@ describe("AnswersProvidersService", () => {
     });
 
     const result = await service.searchSources({
-      searchRoute: "news",
+      searchRoute: "supported",
       queries: [{ id: "q2", text: "테슬라 한국 철수", rank: 1 }],
       coreCheck: "테슬라 한국 철수",
       domainRegistry: [
@@ -223,6 +224,9 @@ describe("AnswersProvidersService", () => {
     });
 
     expect(naverSpy).toHaveBeenCalled();
+    expect(naverSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ display: 8 }),
+    );
     expect(searchSourcesSpy).toHaveBeenCalled();
     expect(result.length).toBe(2);
     expect(result[1]?.sourceProvider).toBe("tavily-search");
@@ -283,7 +287,7 @@ describe("AnswersProvidersService", () => {
 
     await expect(
       service.searchSources({
-        searchRoute: "news",
+        searchRoute: "supported",
         queries: [{ id: "q1", text: "한국은행 기준금리", rank: 1 }],
         coreCheck: "한국은행 기준금리",
         domainRegistry: [],

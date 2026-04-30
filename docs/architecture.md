@@ -47,9 +47,9 @@ VARO는 아래 도메인으로 구성한다.
 ### 4.2 Answer & Evidence Pipeline
 - check 입력
 - source 검색 및 수집
-- relevance와 evidence signal 통합 분류
+- relevance, evidence signal, summary 통합 생성
 - preview detail 생성
-- preview artifact 기반 verdict / interpretation / uncertainty 계산
+- 저장된 summary와 preview artifact 기반 verdict / interpretation / uncertainty 구성
 - 결과 페이지 렌더링
 
 ### 4.3 Community & Participation

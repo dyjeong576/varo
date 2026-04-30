@@ -12,6 +12,7 @@ import {
   EvidenceSignalUpdateType,
   QueryRefinementResult,
   AnswerCheckType,
+  AnswerResponseType,
   RelevanceSignalClassificationInput,
   RelevanceSignalClassificationResult,
   AnswerRelevanceTier,
@@ -19,6 +20,7 @@ import {
   SearchPlan,
   SearchPlanQueryArtifact,
   SearchRoute,
+  AnswerGeneratedSummary,
 } from "../answers.types";
 import { postJson } from "./answers-provider-http";
 
@@ -26,8 +28,9 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
-const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 2400;
-const SEARCH_ROUTES: SearchRoute[] = ["news", "unsupported"];
+const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 3200;
+const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported"];
+const ANSWER_TYPES: AnswerResponseType[] = ["short_answer", "descriptive_answer"];
 const CHECK_TYPES: AnswerCheckType[] = [
   "scheduled_event",
   "current_status",
@@ -87,6 +90,7 @@ interface OpenAiQueryRefinementPayload {
   coreCheck: string;
   normalizedCheck: string;
   checkType: AnswerCheckType;
+  answerType: AnswerResponseType;
   searchPlan: OpenAiSearchPlanPayload;
   searchRoute: SearchRoute;
 }
@@ -122,6 +126,7 @@ interface OpenAiRelevanceSignalDecision {
 
 interface OpenAiRelevanceSignalPayload {
   decisions: OpenAiRelevanceSignalDecision[];
+  answerSummary: AnswerGeneratedSummary;
 }
 
 @Injectable()
@@ -145,6 +150,7 @@ export class AnswersOpenAiClient {
               "coreCheck",
               "normalizedCheck",
               "checkType",
+              "answerType",
               "searchRoute",
               "searchPlan",
             ],
@@ -154,6 +160,10 @@ export class AnswersOpenAiClient {
               checkType: {
                 type: "string",
                 enum: CHECK_TYPES,
+              },
+              answerType: {
+                type: "string",
+                enum: ANSWER_TYPES,
               },
               searchRoute: {
                 type: "string",
@@ -198,14 +208,17 @@ export class AnswersOpenAiClient {
 - coreCheck: 핵심 주장
 - normalizedCheck: 검증 가능한 형태로 정규화한 주장
 - checkType: scheduled_event | current_status | statistic | quote | policy | corporate_action | incident | general_fact
+- answerType:
+  - short_answer: 예/아니오, 수치, 현재 상태처럼 한두 문장으로 답할 수 있는 check
+  - descriptive_answer: 배경, 맥락, 조건, 여러 source 비교가 필요한 check
 - searchRoute:
-  - news: 한국 정치·경제 뉴스성 check (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
+  - supported: 한국 정치·경제 뉴스성 check (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
   - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천·순수 의견·미래 예측
 - route는 인물/기업의 국적보다 check이 다루는 사건·제도·영향의 관할, 장소, 시장을 우선해 판정.
-- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 news.
+- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 supported.
 
 ## searchPlan.queries
-news면 정확히 4개, unsupported면 빈 배열.
+supported면 정확히 4개, unsupported면 빈 배열.
 
 네이버 뉴스 검색 쿼리 원칙:
 - 기사 제목에 실제로 등장할 법한 핵심 키워드 조합
@@ -236,7 +249,11 @@ news면 정확히 4개, unsupported면 빈 배열.
     const checkType = CHECK_TYPES.includes(payload.checkType)
       ? payload.checkType
       : "general_fact";
-    const searchRoute = payload.searchRoute === "news" ? "news" : "unsupported";
+    const answerType = ANSWER_TYPES.includes(payload.answerType)
+      ? payload.answerType
+      : "descriptive_answer";
+    const searchRoute =
+      payload.searchRoute === "unsupported" ? "unsupported" : "supported";
 
     let searchPlan: SearchPlan;
     let generatedQueries: QueryArtifact[];
@@ -258,6 +275,7 @@ news면 정확히 4개, unsupported면 빈 배열.
       coreCheck,
       normalizedCheck,
       checkType,
+      answerType,
       searchPlan,
       generatedQueries,
       searchRoute,
@@ -283,7 +301,7 @@ news면 정확히 4개, unsupported면 빈 배열.
           schema: {
             type: "object",
             additionalProperties: false,
-            required: ["decisions"],
+            required: ["decisions", "answerSummary"],
             properties: {
               decisions: {
                 type: "array",
@@ -325,18 +343,40 @@ news면 정확히 4개, unsupported면 빈 배열.
                   },
                 },
               },
+              answerSummary: {
+                type: "object",
+                additionalProperties: false,
+                required: [
+                  "analysisSummary",
+                  "uncertaintySummary",
+                  "uncertaintyItems",
+                ],
+                properties: {
+                  analysisSummary: { type: "string" },
+                  uncertaintySummary: { type: "string" },
+                  uncertaintyItems: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                },
+              },
             },
           },
         },
         [
           {
             role: "system",
-            content: `뉴스 소스의 관련성(relevanceTier) 및 증거 신호(Evidence Signal)를 분류하세요.
+            content: `뉴스 소스의 관련성(relevanceTier), 증거 신호(Evidence Signal), 결과 화면용 summary를 생성하세요.
 
 1. Relevance: primary(직접 근거), reference(보조), discard(무관) 중 선택. 사유는 60자 이내.
 2. Signal: core check에 대한 stance(지지/반박 등), 시점 역할(예정/현황/최신), 업데이트 유형, 임팩트를 판정합니다.
-3. 규칙:
-   - 사실 여부 결론을 내리지 말고 '소스의 역할'만 기술하세요.
+3. Summary:
+   - analysisSummary는 한국어 2~4문장으로 작성하세요.
+   - 수집된 제목/스니펫/source metadata에 근거한 해석만 쓰고, 원문에 없는 사실이나 출처는 만들지 마세요.
+   - 절대적 진실 판정처럼 쓰지 말고 "수집된 출처 기준"의 표현을 유지하세요.
+   - uncertaintySummary는 1문장, uncertaintyItems는 구체적인 한계 1~3개로 작성하세요.
+4. 규칙:
+   - source별 signal에서는 사실 여부 결론을 내리지 말고 '소스의 역할'만 기술하세요.
    - discard인 경우: stance=unknown, temporal=background, update=none, impact=neutral로 설정.
    - scheduled_event: 과거 계획과 현재 최신 상태를 엄격히 구분하고, 취소/연기/정정 신호를 포착하세요.`,
           },
@@ -412,7 +452,11 @@ news면 정확히 4개, unsupported면 빈 배열.
       ];
     });
 
-    return { relevanceCandidates, evidenceSignals };
+    return {
+      relevanceCandidates,
+      evidenceSignals,
+      answerSummary: this.normalizeAnswerSummary(payload.answerSummary),
+    };
   }
 
   async classifyEvidenceSignals(
@@ -518,6 +562,23 @@ news면 정확히 4개, unsupported면 빈 배열.
 
   private normalizeText(value: unknown, fallback: string): string {
     return typeof value === "string" && value.trim() ? value.trim() : fallback.trim();
+  }
+
+  private normalizeAnswerSummary(summary: AnswerGeneratedSummary): AnswerGeneratedSummary {
+    return {
+      analysisSummary: this.normalizeText(
+        summary.analysisSummary,
+        "수집된 출처 기준으로 검토 결과를 요약하기 어렵습니다.",
+      ),
+      uncertaintySummary: this.normalizeText(
+        summary.uncertaintySummary,
+        "추가 정보가 확인되면 해석이 달라질 수 있습니다.",
+      ),
+      uncertaintyItems: summary.uncertaintyItems
+        .filter((item) => typeof item === "string" && item.trim())
+        .map((item) => item.trim())
+        .slice(0, 3),
+    };
   }
 
   private normalizeSearchPlan(
@@ -765,7 +826,11 @@ news면 정확히 4개, unsupported면 빈 배열.
     payload: OpenAiRelevanceSignalPayload,
     candidates: SearchCandidate[],
   ): payload is OpenAiRelevanceSignalPayload {
-    if (!payload || !Array.isArray(payload.decisions)) {
+    if (
+      !payload ||
+      !Array.isArray(payload.decisions) ||
+      !this.isValidAnswerSummary(payload.answerSummary)
+    ) {
       return false;
     }
 
@@ -797,6 +862,21 @@ news면 정확히 4개, unsupported면 빈 배열.
     }
 
     return true;
+  }
+
+  private isValidAnswerSummary(value: unknown): value is AnswerGeneratedSummary {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+
+    const summary = value as Record<string, unknown>;
+
+    return (
+      typeof summary.analysisSummary === "string" &&
+      typeof summary.uncertaintySummary === "string" &&
+      Array.isArray(summary.uncertaintyItems) &&
+      summary.uncertaintyItems.every((item) => typeof item === "string")
+    );
   }
 
   private isValidEvidenceSignalPayload(

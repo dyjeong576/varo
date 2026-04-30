@@ -1,5 +1,11 @@
 import { EvidenceSnippet, Source } from "@prisma/client";
-import { EvidenceSignal, QueryPurpose, AnswerCheckType, SearchPlan } from "../answers.types";
+import {
+  EvidenceSignal,
+  QueryPurpose,
+  AnswerCheckType,
+  SearchPlan,
+  AnswerGeneratedSummary,
+} from "../answers.types";
 
 export type AnswerResultVerdict =
   | "Likely True"
@@ -24,6 +30,7 @@ interface ResultAssemblerInput {
   checkType?: AnswerCheckType | null;
   searchPlan?: SearchPlan | null;
   evidenceSignals?: EvidenceSignal[];
+  answerSummary?: AnswerGeneratedSummary | null;
 }
 
 interface AssembledSourceBreakdown {
@@ -93,6 +100,10 @@ const UPDATE_KEYWORDS = [
   "next month",
   "slipped",
 ];
+const FALLBACK_ANALYSIS_SUMMARY =
+  "OpenAI summary가 아직 저장되지 않아 수집된 출처의 구조 정보만 표시합니다.";
+const FALLBACK_UNCERTAINTY_SUMMARY =
+  "요약이 없는 기존 결과이므로 중요한 판단은 원문 출처를 직접 확인해 주세요.";
 
 function categorizeSourceType(sourceType: string): AnswerSourceCategory {
   const normalized = sourceType.toLowerCase();
@@ -394,163 +405,6 @@ function buildConsensusLevel(
   return supportCount >= 2 ? "high" : "medium";
 }
 
-function getPublishedAtTime(source: Source): number {
-  return source.publishedAt?.getTime() ?? 0;
-}
-
-function pickLatestSource(sources: Source[]): Source | null {
-  return [...sources].sort(
-    (left, right) => getPublishedAtTime(right) - getPublishedAtTime(left),
-  )[0] ?? null;
-}
-
-function formatPublishedAt(source: Source | null): string | null {
-  if (!source?.publishedAt) {
-    return null;
-  }
-
-  return `${source.publishedAt.getMonth() + 1}월 ${source.publishedAt.getDate()}일 보도`;
-}
-
-function buildOfficialSourceSentence(params: {
-  officialCount: number;
-  verificationCount: number;
-}): string {
-  if (params.officialCount > 0) {
-    return "공식 출처에서도 이를 확인했습니다.";
-  }
-
-  if (params.verificationCount > 0) {
-    return "검증 성격의 출처가 포함되어 있습니다.";
-  }
-
-  return "";
-}
-
-function buildAnalysisSummary(params: {
-  coreCheck: string;
-  verdict: AnswerResultVerdict;
-  supportSources: Source[];
-  conflictSources: Source[];
-  contextSources: Source[];
-  verificationCount: number;
-  officialCount: number;
-  hasCurrentUpdateConflict: boolean;
-  isScheduledEvent: boolean;
-}): string {
-  const {
-    coreCheck,
-    verdict,
-    supportSources,
-    conflictSources,
-    contextSources,
-    verificationCount,
-    officialCount,
-    hasCurrentUpdateConflict,
-    isScheduledEvent,
-  } = params;
-  const officialLine = buildOfficialSourceSentence({ officialCount, verificationCount });
-
-  if (isScheduledEvent && hasCurrentUpdateConflict) {
-    const latestSupportSource = pickLatestSource(supportSources);
-    const latestConflictSource = pickLatestSource(conflictSources);
-    const supportDate = formatPublishedAt(latestSupportSource);
-    const conflictDate = formatPublishedAt(latestConflictSource);
-    const updateSentence =
-      supportSources.length > 0
-        ? `${supportDate ?? "초기 보도"}에서는 이 내용이 예정되어 있었지만, ${conflictDate ?? "최근 보도"}에서 일정 변경 또는 연기 신호가 확인됩니다.`
-        : `${conflictDate ?? "최근 보도"}에서 일정 변경 또는 연기 신호가 확인됩니다.`;
-
-    return [
-      `"${coreCheck}"에 대해 보도가 엇갈리고 있습니다.`,
-      updateSentence,
-      officialLine,
-      "현재 상태를 정확히 파악하려면 최신 원문을 직접 확인해 보세요.",
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }
-
-  const verdictLead: Record<AnswerResultVerdict, string> = {
-    "Likely True": `수집된 뉴스들이 "${coreCheck}"을 뒷받침하고 있습니다.`,
-    "Likely False": `수집된 뉴스들은 대체로 "${coreCheck}"과 다른 내용을 담고 있습니다.`,
-    "Mixed Evidence": `"${coreCheck}"에 대한 보도가 엇갈리고 있습니다.`,
-    Unclear: `수집된 자료만으로는 "${coreCheck}"을 정확히 판단하기 어렵습니다.`,
-  };
-
-  const supportCount = supportSources.length;
-  const conflictCount = conflictSources.length;
-  const evidenceSentence =
-    supportCount > 0 && conflictCount > 0
-      ? `${supportCount}건의 기사가 이를 뒷받침하지만, ${conflictCount}건에서는 반박 또는 다른 내용이 확인됩니다.`
-      : supportCount > 0
-        ? `${supportCount}건의 기사가 같은 방향을 가리키고 있으며, 반박 보도는 현재 확인되지 않습니다.`
-        : conflictCount > 0
-          ? `${conflictCount}건의 기사에서 이와 다른 내용이 보도됐습니다.`
-          : contextSources.length > 0
-            ? "관련 배경 정보는 수집됐지만, 질문에 직접 답할 근거는 아직 부족합니다."
-            : "관련 기사를 충분히 찾지 못했습니다.";
-
-  const conclusion: Record<AnswerResultVerdict, string> = {
-    "Likely True": `${officialLine ? officialLine + " " : ""}현재 수집된 정보 기준으로는 이 내용이 사실일 가능성이 높습니다.`,
-    "Likely False": `현재 수집된 정보 기준으로는 이 주장의 신빙성이 낮아 보입니다. 원문을 직접 확인해 보세요.`,
-    "Mixed Evidence": `${officialLine ? officialLine + " " : ""}한쪽으로 결론 내리기 어려운 상황입니다. 원문을 직접 확인해 보시기 바랍니다.`,
-    Unclear: "더 많은 정보를 확인하려면 관련 기사를 직접 검색해 보세요.",
-  };
-
-  return [verdictLead[verdict], evidenceSentence, conclusion[verdict]]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function buildUncertaintyItems(params: {
-  insufficiencyReason: string | null;
-  verdict: AnswerResultVerdict;
-  fetchedEvidenceCount: number;
-  verificationCount: number;
-  contextCount: number;
-  supportCount: number;
-  conflictCount: number;
-  discardCount: number;
-  hasCurrentUpdateConflict: boolean;
-}): string[] {
-  const items: string[] = [];
-
-  if (params.insufficiencyReason) {
-    items.push(params.insufficiencyReason);
-  }
-
-  if (params.verdict === "Mixed Evidence") {
-    items.push("지지 기사와 반박 기사가 함께 확인됩니다.");
-  }
-
-  if (params.hasCurrentUpdateConflict) {
-    items.push("일정 변경이나 연기 관련 보도가 있어 최신 상태를 재확인할 필요가 있습니다.");
-  }
-
-  if (params.fetchedEvidenceCount < 2) {
-    items.push("충분한 자료를 수집하지 못해 결과의 정확도가 낮을 수 있습니다.");
-  }
-
-  if (params.contextCount > params.supportCount + params.conflictCount) {
-    items.push("직접적인 근거보다 배경 설명 자료가 더 많습니다.");
-  }
-
-  if (params.verificationCount === 0 && params.fetchedEvidenceCount >= 2) {
-    items.push("공식 발표나 검증 자료가 충분히 수집되지 않았습니다.");
-  }
-
-  return items.slice(0, 3);
-}
-
-function buildUncertaintySummary(items: string[]): string {
-  if (items.length === 0) {
-    return "이 결과는 자동 분석이므로 중요한 판단은 원문 기사를 직접 확인해 주세요.";
-  }
-
-  return `${items[0]} 추가 정보가 확인되면 결과가 달라질 수 있습니다.`;
-}
-
 export function assembleAnswerResult(
   input: ResultAssemblerInput,
 ): AssembledAnswerResultPayload {
@@ -631,17 +485,11 @@ export function assembleAnswerResult(
     hasHighTrustSource,
   });
   const sourceBreakdown = buildSourceBreakdown(input.sources, sourceStances);
-  const uncertaintyItems = buildUncertaintyItems({
-    insufficiencyReason: input.insufficiencyReason,
-    verdict,
-    fetchedEvidenceCount,
-    verificationCount,
-    contextCount: contextSources.length,
-    supportCount: supportSources.length,
-    conflictCount: conflictSources.length,
-    discardCount,
-    hasCurrentUpdateConflict,
-  });
+  const uncertaintyItems = input.answerSummary?.uncertaintyItems.length
+    ? input.answerSummary.uncertaintyItems
+    : input.insufficiencyReason
+      ? [input.insufficiencyReason]
+      : [];
 
   return {
     sourceStances,
@@ -664,18 +512,10 @@ export function assembleAnswerResult(
         supportSources.length,
         hasCurrentUpdateConflict,
       ),
-      analysisSummary: buildAnalysisSummary({
-        coreCheck: input.coreCheck || input.rawCheck,
-        verdict,
-        supportSources,
-        conflictSources,
-        contextSources,
-        verificationCount,
-        officialCount,
-        hasCurrentUpdateConflict,
-        isScheduledEvent,
-      }),
-      uncertaintySummary: buildUncertaintySummary(uncertaintyItems),
+      analysisSummary: input.answerSummary?.analysisSummary ?? FALLBACK_ANALYSIS_SUMMARY,
+      uncertaintySummary:
+        input.answerSummary?.uncertaintySummary ??
+        FALLBACK_UNCERTAINTY_SUMMARY,
       uncertaintyItems,
       agreementCount: supportSources.length,
       conflictCount: conflictSources.length,

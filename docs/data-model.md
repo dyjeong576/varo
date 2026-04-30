@@ -150,7 +150,7 @@
 | `created_at` | timestamptz | 생성 시각 |
 | `updated_at` | timestamptz | 갱신 시각 |
 
-`handoff_payload.evidenceSignals[]`에는 source별 `sourceId`, 선택적 `snippetId`, `stanceToCheck`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`을 저장한다. 현재 preview 생성 경로는 본문 추출을 호출하지 않으므로 `snippetId`는 보통 `null`이다. 요약 문장은 저장하지 않으며, 생성 응답과 `/answers/:answerId` 조회 시 저장된 source와 evidence signal을 기반으로 `consensusLevel`, `sourceStances`, `analysisSummary`를 계산한다.
+`handoff_payload.evidenceSignals[]`에는 source별 `sourceId`, 선택적 `snippetId`, `stanceToCheck`, `temporalRole`, `updateType`, `currentAnswerImpact`, `reason`을 저장한다. 현재 preview 생성 경로는 본문 추출을 호출하지 않으므로 `snippetId`는 보통 `null`이다. `handoff_payload.answerSummary`에는 OpenAI가 생성한 `analysisSummary`, `uncertaintySummary`, `uncertaintyItems`를 저장한다. 생성 응답과 `/answers/:answerId` 조회 시 저장된 source와 evidence signal을 기반으로 `consensusLevel`, `sourceStances`를 계산하고 summary는 저장된 값을 우선 사용한다.
 
 ### 6.6 `sources`
 | 컬럼 | 타입 | 설명 |
@@ -174,7 +174,7 @@
 | `relevance_reason` | text nullable | relevance 판정 이유 |
 | `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
 
-`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. **한국 정치·경제 뉴스**는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, check 이해 기반 `normalized_check`, `check_type`, 목적별 `search_plan`을 함께 보존한다.
+`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. **한국 정치·경제 뉴스**는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, check 이해 기반 `normalized_check`, `check_type`, `answerType`, 목적별 `search_plan`을 함께 보존한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |

@@ -45,7 +45,7 @@ export default function AnalysisSummary({
         </p>
         <p className="mt-3 text-xs text-[#6b7280]">
           {mode === "rule_based_preview"
-            ? "현재 단계에서는 저장된 근거만으로 계산한 임시 요약입니다."
+            ? "현재 단계에서는 저장된 근거를 바탕으로 생성한 임시 요약입니다."
             : ""}
         </p>
       </div>
