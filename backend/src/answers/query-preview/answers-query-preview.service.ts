@@ -6,12 +6,22 @@ import { AnswerPreviewSummaryResponseDto } from "../dto/answer-preview-summary-r
 import { AnswerQueryProcessingPreviewResponseDto } from "../dto/answer-query-processing-preview-response.dto";
 import { AnswersProvidersService } from "../answers.providers.service";
 import {
+  AnswerGeneratedSummary,
+  AnswerRelevanceTier,
+  DirectAnswerCitation,
   QueryArtifact,
   QueryRefinementResult,
+  RetrievalBucket,
   SearchCandidate,
+  SearchProvider,
+  SearchRoute,
 } from "../answers.types";
 import {
+  buildCanonicalUrl,
+  buildNormalizedHash,
+  classifySourceType,
   deduplicateCandidates,
+  extractHostname,
   getKoreanSearchDomainRegistry,
   normalizeCheckText,
 } from "../answers.utils";
@@ -86,8 +96,7 @@ export class AnswersQueryPreviewService {
       const refinement = await this.providersService.refineQuery(normalizedCheck);
       this.logStageDuration("query_refinement", refinementStartedAt, answerJob.id);
       const generatedQueries = refinement.generatedQueries;
-      const searchRoute =
-        refinement.searchRoute === "unsupported" ? "unsupported" : "supported";
+      const searchRoute = refinement.searchRoute;
       const sourceQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
@@ -115,6 +124,49 @@ export class AnswersQueryPreviewService {
           refinement,
           generatedQueries,
           insufficiencyReason: persistedOutOfScope.insufficiencyReason,
+        });
+      }
+
+      if (searchRoute === "llm_direct") {
+        const directAnswerStartedAt = Date.now();
+        const directAnswer = await this.providersService.answerDirectly(refinement.coreCheck);
+        this.logStageDuration("llm_direct_answer", directAnswerStartedAt, answerJob.id);
+
+        const citationCandidates = this.buildCitationCandidates(directAnswer.citations);
+        const answerSummary: AnswerGeneratedSummary = {
+          analysisSummary: directAnswer.answerText,
+          uncertaintySummary:
+            "실시간 웹 검색 기반 답변입니다. 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+          uncertaintyItems: [],
+        };
+
+        const persistedArtifacts =
+          await this.persistenceService.persistQueryPreviewResult({
+            userId,
+            answerJob,
+            refinement,
+            generatedQueries,
+            relevanceCandidates: citationCandidates,
+            evidenceSignals: [],
+            answerSummary,
+            primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
+          });
+
+        return mapPreviewResponse({
+          answerJob,
+          check,
+          createdAt: answerJob.createdAt,
+          normalizedCheck,
+          refinement,
+          generatedQueries,
+          sources: persistedArtifacts.createdSources,
+          evidenceSnippets: persistedArtifacts.evidenceSnippets,
+          selectedSourceCount: citationCandidates.length,
+          discardedSourceCount: 0,
+          handoffSourceIds: persistedArtifacts.handoffSourceIds,
+          insufficiencyReason: persistedArtifacts.insufficiencyReason,
+          evidenceSignals: [],
+          answerSummary,
         });
       }
 
@@ -234,8 +286,7 @@ export class AnswersQueryPreviewService {
       const refinement = await this.providersService.refineQuery(normalizedCheck);
       this.logStageDuration("query_refinement", refinementStartedAt, answerJob.id);
       const generatedQueries = refinement.generatedQueries;
-      const searchRoute =
-        refinement.searchRoute === "unsupported" ? "unsupported" : "supported";
+      const searchRoute = refinement.searchRoute;
       const sourceQueries =
         refinement.searchPlan?.queries?.length
           ? refinement.searchPlan.queries.map((query) => ({
@@ -263,6 +314,49 @@ export class AnswersQueryPreviewService {
           refinement,
           generatedQueries,
           insufficiencyReason: persistedOutOfScope.insufficiencyReason,
+        });
+      }
+
+      if (searchRoute === "llm_direct") {
+        const directAnswerStartedAt = Date.now();
+        const directAnswer = await this.providersService.answerDirectly(refinement.coreCheck);
+        this.logStageDuration("llm_direct_answer", directAnswerStartedAt, answerJob.id);
+
+        const citationCandidates = this.buildCitationCandidates(directAnswer.citations);
+        const answerSummary: AnswerGeneratedSummary = {
+          analysisSummary: directAnswer.answerText,
+          uncertaintySummary:
+            "실시간 웹 검색 기반 답변입니다. 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+          uncertaintyItems: [],
+        };
+
+        const persistedArtifacts =
+          await this.persistenceService.persistQueryPreviewResult({
+            userId,
+            answerJob,
+            refinement,
+            generatedQueries,
+            relevanceCandidates: citationCandidates,
+            evidenceSignals: [],
+            answerSummary,
+            primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
+          });
+
+        return mapPreviewResponse({
+          answerJob,
+          check,
+          createdAt: answerJob.createdAt,
+          normalizedCheck,
+          refinement,
+          generatedQueries,
+          sources: persistedArtifacts.createdSources,
+          evidenceSnippets: persistedArtifacts.evidenceSnippets,
+          selectedSourceCount: citationCandidates.length,
+          discardedSourceCount: 0,
+          handoffSourceIds: persistedArtifacts.handoffSourceIds,
+          insufficiencyReason: persistedArtifacts.insufficiencyReason,
+          evidenceSignals: [],
+          answerSummary,
         });
       }
 
@@ -384,6 +478,32 @@ export class AnswersQueryPreviewService {
       );
       await this.persistenceService.markAnswerJobFailed(params.answerJob.id, error);
     }
+  }
+
+  private buildCitationCandidates(citations: DirectAnswerCitation[]): SearchCandidate[] {
+    return citations.map((citation, index) => {
+      const canonicalUrl = buildCanonicalUrl(citation.url);
+      const hostname = extractHostname(canonicalUrl);
+
+      return {
+        id: `perplexity-${index + 1}`,
+        searchRoute: "llm_direct" as SearchRoute,
+        sourceProvider: "perplexity-sonar" as SearchProvider,
+        sourceType: classifySourceType(canonicalUrl, ""),
+        publisherName: hostname,
+        publishedAt: null,
+        canonicalUrl,
+        originalUrl: citation.url,
+        rawTitle: hostname ?? canonicalUrl,
+        rawSnippet: null,
+        normalizedHash: buildNormalizedHash(canonicalUrl),
+        originQueryIds: ["q1"],
+        retrievalBucket: "familiar" as RetrievalBucket,
+        domainRegistryId: null,
+        relevanceTier: "primary" as AnswerRelevanceTier,
+        relevanceReason: "Perplexity sonar 실시간 검색 인용 출처",
+      };
+    });
   }
 
   private selectClassificationCandidates(

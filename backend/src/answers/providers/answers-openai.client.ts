@@ -28,7 +28,7 @@ const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
 const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 3200;
-const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported"];
+const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported", "llm_direct"];
 const CHECK_TYPES: AnswerCheckType[] = [
   "scheduled_event",
   "current_status",
@@ -131,6 +131,47 @@ interface OpenAiRelevanceSignalPayload {
 export class AnswersOpenAiClient {
   private readonly logger = new Logger(AnswersOpenAiClient.name);
 
+  async answerDirectly(
+    apiKey: string,
+    coreCheck: string,
+  ): Promise<{ answerText: string; citations: { url: string }[] }> {
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const payload = await this.requestStructuredOutput<{ answer: string }>(
+      apiKey,
+      {
+        name: "direct_answer",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["answer"],
+          properties: {
+            answer: { type: "string" },
+          },
+        },
+      },
+      [
+        {
+          role: "system",
+          content: `한국 정치·경제 관련 사실 정보를 정확하고 간결하게 답변하세요.
+현재 날짜: ${currentDate}
+공식 정부 발표, 법령, 통계청·한국은행 등 공신력 있는 기관 자료를 기준으로 답변하세요.
+기준 날짜나 연도를 반드시 명시하고, 3문장 이내로 핵심만 답변하세요.`,
+        },
+        {
+          role: "user",
+          content: coreCheck,
+        },
+      ],
+      "직접 답변 요청에 실패했습니다.",
+      { reasoningEffort: "minimal", textVerbosity: "low", maxOutputTokens: 300 },
+    );
+
+    return {
+      answerText: this.normalizeText(payload.answer, "답변을 생성하지 못했습니다."),
+      citations: [],
+    };
+  }
+
   async refineQuery(
     apiKey: string,
     rawCheck: string,
@@ -205,13 +246,15 @@ export class AnswersOpenAiClient {
 - checkType: scheduled_event | current_status | statistic | quote | policy | corporate_action | incident | general_fact
 - isFactCheckQuestion: 출처 기반으로 사실성 검토가 가능한 질문/주장이면 true, 의견·상담·창작·일반 설명·미래 예측이면 false
 - searchRoute:
-  - supported: 한국 정치·경제 뉴스성 check (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
+  - supported: 한국 정치·경제 뉴스성 check — 뉴스 검색이 필요한 이슈, 루머, 사건, 인물 발언, 정책 변화
+  - llm_direct: 한국 정책·통계·법령 수치 조회형 질문 — 뉴스 검색 없이 즉시 답변 가능한 공식 수치 (예: 최저임금, 기준금리, 세율, 인구 통계, 특정 법 조항, 정부 기관 정보 등 변하지 않거나 공식 출처가 명확한 팩트)
   - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천·순수 의견·미래 예측
 - route는 인물/기업의 국적보다 check이 다루는 사건·제도·영향의 관할, 장소, 시장을 우선해 판정.
-- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 supported.
+- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 supported 또는 llm_direct.
+- "얼마야", "몇 %야", "언제부터야" 등 수치/날짜 조회 형태이면 llm_direct 우선 고려.
 
 ## searchPlan.queries
-supported면 정확히 4개, unsupported면 빈 배열.
+supported면 정확히 4개, llm_direct이면 빈 배열, unsupported면 빈 배열.
 
 네이버 뉴스 검색 쿼리 원칙:
 - 기사 제목에 실제로 등장할 법한 핵심 키워드 조합
@@ -243,13 +286,17 @@ supported면 정확히 4개, unsupported면 빈 배열.
       ? payload.checkType
       : "general_fact";
     const isFactCheckQuestion = payload.isFactCheckQuestion === true;
-    const searchRoute =
-      payload.searchRoute === "unsupported" ? "unsupported" : "supported";
+    const searchRoute: SearchRoute =
+      payload.searchRoute === "unsupported"
+        ? "unsupported"
+        : payload.searchRoute === "llm_direct"
+          ? "llm_direct"
+          : "supported";
 
     let searchPlan: SearchPlan;
     let generatedQueries: QueryArtifact[];
 
-    if (searchRoute === "unsupported") {
+    if (searchRoute === "unsupported" || searchRoute === "llm_direct") {
       searchPlan = {
         queries: [],
       };

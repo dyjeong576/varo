@@ -5,8 +5,10 @@ import { AppException } from "../common/exceptions/app-exception";
 import { NaverNewsSearchTestRequestDto } from "./dto/naver-news-search-test.dto";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
 import { AnswersOpenAiClient } from "./providers/answers-openai.client";
+import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import {
+  DirectAnswerResult,
   ExtractedSource,
   EvidenceSignal,
   EvidenceSignalClassificationInput,
@@ -32,7 +34,13 @@ export class AnswersProvidersService {
     private readonly openAiClient: AnswersOpenAiClient,
     private readonly tavilyClient: AnswersTavilyClient,
     private readonly naverClient: AnswersNaverClient,
+    private readonly perplexityClient: AnswersPerplexityClient,
   ) {}
+
+  async answerDirectly(coreCheck: string): Promise<DirectAnswerResult> {
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.answerDirectly(apiKey, coreCheck);
+  }
 
   async refineQuery(rawCheck: string): Promise<QueryRefinementResult> {
     const apiKey = this.getRequiredOpenAiApiKey();
@@ -152,6 +160,20 @@ export class AnswersProvidersService {
       throw new AppException(
         APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
         "real provider mode에서는 OPENAI_API_KEY가 필요합니다.",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return apiKey;
+  }
+
+  private getRequiredPerplexityApiKey(): string {
+    const apiKey = this.configService.get<string | null>("perplexityApiKey", null);
+
+    if (!apiKey) {
+      throw new AppException(
+        APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+        "llm_direct route에는 PERPLEXITY_API_KEY가 필요합니다.",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

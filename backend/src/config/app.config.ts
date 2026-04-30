@@ -28,6 +28,7 @@ export interface AppConfig {
   tavilyApiKey: string | null;
   tavilySearchTimeoutMs: number;
   tavilyExtractTimeoutMs: number;
+  perplexityApiKey: string | null;
 }
 
 export const GOOGLE_CALLBACK_PATH = "/api/v1/auth/google/callback";
@@ -199,5 +200,6 @@ export function getAppConfig(): AppConfig {
     tavilyApiKey: getOptional("TAVILY_API_KEY") ?? null,
     tavilySearchTimeoutMs: readPositiveInteger("TAVILY_SEARCH_TIMEOUT_MS", 40000),
     tavilyExtractTimeoutMs: readPositiveInteger("TAVILY_EXTRACT_TIMEOUT_MS", 180000),
+    perplexityApiKey: getOptional("PERPLEXITY_API_KEY") ?? null,
   };
 }

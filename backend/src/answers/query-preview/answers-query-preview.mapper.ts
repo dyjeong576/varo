@@ -309,6 +309,10 @@ function buildSearchProvider(searchRoute: string): string | null {
     return "naver-search";
   }
 
+  if (searchRoute === "llm_direct") {
+    return "perplexity-sonar";
+  }
+
   return null;
 }
 

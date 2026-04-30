@@ -2,6 +2,7 @@ import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
 import { AnswersOpenAiClient } from "./providers/answers-openai.client";
+import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import { AnswersProvidersService } from "./answers.providers.service";
 
@@ -40,6 +41,7 @@ describe("AnswersProvidersService", () => {
       new AnswersOpenAiClient(),
       new AnswersTavilyClient(),
       new AnswersNaverClient(),
+      new AnswersPerplexityClient(),
     );
 
   afterEach(() => {

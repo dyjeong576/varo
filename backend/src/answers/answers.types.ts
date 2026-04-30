@@ -1,7 +1,7 @@
 export type AnswerRelevanceTier = "primary" | "reference" | "discard";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
-export type SearchRoute = "supported" | "unsupported";
-export type SearchProvider = "naver-search" | "tavily-search";
+export type SearchRoute = "supported" | "unsupported" | "llm_direct";
+export type SearchProvider = "naver-search" | "tavily-search" | "perplexity-sonar";
 export type SourcePoliticalLean =
   | "progressive"
   | "centrist"
@@ -165,4 +165,13 @@ export interface AnswerGeneratedSummary {
   analysisSummary: string;
   uncertaintySummary: string;
   uncertaintyItems: string[];
+}
+
+export interface DirectAnswerCitation {
+  url: string;
+}
+
+export interface DirectAnswerResult {
+  answerText: string;
+  citations: DirectAnswerCitation[];
 }
