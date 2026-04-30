@@ -49,6 +49,7 @@ export interface AnswerPreviewDetailResponse {
   currentStage: string;
   normalizedCheck: string;
   coreCheck: string;
+  isFactCheckQuestion: boolean;
   generatedQueries: AnswerPreviewQueryArtifactResponse[];
 
   sources: AnswerPreviewSourceResponse[];
@@ -163,6 +164,7 @@ export interface AnswerPreviewDetail {
   statusTone: "blue" | "slate" | "red";
   pendingMessage: string;
   coreCheck: string;
+  isFactCheckQuestion: boolean;
   generatedQueries: AnswerPreviewQueryArtifact[];
   sources: AnswerPreviewSource[];
   evidenceSnippets: AnswerPreviewEvidenceSnippet[];

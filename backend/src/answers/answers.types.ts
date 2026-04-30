@@ -2,7 +2,6 @@ export type AnswerRelevanceTier = "primary" | "reference" | "discard";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
 export type SearchRoute = "supported" | "unsupported";
 export type SearchProvider = "naver-search" | "tavily-search";
-export type AnswerResponseType = "short_answer" | "descriptive_answer";
 export type SourcePoliticalLean =
   | "progressive"
   | "centrist"
@@ -101,7 +100,7 @@ export interface QueryRefinementResult {
   coreCheck: string;
   normalizedCheck: string;
   checkType: AnswerCheckType;
-  answerType: AnswerResponseType;
+  isFactCheckQuestion: boolean;
   searchPlan: SearchPlan;
   generatedQueries: QueryArtifact[];
   searchRoute: SearchRoute;

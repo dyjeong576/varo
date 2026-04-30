@@ -349,6 +349,7 @@ export default function AnswerResultPage() {
             conflictCount={answer.conflictCount}
             contextCount={answer.contextCount}
             consensusLabel={answer.consensusLabel}
+            isFactCheckQuestion={answer.isFactCheckQuestion}
             sourceBreakdown={answer.sourceBreakdown}
           />
         )}
@@ -390,7 +391,7 @@ export default function AnswerResultPage() {
               </div>
             ) : (
               filteredSources.map((source) => (
-                <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} />
+                <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} isFactCheckQuestion={answer.isFactCheckQuestion} />
               ))
             )}
           </div>

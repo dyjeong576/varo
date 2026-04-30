@@ -39,10 +39,8 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
 
 3. query refinement
    - OpenAI `gpt-5-mini` structured output을 호출한다.
-   - 출력은 `coreCheck`, `normalizedCheck`, `checkType`, `answerType`, `searchRoute`, `searchPlan`이다.
-   - `answerType`은 `short_answer` 또는 `descriptive_answer`다.
-   - `short_answer`는 예/아니오, 수치, 현재 상태처럼 짧게 답할 수 있는 check이다.
-   - `descriptive_answer`는 배경, 맥락, 조건, 여러 source 비교가 필요한 check이다.
+   - 출력은 `coreCheck`, `normalizedCheck`, `checkType`, `isFactCheckQuestion`, `searchRoute`, `searchPlan`이다.
+   - `isFactCheckQuestion`은 출처 기반 사실성 검토 대상 여부다.
    - `searchRoute`는 현재 `supported` 또는 `unsupported`만 사용한다.
    - `supported`는 한국 정치·경제 뉴스성 check이다.
    - `unsupported`는 지원 범위 밖이며 source search를 하지 않는다.
@@ -127,7 +125,7 @@ sequenceDiagram
   FE->>API: POST /answers/query-processing-preview/async
   API->>DB: create checks, answer_jobs(searching)
   API->>OAI: query refinement
-  OAI-->>API: answerType, searchRoute, searchPlan
+  OAI-->>API: isFactCheckQuestion, searchRoute, searchPlan
   alt unsupported
     API->>DB: update answer_jobs(out_of_scope)
     API-->>FE: out_of_scope response

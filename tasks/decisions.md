@@ -294,11 +294,12 @@
 
 ## 2026-04-30
 
-### Query Refinement Answer Type
+### Query Refinement FactCheck Flag
 - `search_route` 값에서 `news`를 제거하고 신규 answer 생성 기준 `supported / unsupported`만 사용한다.
 - 한국 정치·경제 뉴스성 check은 `supported`, 지원 범위 밖 check은 `unsupported/out_of_scope`로 처리한다.
-- query refinement는 `answerType`을 함께 반환하며 값은 `short_answer / descriptive_answer`로 제한한다.
-- `answerType`은 답변 표현 방식 분류용이며 source search provider 선택에는 사용하지 않는다.
+- query refinement는 `answerType`을 반환하지 않고, 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 반환한다.
+- `isFactCheckQuestion`은 결과 화면의 정보 합의성 노출 조건으로 사용한다.
+- `checkType`은 `scheduled_event` 등 내부 결과 계산 힌트로만 유지한다.
 - Naver News Search는 query별 `display=8`, `sort=sim`으로 요청한다.
 
 ### Check/Answer Naming Migration

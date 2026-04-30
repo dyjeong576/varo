@@ -291,6 +291,7 @@ export function mapAnswerPreviewDetail(
     statusTone: getAnswerStatusTone(detail.status),
     pendingMessage,
     coreCheck: detail.coreCheck,
+    isFactCheckQuestion: detail.isFactCheckQuestion,
     generatedQueries: detail.generatedQueries,
     sources: sources.map((source) => {
       const evidenceSnippet = detail.evidenceSnippets.find(

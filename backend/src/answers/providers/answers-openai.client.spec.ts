@@ -40,6 +40,7 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "트럼프의 관세 발표",
                     normalizedCheck: "트럼프가 관세를 발표했다",
                     checkType: "policy",
+                    isFactCheckQuestion: true,
                     searchRoute: "unsupported",
                     searchRouteReason:
                       "미국 관세 발표를 다루는 해외/글로벌 뉴스성 check입니다. VARO가 현재 한국 뉴스만 분석한다.",
@@ -78,6 +79,44 @@ describe("AnswersOpenAiClient", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("사실성 검토 대상이 아닌 질문은 isFactCheckQuestion false로 반환한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    coreCheck: "정치 뉴스 읽는 방법",
+                    normalizedCheck: "정치 뉴스를 어떻게 읽어야 하는지 묻는 질문",
+                    checkType: "general_fact",
+                    isFactCheckQuestion: false,
+                    searchRoute: "unsupported",
+                    searchPlan: {
+                      queries: [],
+                    },
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new AnswersOpenAiClient();
+    const result = await client.refineQuery(
+      "openai-test-key",
+      "정치 뉴스는 어떻게 읽는 게 좋아?",
+    );
+
+    expect(result.isFactCheckQuestion).toBe(false);
+    expect(result.searchRoute).toBe("unsupported");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("단일 LLM 호출에서 search plan purpose가 중복되어도 누락 purpose를 fallback query로 보정한다", async () => {
     global.fetch = jest.fn().mockResolvedValue(
       createFetchResponse({
@@ -91,7 +130,7 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "한국 기준금리 동결",
                     normalizedCheck: "한국은행이 기준금리를 동결했다",
                     checkType: "policy",
-                    answerType: "short_answer",
+                    isFactCheckQuestion: true,
                     searchRoute: "supported",
                     searchRouteReason:
                       "한국 경제 정책 관련 뉴스성 check입니다.",
@@ -144,7 +183,7 @@ describe("AnswersOpenAiClient", () => {
       "primary_source",
       "contradiction_or_update",
     ]);
-    expect(result.answerType).toBe("short_answer");
+    expect(result.isFactCheckQuestion).toBe(true);
     // sp2는 check_specific 중복이므로 버려지고 current_state는 fallback 쿼리(coreCheck, index=1)로 채워진다
     expect(result.searchPlan.queries[1]?.query).toBe(
       "한국 기준금리 동결",
@@ -165,6 +204,7 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "일론 머스크의 부산 국회의원 출마",
                     normalizedCheck: "일론 머스크가 부산에서 국회의원에 출마한다",
                     checkType: "scheduled_event",
+                    isFactCheckQuestion: true,
                     searchRoute: "supported",
                     searchPlan: {
                       queries: [
@@ -226,6 +266,7 @@ describe("AnswersOpenAiClient", () => {
                     coreCheck: "해외 기업의 한국 서비스 종료",
                     normalizedCheck: "해외 기업이 한국에서 서비스를 종료한다",
                     checkType: "corporate_action",
+                    isFactCheckQuestion: true,
                     searchRoute: "supported",
                     searchPlan: {
                       queries: [

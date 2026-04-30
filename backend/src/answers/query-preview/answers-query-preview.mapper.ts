@@ -56,7 +56,7 @@ interface QueryRefinementPayload {
   coreCheck: string;
   normalizedCheck: string;
   checkType: string;
-  answerType: string;
+  isFactCheckQuestion: boolean;
   searchPlan: SearchPlan | null;
   generatedQueries: QueryArtifact[];
   searchRoute?: string;
@@ -223,7 +223,7 @@ export function buildQueryRefinementPayload(
     coreCheck: refinement.coreCheck,
     normalizedCheck: refinement.normalizedCheck,
     checkType: refinement.checkType,
-    answerType: refinement.answerType,
+    isFactCheckQuestion: refinement.isFactCheckQuestion,
     searchPlan: {
       queries: refinement.searchPlan.queries.map((query) => ({
         id: query.id,
@@ -350,6 +350,7 @@ export function mapPreviewResponse(params: {
     currentStage: "handoff_ready",
     normalizedCheck: params.normalizedCheck,
     coreCheck: params.refinement.coreCheck,
+    isFactCheckQuestion: params.refinement.isFactCheckQuestion,
     generatedQueries: params.generatedQueries,
     sources: params.sources.map((source) => ({
       id: source.id,
@@ -405,6 +406,7 @@ export function mapOutOfScopePreviewResponse(params: {
     currentStage: "scope_checked",
     normalizedCheck: params.normalizedCheck,
     coreCheck: params.refinement.coreCheck,
+    isFactCheckQuestion: params.refinement.isFactCheckQuestion,
     generatedQueries: params.generatedQueries,
     sources: [],
     evidenceSnippets: [],
@@ -440,6 +442,7 @@ export function mapSearchPreviewResponse(params: {
     currentStage: "relevance_and_signal_classification",
     normalizedCheck: params.normalizedCheck,
     coreCheck: params.refinement.coreCheck,
+    isFactCheckQuestion: params.refinement.isFactCheckQuestion,
     generatedQueries: params.generatedQueries,
     sources: params.sources.map((source) => ({
       id: source.id,
@@ -637,7 +640,7 @@ function parseQueryRefinementPayload(
       coreCheck: normalizedCheck,
       normalizedCheck,
       checkType: "general_fact",
-      answerType: "descriptive_answer",
+      isFactCheckQuestion: false,
       searchPlan: null,
       generatedQueries: [],
       searchRoute: "unsupported",
@@ -653,7 +656,10 @@ function parseQueryRefinementPayload(
     coreCheck: parseString(payload.coreCheck, normalizedCheck),
     normalizedCheck: parseString(payload.normalizedCheck, normalizedCheck),
     checkType: parseString(payload.checkType, "general_fact"),
-    answerType: parseString(payload.answerType, "descriptive_answer"),
+    isFactCheckQuestion:
+      typeof payload.isFactCheckQuestion === "boolean"
+        ? payload.isFactCheckQuestion
+        : searchRoute === "supported",
     searchPlan: parseSearchPlan(payload.searchPlan),
     generatedQueries,
     searchRoute,
@@ -747,6 +753,7 @@ export function mapStoredPreviewResponse(
     currentStage: answerJob.currentStage,
     normalizedCheck: answerJob.check.normalizedText,
     coreCheck: refinement.coreCheck,
+    isFactCheckQuestion: refinement.isFactCheckQuestion,
     generatedQueries: refinement.generatedQueries,
     sources: answerJob.sources.map((source) => ({
       id: source.id,

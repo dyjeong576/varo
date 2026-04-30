@@ -12,7 +12,6 @@ import {
   EvidenceSignalUpdateType,
   QueryRefinementResult,
   AnswerCheckType,
-  AnswerResponseType,
   RelevanceSignalClassificationInput,
   RelevanceSignalClassificationResult,
   AnswerRelevanceTier,
@@ -30,7 +29,6 @@ const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
 const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 3200;
 const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported"];
-const ANSWER_TYPES: AnswerResponseType[] = ["short_answer", "descriptive_answer"];
 const CHECK_TYPES: AnswerCheckType[] = [
   "scheduled_event",
   "current_status",
@@ -90,7 +88,7 @@ interface OpenAiQueryRefinementPayload {
   coreCheck: string;
   normalizedCheck: string;
   checkType: AnswerCheckType;
-  answerType: AnswerResponseType;
+  isFactCheckQuestion: boolean;
   searchPlan: OpenAiSearchPlanPayload;
   searchRoute: SearchRoute;
 }
@@ -150,7 +148,7 @@ export class AnswersOpenAiClient {
               "coreCheck",
               "normalizedCheck",
               "checkType",
-              "answerType",
+              "isFactCheckQuestion",
               "searchRoute",
               "searchPlan",
             ],
@@ -161,10 +159,7 @@ export class AnswersOpenAiClient {
                 type: "string",
                 enum: CHECK_TYPES,
               },
-              answerType: {
-                type: "string",
-                enum: ANSWER_TYPES,
-              },
+              isFactCheckQuestion: { type: "boolean" },
               searchRoute: {
                 type: "string",
                 enum: SEARCH_ROUTES,
@@ -208,9 +203,7 @@ export class AnswersOpenAiClient {
 - coreCheck: 핵심 주장
 - normalizedCheck: 검증 가능한 형태로 정규화한 주장
 - checkType: scheduled_event | current_status | statistic | quote | policy | corporate_action | incident | general_fact
-- answerType:
-  - short_answer: 예/아니오, 수치, 현재 상태처럼 한두 문장으로 답할 수 있는 check
-  - descriptive_answer: 배경, 맥락, 조건, 여러 source 비교가 필요한 check
+- isFactCheckQuestion: 출처 기반으로 사실성 검토가 가능한 질문/주장이면 true, 의견·상담·창작·일반 설명·미래 예측이면 false
 - searchRoute:
   - supported: 한국 정치·경제 뉴스성 check (한국 장소/기관/기업/정책/시장이 직접 포함, 사실성 주장)
   - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천·순수 의견·미래 예측
@@ -249,9 +242,7 @@ supported면 정확히 4개, unsupported면 빈 배열.
     const checkType = CHECK_TYPES.includes(payload.checkType)
       ? payload.checkType
       : "general_fact";
-    const answerType = ANSWER_TYPES.includes(payload.answerType)
-      ? payload.answerType
-      : "descriptive_answer";
+    const isFactCheckQuestion = payload.isFactCheckQuestion === true;
     const searchRoute =
       payload.searchRoute === "unsupported" ? "unsupported" : "supported";
 
@@ -275,7 +266,7 @@ supported면 정확히 4개, unsupported면 빈 배열.
       coreCheck,
       normalizedCheck,
       checkType,
-      answerType,
+      isFactCheckQuestion,
       searchPlan,
       generatedQueries,
       searchRoute,

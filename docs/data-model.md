@@ -174,7 +174,7 @@
 | `relevance_reason` | text nullable | relevance 판정 이유 |
 | `retrieval_bucket` | varchar(32) nullable | 검색 route/provider와 함께 해석되는 수집 bucket |
 
-`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. **한국 정치·경제 뉴스**는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, check 이해 기반 `normalized_check`, `check_type`, `answerType`, 목적별 `search_plan`을 함께 보존한다.
+`search_route`는 query refinement artifact에서, `source_provider`는 source row에서 직접 추적한다. **한국 정치·경제 뉴스**는 기본적으로 `naver-search` source를 기록하고, Naver 후보가 부족해 Tavily fallback이 실행된 경우 `tavily-search` source를 함께 기록한다. search planning artifact에는 사용자-facing `generated_queries`, check 이해 기반 `normalized_check`, `check_type`, `isFactCheckQuestion`, 목적별 `search_plan`을 함께 보존한다.
 
 ### 6.7 `evidence_snippets`
 | 컬럼 | 타입 | 설명 |

@@ -253,6 +253,12 @@ export class AnswerQueryProcessingPreviewResponseDto {
   @ApiProperty({ description: "핵심 check", example: "테슬라의 한국 시장 철수" })
   coreCheck!: string;
 
+  @ApiProperty({
+    description: "출처 기반 사실성 검토 대상 질문인지 여부",
+    example: true,
+  })
+  isFactCheckQuestion!: boolean;
+
   @ApiProperty({ description: "생성된 query 목록", type: [AnswerQueryArtifactDto] })
   generatedQueries!: AnswerQueryArtifactDto[];
 

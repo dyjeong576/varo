@@ -81,6 +81,7 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
+        isFactCheckQuestion: true,
         searchPlan: {
           queries: [
             {
@@ -372,6 +373,7 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "한국은행 기준금리 동결",
         normalizedCheck: "한국은행이 기준금리를 동결했다",
         checkType: "policy",
+        isFactCheckQuestion: true,
         searchPlan: {
           queries: searchPlanQueries,
         },
@@ -430,6 +432,7 @@ describe("AnswersQueryPreviewService", () => {
       coreCheck: "한국은행 기준금리 동결",
       normalizedCheck: "한국은행이 기준금리를 동결했다",
       checkType: "policy",
+      isFactCheckQuestion: true,
       searchPlan: {
         queries: [
           {
@@ -560,6 +563,7 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "한국은행 기준금리 동결",
         normalizedCheck: "한국은행이 기준금리를 동결했다",
         checkType: "policy",
+        isFactCheckQuestion: true,
         searchPlan: {
           queries: [
             {
@@ -671,6 +675,7 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
+        isFactCheckQuestion: true,
         searchPlan: {
           queries: [
             {

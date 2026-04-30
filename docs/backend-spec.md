@@ -152,7 +152,7 @@
 - source와 snippet까지 추적 가능해야 한다.
 - 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 판정 이유는 `search_route_reason`에 남긴다.
 - OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 check**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
-- OpenAI는 답변 형태를 `answerType=short_answer/descriptive_answer`로 함께 분류한다.
+- OpenAI는 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 함께 분류한다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 check은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - **한국 정치·경제 뉴스성 check**은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
