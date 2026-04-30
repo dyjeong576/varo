@@ -107,6 +107,17 @@ export class AnswersQueryPreviewService {
             }))
           : refinement.generatedQueries;
 
+      if (refinement.isFactCheckQuestion === false) {
+        return this.createDirectAnswerPreviewResult({
+          userId,
+          answerJob,
+          check,
+          normalizedCheck,
+          refinement,
+          generatedQueries,
+        });
+      }
+
       if (searchRoute === "unsupported") {
         const persistedOutOfScope =
           await this.persistenceService.persistOutOfScopeAnswer({
@@ -297,6 +308,17 @@ export class AnswersQueryPreviewService {
             }))
           : refinement.generatedQueries;
 
+      if (refinement.isFactCheckQuestion === false) {
+        return this.createDirectAnswerPreviewResult({
+          userId,
+          answerJob,
+          check,
+          normalizedCheck,
+          refinement,
+          generatedQueries,
+        });
+      }
+
       if (searchRoute === "unsupported") {
         const persistedOutOfScope =
           await this.persistenceService.persistOutOfScopeAnswer({
@@ -425,6 +447,62 @@ export class AnswersQueryPreviewService {
     const previewUser = await this.persistenceService.ensurePreviewUser();
 
     return this.createQueryProcessingPreview(previewUser.id, payload);
+  }
+
+  private async createDirectAnswerPreviewResult(params: {
+    userId: string;
+    answerJob: Pick<AnswerJob, "id" | "createdAt" | "clientRequestId">;
+    check: { id: string; rawText: string };
+    normalizedCheck: string;
+    refinement: QueryRefinementResult;
+    generatedQueries: QueryArtifact[];
+  }): Promise<AnswerQueryProcessingPreviewResponseDto> {
+    const directAnswerStartedAt = Date.now();
+    const directAnswer = await this.providersService.answerDirectly(
+      params.refinement.coreCheck,
+    );
+    this.logStageDuration(
+      "perplexity_direct_answer",
+      directAnswerStartedAt,
+      params.answerJob.id,
+    );
+
+    const citationCandidates = this.buildCitationCandidates(directAnswer.citations);
+    const answerSummary: AnswerGeneratedSummary = {
+      analysisSummary: directAnswer.answerText,
+      uncertaintySummary:
+        "Perplexity 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 원문을 직접 확인하세요.",
+      uncertaintyItems: [],
+    };
+
+    const persistedArtifacts =
+      await this.persistenceService.persistQueryPreviewResult({
+        userId: params.userId,
+        answerJob: params.answerJob,
+        refinement: params.refinement,
+        generatedQueries: params.generatedQueries,
+        relevanceCandidates: citationCandidates,
+        evidenceSignals: [],
+        answerSummary,
+        primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
+      });
+
+    return mapPreviewResponse({
+      answerJob: params.answerJob,
+      check: params.check,
+      createdAt: params.answerJob.createdAt,
+      normalizedCheck: params.normalizedCheck,
+      refinement: params.refinement,
+      generatedQueries: params.generatedQueries,
+      sources: persistedArtifacts.createdSources,
+      evidenceSnippets: persistedArtifacts.evidenceSnippets,
+      selectedSourceCount: citationCandidates.length,
+      discardedSourceCount: 0,
+      handoffSourceIds: persistedArtifacts.handoffSourceIds,
+      insufficiencyReason: persistedArtifacts.insufficiencyReason,
+      evidenceSignals: [],
+      answerSummary,
+    });
   }
 
   private async completeAsyncQueryProcessingPreview(params: {

@@ -28,7 +28,7 @@ const OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
 const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 3200;
-const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported", "llm_direct"];
+const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported"];
 const CHECK_TYPES: AnswerCheckType[] = [
   "scheduled_event",
   "current_status",
@@ -247,14 +247,13 @@ export class AnswersOpenAiClient {
 - isFactCheckQuestion: 출처 기반으로 사실성 검토가 가능한 질문/주장이면 true, 의견·상담·창작·일반 설명·미래 예측이면 false
 - searchRoute:
   - supported: 한국 정치·경제 뉴스성 check — 뉴스 검색이 필요한 이슈, 루머, 사건, 인물 발언, 정책 변화
-  - llm_direct: 한국 정책·통계·법령 수치 조회형 질문 — 뉴스 검색 없이 즉시 답변 가능한 공식 수치 (예: 최저임금, 기준금리, 세율, 인구 통계, 특정 법 조항, 정부 기관 정보 등 변하지 않거나 공식 출처가 명확한 팩트)
-  - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천·순수 의견·미래 예측
+  - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천, 또는 출처 기반 사실성 검토 대상이 아닌 의견·상담·창작·일반 설명·미래 예측
 - route는 인물/기업의 국적보다 check이 다루는 사건·제도·영향의 관할, 장소, 시장을 우선해 판정.
-- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 supported 또는 llm_direct.
-- "얼마야", "몇 %야", "언제부터야" 등 수치/날짜 조회 형태이면 llm_direct 우선 고려.
+- 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 supported.
+- isFactCheckQuestion=false이면 searchRoute는 unsupported로 둡니다.
 
 ## searchPlan.queries
-supported면 정확히 4개, llm_direct이면 빈 배열, unsupported면 빈 배열.
+supported면 정확히 4개, unsupported면 빈 배열.
 
 네이버 뉴스 검색 쿼리 원칙:
 - 기사 제목에 실제로 등장할 법한 핵심 키워드 조합

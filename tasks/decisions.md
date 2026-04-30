@@ -239,6 +239,15 @@
 - 분석 사건 묶음은 서로 다른 보도 매체 수가 많은 순으로 표시하고, 동률이면 포함 기사 수를 다음 정렬 기준으로 사용한다.
 - OpenAI 분석 응답에서 누락된 기사는 단일 기사 사건으로 보존해 분석 결과에서 사라지지 않게 한다.
 
+## 2026-05-01
+
+### Answer Provider Routing Cost Optimization
+- 신규 answer 생성의 query refinement는 항상 OpenAI structured output으로 수행한다.
+- `isFactCheckQuestion=true`이고 `searchRoute=supported`이면 Naver News Search로 출처를 수집하고 OpenAI로 relevance, evidence signal, answer summary를 생성한다.
+- `isFactCheckQuestion=false`이면 out_of_scope로 기록하지 않고 Perplexity direct answer를 사용하되, 이 결과는 출처 기반 fact-check verdict가 아니라 직접 답변으로 표시한다.
+- `isFactCheckQuestion=true`이고 `searchRoute=unsupported`이면 기존처럼 지원 범위 밖 answer로 기록하고 verdict를 생성하지 않는다.
+- 기존 저장 데이터 호환을 위해 `llm_direct` route parsing과 `perplexity-sonar` source provider는 유지한다.
+
 ## 2026-04-28
 
 ### Tavily KR Trusted Domain Registry

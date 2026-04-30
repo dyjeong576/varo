@@ -1,6 +1,7 @@
 import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
+import { AnswersOpenAiClient } from "./providers/answers-openai.client";
 import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import { AnswersProvidersService } from "./answers.providers.service";
@@ -39,6 +40,7 @@ describe("AnswersProvidersService", () => {
       createConfigServiceMock(values) as never,
       new AnswersTavilyClient(),
       new AnswersNaverClient(),
+      new AnswersOpenAiClient(),
       new AnswersPerplexityClient(),
     );
 
@@ -47,12 +49,30 @@ describe("AnswersProvidersService", () => {
     jest.restoreAllMocks();
   });
 
-  it("PERPLEXITY_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
+  it("OPENAI_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
     const service = createService({
-      perplexityApiKey: null,
+      openAiApiKey: null,
     });
 
     await expect(service.refineQuery("테슬라가 한국에서 철수한대")).rejects.toMatchObject({
+      code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    });
+  });
+
+  it("OPENAI_API_KEY가 없으면 relevance/evidence 분류를 실패시킨다", async () => {
+    const service = createService({
+      openAiApiKey: null,
+    });
+
+    await expect(
+      service.classifyRelevanceAndEvidenceSignals({
+        coreCheck: "한국은행 기준금리 동결",
+        searchRoute: "supported",
+        searchPlan: null,
+        candidates: [],
+      }),
+    ).rejects.toMatchObject({
       code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
       status: HttpStatus.INTERNAL_SERVER_ERROR,
     });
@@ -109,9 +129,9 @@ describe("AnswersProvidersService", () => {
     });
   });
 
-  it("refineQuery는 Perplexity client에 위임한다", async () => {
+  it("refineQuery는 OpenAI client에 위임한다", async () => {
     const refineSpy = jest
-      .spyOn(AnswersPerplexityClient.prototype, "refineQuery")
+      .spyOn(AnswersOpenAiClient.prototype, "refineQuery")
       .mockResolvedValue({
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
@@ -123,13 +143,13 @@ describe("AnswersProvidersService", () => {
         searchRouteReason: "이유",
       });
     const service = createService({
-      perplexityApiKey: "perplexity-test-key",
+      openAiApiKey: "openai-test-key",
     });
 
     const result = await service.refineQuery("트럼프가 관세를 발표했다");
 
     expect(refineSpy).toHaveBeenCalledWith(
-      "perplexity-test-key",
+      "openai-test-key",
       "트럼프가 관세를 발표했다",
     );
     expect(result.coreCheck).toBe("트럼프의 관세 발표");
@@ -251,9 +271,9 @@ describe("AnswersProvidersService", () => {
     expect(result[1]?.sourceProvider).toBe("tavily-search");
   });
 
-  it("classifyEvidenceSignals는 Perplexity client에 분류를 위임한다", async () => {
+  it("classifyEvidenceSignals는 OpenAI client에 분류를 위임한다", async () => {
     const classifySpy = jest
-      .spyOn(AnswersPerplexityClient.prototype, "classifyEvidenceSignals")
+      .spyOn(AnswersOpenAiClient.prototype, "classifyEvidenceSignals")
       .mockResolvedValue([
         {
           sourceId: "c1",
@@ -266,7 +286,7 @@ describe("AnswersProvidersService", () => {
         },
       ]);
     const service = createService({
-      perplexityApiKey: "perplexity-test-key",
+      openAiApiKey: "openai-test-key",
     });
     const input = {
       coreCheck: "테슬라 로드스터 4월 공개",
@@ -288,8 +308,36 @@ describe("AnswersProvidersService", () => {
 
     const result = await service.classifyEvidenceSignals(input);
 
-    expect(classifySpy).toHaveBeenCalledWith("perplexity-test-key", input);
+    expect(classifySpy).toHaveBeenCalledWith("openai-test-key", input);
     expect(result[0]?.currentAnswerImpact).toBe("overrides");
+  });
+
+  it("classifyRelevanceAndEvidenceSignals는 OpenAI client에 분류를 위임한다", async () => {
+    const classifySpy = jest
+      .spyOn(AnswersOpenAiClient.prototype, "classifyRelevanceAndEvidenceSignals")
+      .mockResolvedValue({
+        relevanceCandidates: [],
+        evidenceSignals: [],
+        answerSummary: {
+          analysisSummary: "수집된 출처 기준 요약입니다.",
+          uncertaintySummary: "추가 출처 확인이 필요합니다.",
+          uncertaintyItems: [],
+        },
+      });
+    const service = createService({
+      openAiApiKey: "openai-test-key",
+    });
+    const input = {
+      coreCheck: "한국은행 기준금리 동결",
+      searchRoute: "supported" as const,
+      searchPlan: null,
+      candidates: [],
+    };
+
+    const result = await service.classifyRelevanceAndEvidenceSignals(input);
+
+    expect(classifySpy).toHaveBeenCalledWith("openai-test-key", input);
+    expect(result.answerSummary?.analysisSummary).toContain("요약");
   });
 
   it("한국 뉴스 보조검색에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {

@@ -1,44 +1,25 @@
 # Current Task
 
 ## 작업명
-오늘의 헤드라인 v1
+Answer Provider Routing 비용 최적화
 
 ## 목표
-- 매일 새벽 1시(KST)에 주요 매체 RSS 헤드라인을 수집해 DB에 저장한다.
-- `/headlines`에서 정치/경제별 오늘의 헤드라인을 비교해 보여준다.
-- 수집된 RSS 제목만 기반으로 1차 군집화하고 사건별 표현 비교 분석을 제공한다.
+- Perplexity 사용 비용을 줄이기 위해 answer 생성 경로를 OpenAI 중심으로 전환한다.
+- query refinement는 항상 OpenAI로 수행한다.
+- 출처 기반 사실성 검토 대상이면 Naver News Search로 출처를 수집하고 OpenAI로 relevance/evidence/summary를 생성한다.
+- 출처 기반 사실성 검토 대상이 아니면 out_of_scope로 막지 않고 Perplexity 직접 답변으로 처리한다.
 
 ## 이번 작업 범위
 - `docs/prd.md`
 - `tasks/decisions.md`
 - `tasks/current-task.md`
-- `backend/prisma/schema.prisma`
-- `backend/prisma/migrations`
-- `backend/src/headlines`
-- `backend/src/app.module.ts`
-- `backend/src/config/app.config.ts`
-- `backend/.env.example`
-- `frontend/app/(main)/headlines`
-- `frontend/components/headlines`
-- `frontend/components/layout/main-shell.tsx`
-- `frontend/lib/api/client.ts`
-- `frontend/lib/types/headlines.ts`
-
-## 2026-04-30 추가 변경
-- 경제 RSS 수집 feed를 추가한다.
-- `/headlines` 화면 메뉴를 `헤드라인 / 분석`에서 `정치 / 경제`로 변경한다.
-- 헤드라인 API가 `category=politics|economy`로 정치/경제 RSS 조회, 분석 조회, 수동 수집 범위를 지정할 수 있게 한다.
-- `/headlines` 화면에서 RSS 기사 시간 표기를 제거하고 실시간 조회 대신 날짜 검색을 제공한다.
-- 날짜 검색은 2026-04-30부터 선택할 수 있게 제한한다.
-- 선택 날짜/카테고리에서 수집된 기사를 모두 노출한다.
-- `/headlines` 화면은 AI가 사건별로 그룹화한 헤드라인 분석만 노출한다.
-- 헤드라인 분석은 `date + category` 단위로 저장해 정치/경제 분석 결과가 섞이지 않게 한다.
-- 헤드라인 분석은 저장된 전체 기사의 제목만으로 1차 군집화하고, 사건 묶음은 보도 매체 수가 많은 순으로 표시한다.
-- `headline_articles`도 `category` 필드를 저장해 정치/경제 기사를 publisherKey suffix 추론 없이 구분한다.
-- 수동 수집은 같은 날짜/카테고리에 이미 저장된 `publisher_key`의 RSS feed를 다시 추가하지 않는다.
+- `backend/src/answers`
+- `frontend/app/(main)/answers/[answerId]`
+- `frontend/components/answers`
+- `frontend/lib/answers`
 
 ## 제외 범위
-- 기사 본문 HTML 스크래핑
-- 매체별 신뢰도 점수화
-- 사용자별 맞춤 매체 선택
-- 관리자용 RSS 관리 UI
+- DB schema 변경
+- Naver/Tavily provider 자체 교체
+- Perplexity direct answer API 계약 변경
+- 한국 정치·경제 밖 사실성 check 지원 확대

@@ -4,6 +4,7 @@ import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
 import { NaverNewsSearchTestRequestDto } from "./dto/naver-news-search-test.dto";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
+import { AnswersOpenAiClient } from "./providers/answers-openai.client";
 import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import {
@@ -19,7 +20,7 @@ import {
 } from "./answers.types";
 import { selectDomainsForBucket } from "./answers.utils";
 
-const NAVER_SEARCH_DISPLAY = 8;
+const NAVER_SEARCH_DISPLAY = 10;
 const NAVER_SUFFICIENT_SOURCE_COUNT = 15;
 const NAVER_SEARCH_TIMEOUT_CAP_MS = 8000;
 const TAVILY_FALLBACK_SOFT_TIMEOUT_MS = 8000;
@@ -32,6 +33,7 @@ export class AnswersProvidersService {
     private readonly configService: ConfigService,
     private readonly tavilyClient: AnswersTavilyClient,
     private readonly naverClient: AnswersNaverClient,
+    private readonly openAiClient: AnswersOpenAiClient,
     private readonly perplexityClient: AnswersPerplexityClient,
   ) {}
 
@@ -41,8 +43,8 @@ export class AnswersProvidersService {
   }
 
   async refineQuery(rawCheck: string): Promise<QueryRefinementResult> {
-    const apiKey = this.getRequiredPerplexityApiKey();
-    return this.perplexityClient.refineQuery(apiKey, rawCheck);
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.refineQuery(apiKey, rawCheck);
   }
 
   async searchSources(input: SearchSourcesInput): Promise<SearchCandidate[]> {
@@ -127,15 +129,15 @@ export class AnswersProvidersService {
   async classifyEvidenceSignals(
     input: EvidenceSignalClassificationInput,
   ): Promise<EvidenceSignal[]> {
-    const apiKey = this.getRequiredPerplexityApiKey();
-    return this.perplexityClient.classifyEvidenceSignals(apiKey, input);
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.classifyEvidenceSignals(apiKey, input);
   }
 
   async classifyRelevanceAndEvidenceSignals(
     input: RelevanceSignalClassificationInput,
   ): Promise<RelevanceSignalClassificationResult> {
-    const apiKey = this.getRequiredPerplexityApiKey();
-    return this.perplexityClient.classifyRelevanceAndEvidenceSignals(apiKey, input);
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.classifyRelevanceAndEvidenceSignals(apiKey, input);
   }
 
   async extractContent(
@@ -157,7 +159,21 @@ export class AnswersProvidersService {
     if (!apiKey) {
       throw new AppException(
         APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-        "llm_direct route에는 PERPLEXITY_API_KEY가 필요합니다.",
+        "Perplexity 직접 답변에는 PERPLEXITY_API_KEY가 필요합니다.",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return apiKey;
+  }
+
+  private getRequiredOpenAiApiKey(): string {
+    const apiKey = this.configService.get<string | null>("openAiApiKey", null);
+
+    if (!apiKey) {
+      throw new AppException(
+        APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
+        "OpenAI 호출에는 OPENAI_API_KEY가 필요합니다.",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

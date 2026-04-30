@@ -264,13 +264,15 @@ export default function AnswerResultPage() {
     answer.analysisSummary !== null &&
     answer.uncertaintySummary !== null &&
     answer.resultMode !== null;
+  const hasFactCheckResult = hasAnswerResult && answer.isFactCheckQuestion;
+  const hasDirectAnswerResult = hasAnswerResult && !answer.isFactCheckQuestion;
   const isSignalClassificationPending =
     !answer.isOutOfScope && answer.status === "searching";
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top,#f1f6ff_0%,#f8f9fc_32%,#f6f3fb_70%,#f5f1fb_100%)] px-4 py-5 sm:px-6 sm:py-6">
       <main className="mx-auto max-w-3xl space-y-8">
-        {hasAnswerResult ? (
+        {hasFactCheckResult ? (
           <VerdictHero
             check={answer.check}
             verdictLabel={answer.verdictLabel!}
@@ -279,6 +281,27 @@ export default function AnswerResultPage() {
             currentStageLabel={answer.currentStageLabel}
             pendingMessage={answer.pendingMessage}
           />
+        ) : hasDirectAnswerResult ? (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#0050cb]">
+                  직접 답변
+                </span>
+                <span className="rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-bold text-[#0050cb]">
+                  {answer.currentStageLabel}
+                </span>
+              </div>
+
+              <h1 className="text-[1.9rem] font-extrabold leading-tight tracking-[-0.04em] text-[#191b24] sm:text-[2.2rem]">
+                {answer.check}
+              </h1>
+            </div>
+
+            <p className="text-sm leading-6 text-[#6b7280]">
+              {answer.pendingMessage}
+            </p>
+          </section>
         ) : isSignalClassificationPending ? (
           <section className="space-y-4">
             <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
@@ -336,23 +359,26 @@ export default function AnswerResultPage() {
             officialSourceCount={answer.sourceBreakdown.official}
             sourceCount={answer.sources.length}
             evidenceSnippetCount={answer.evidenceSnippets.length}
+            isFactCheckQuestion={answer.isFactCheckQuestion}
           />
         ) : null}
 
-        {isSignalClassificationPending ? (
-          <SignalClassificationSkeleton sourceCount={answer.sources.length} />
-        ) : (
-          <EvidenceGrid
-            searchedSourceCount={answer.searchedSourceCount}
-            selectedSourceCount={answer.selectedSourceCount}
-            agreementCount={answer.agreementCount}
-            conflictCount={answer.conflictCount}
-            contextCount={answer.contextCount}
-            consensusLabel={answer.consensusLabel}
-            isFactCheckQuestion={answer.isFactCheckQuestion}
-            sourceBreakdown={answer.sourceBreakdown}
-          />
-        )}
+        {answer.isFactCheckQuestion ? (
+          isSignalClassificationPending ? (
+            <SignalClassificationSkeleton sourceCount={answer.sources.length} />
+          ) : (
+            <EvidenceGrid
+              searchedSourceCount={answer.searchedSourceCount}
+              selectedSourceCount={answer.selectedSourceCount}
+              agreementCount={answer.agreementCount}
+              conflictCount={answer.conflictCount}
+              contextCount={answer.contextCount}
+              consensusLabel={answer.consensusLabel}
+              isFactCheckQuestion={answer.isFactCheckQuestion}
+              sourceBreakdown={answer.sourceBreakdown}
+            />
+          )
+        ) : null}
 
         {answer.evidenceSnippets.length > 0 ? (
           <EvidenceSnippetList evidenceSnippets={answer.evidenceSnippets} />

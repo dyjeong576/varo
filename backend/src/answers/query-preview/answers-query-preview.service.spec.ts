@@ -1093,6 +1093,75 @@ describe("AnswersQueryPreviewService", () => {
     expect(providers.extractContent).not.toHaveBeenCalled();
   });
 
+  it("isFactCheckQuestion false면 out_of_scope가 아니라 Perplexity 직접 답변으로 저장한다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [
+        {
+          id: "source-1",
+          sourceType: "other",
+          publisherName: "example.com",
+          publishedAt: null,
+          canonicalUrl: "https://example.com/answer",
+          originalUrl: "https://example.com/answer",
+          rawTitle: "참고 출처",
+          rawSnippet: "직접 답변 참고 링크입니다.",
+          originQueryIds: ["q1"],
+          relevanceTier: "primary",
+          relevanceReason: "Perplexity sonar 실시간 검색 인용 출처",
+          retrievalBucket: "familiar",
+          domainRegistryId: null,
+          fetchStatus: "pending",
+          contentText: null,
+        },
+      ],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: ["source-1"],
+      insufficiencyReason: "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
+      evidenceSignals: [],
+      answerSummary: {
+        analysisSummary: "정치 뉴스는 여러 출처를 비교해 읽는 것이 좋습니다.",
+        uncertaintySummary:
+          "Perplexity 직접 답변입니다. 출처 기반 사실성 검토 결과가 아닙니다.",
+        uncertaintyItems: [],
+      },
+    });
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        coreCheck: "정치 뉴스 읽는 방법",
+        normalizedCheck: "정치 뉴스를 어떻게 읽어야 하는지 묻는 질문",
+        checkType: "general_fact",
+        isFactCheckQuestion: false,
+        searchPlan: { queries: [] },
+        generatedQueries: [{ id: "q1", text: "정치 뉴스 읽는 방법", rank: 1 }],
+        searchRoute: "unsupported",
+        searchRouteReason: "출처 기반 사실성 검토 대상이 아닙니다.",
+      }),
+      answerDirectly: jest.fn().mockResolvedValue({
+        answerText: "정치 뉴스는 여러 출처를 비교해 읽는 것이 좋습니다.",
+        citations: [{ url: "https://example.com/answer" }],
+      }),
+      searchSources: jest.fn(),
+      extractContent: jest.fn(),
+    } as unknown as AnswersProvidersService;
+    const service = new AnswersQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const result = await service.createQueryProcessingPreview("user-1", {
+      check: "정치 뉴스는 어떻게 읽는 게 좋아?",
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.isFactCheckQuestion).toBe(false);
+    expect(result.result?.analysisSummary).toContain("정치 뉴스");
+    expect(providers.answerDirectly).toHaveBeenCalledWith("정치 뉴스 읽는 방법");
+    expect(providers.searchSources).not.toHaveBeenCalled();
+    expect(persistence.persistOutOfScopeAnswer).not.toHaveBeenCalled();
+  });
+
   it("verification source가 부족해도 domainless fallback search를 수행하지 않는다", async () => {
     const persistence = createPersistenceMock();
     const providers = {
