@@ -20,7 +20,6 @@ export interface AppConfig {
   sessionCookieName: string;
   sessionCookieDomain: string | null;
   sessionTtlDays: number;
-  answerProviderMode: "mock" | "real";
   openAiApiKey: string | null;
   naverClientId: string | null;
   naverClientSecret: string | null;
@@ -76,18 +75,6 @@ function normalizeOptionalBaseUrl(name: string, value?: string): string | null {
 
 function readCanonicalHostStatus(value?: string): CanonicalHostStatus {
   return value === "live" ? "live" : "pending";
-}
-
-function readAnswerProviderMode(value?: string, appEnv?: AppEnv): "mock" | "real" {
-  if (value === "real") {
-    return "real";
-  }
-
-  if (value === "mock") {
-    return "mock";
-  }
-
-  return appEnv === "prod" ? "real" : "mock";
 }
 
 function readPositiveInteger(name: string, fallback: number): number {
@@ -193,7 +180,6 @@ export function getAppConfig(): AppConfig {
     sessionCookieName: getRequired("SESSION_COOKIE_NAME"),
     sessionCookieDomain,
     sessionTtlDays: ttl,
-    answerProviderMode: readAnswerProviderMode(getOptional("ANSWER_PROVIDER_MODE"), appEnv),
     openAiApiKey: getOptional("OPENAI_API_KEY") ?? null,
     naverClientId: getOptional("NAVER_CLIENT_ID") ?? null,
     naverClientSecret: getOptional("NAVER_CLIENT_SECRET") ?? null,

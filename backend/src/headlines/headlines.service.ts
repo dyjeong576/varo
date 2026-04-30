@@ -420,12 +420,7 @@ export class HeadlinesService {
     category: HeadlineCategory,
     articles: HeadlineAnalysisArticleInput[],
   ): Promise<HeadlineAnalysisPayload> {
-    const providerMode = this.configService.get<string>("answerProviderMode", "mock");
     const apiKey = this.configService.get<string | null>("openAiApiKey", null);
-
-    if (providerMode === "mock") {
-      return this.buildMockAnalysis(articles);
-    }
 
     if (!apiKey) {
       throw new AppException(
@@ -436,30 +431,6 @@ export class HeadlinesService {
     }
 
     return this.openAiClient.analyzeHeadlines(apiKey, dateKey, category, articles);
-  }
-
-  private buildMockAnalysis(articles: HeadlineAnalysisArticleInput[]): HeadlineAnalysisPayload {
-    const selected = articles.slice(0, 8);
-
-    return {
-      summary: "개발 모드에서는 RSS 제목과 요약을 기준으로 임시 사건 묶음을 생성합니다.",
-      clusters: selected.length > 0
-        ? [
-            {
-              eventName: "오늘 수집된 주요 헤드라인",
-              eventSummary: "수집된 RSS 헤드라인을 하나의 임시 묶음으로 비교합니다.",
-              commonFacts: ["RSS 제목과 요약만 사용했습니다."],
-              uncertainty: "실제 사건별 군집화는 real provider mode에서 OpenAI 분석으로 생성됩니다.",
-              items: selected.map((article) => ({
-                articleId: article.id,
-                expressionSummary: `${article.publisherName}은 "${article.title}"로 이 사안을 표현했습니다.`,
-                emphasis: article.summary ? article.summary.slice(0, 120) : null,
-                framing: null,
-              })),
-            },
-          ]
-        : [],
-    };
   }
 
   private async persistAnalysis(

@@ -159,7 +159,7 @@ export class AnswersProvidersService {
     if (!apiKey) {
       throw new AppException(
         APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-        "real provider mode에서는 OPENAI_API_KEY가 필요합니다.",
+        "OpenAI 호출에는 OPENAI_API_KEY가 필요합니다.",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -187,7 +187,7 @@ export class AnswersProvidersService {
     if (!apiKey) {
       throw new AppException(
         APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-        "real provider mode에서는 TAVILY_API_KEY가 필요합니다.",
+        "Tavily 호출에는 TAVILY_API_KEY가 필요합니다.",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

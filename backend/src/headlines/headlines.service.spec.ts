@@ -17,7 +17,7 @@ describe("HeadlinesService", () => {
     const prisma = db as any;
     const service = new HeadlinesService(
       prisma,
-      new ConfigService({ answerProviderMode: "mock" }),
+      new ConfigService(),
       new HeadlinesRssParserService(),
       {} as HeadlinesOpenAiClient,
     );
@@ -109,7 +109,7 @@ describe("HeadlinesService", () => {
     };
     const service = new HeadlinesService(
       db as any,
-      new ConfigService({ answerProviderMode: "mock" }),
+      new ConfigService(),
       new HeadlinesRssParserService(),
       {} as HeadlinesOpenAiClient,
     );

@@ -58,7 +58,6 @@ describe("app.config", () => {
     expect(config.googleCallbackUrl).toBe("http://localhost:4000/api/v1/auth/google/callback");
     expect(config.frontendBaseUrl).toBe("http://localhost:3000");
     expect(config.sessionCookieDomain).toBe("varocheck.com");
-    expect(config.answerProviderMode).toBe("mock");
     expect(config.openAiApiKey).toBeNull();
     expect(config.naverClientId).toBeNull();
     expect(config.naverClientSecret).toBeNull();

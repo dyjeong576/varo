@@ -80,6 +80,8 @@ export class HeadlinesOpenAiClient {
 - 입력으로 제공된 RSS 제목, 요약, 매체명만 사용하세요.
 - 기사 본문을 읽었다고 가정하지 마세요.
 - 사실 판정, 매체 신뢰도 점수, 정치 성향 판단을 하지 마세요.
+- summary는 2~3문장의 개요 문단 뒤에 빈 줄을 두고, "- "로 시작하는 핵심 bullet 3~5개를 포함하세요.
+- summary bullet은 주요 사건 흐름, 반복 노출된 이슈, 매체별 표현 차이, 남은 불확실성을 다루세요.
 - 같은 사건을 다루는 기사만 하나의 cluster로 묶고, 근거가 약하면 uncertainty에 명시하세요.
 - expressionSummary는 각 매체가 제목/요약에서 사건을 어떻게 표현했는지 짧게 설명하세요.`,
         },
@@ -138,7 +140,7 @@ export class HeadlinesOpenAiClient {
           model: OPENAI_MODEL,
           input,
           text: {
-            verbosity: "low",
+            verbosity: "medium",
             format: {
               type: "json_schema",
               name: schema.name,

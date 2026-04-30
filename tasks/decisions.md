@@ -42,7 +42,7 @@
 - answer query backend의 1차 공개 API는 `POST /api/v1/answers/query-processing-preview`로 둔다.
 - query refinement와 relevance filtering의 출력 모델은 `primary / reference / discard` 3단계로 고정한다.
 - source traceability는 source별 `origin_query_ids[]`를 유지하는 방식으로 구현한다.
-- dev 환경의 answer provider mode 기본값은 `mock`, prod 기본값은 `real`로 둔다.
+- answer provider는 환경별 mock/real mode 분기 없이 실제 provider 설정을 기준으로 동작한다.
 - 1차 extraction 대상은 `primary` 우선, 부족 시 `reference` 제한 승격으로 처리한다.
 - 초기 실제 provider 조합은 Tavily search/extract + OpenAI structured outputs로 두었으나, 검색 provider 조합은 2026-04-21 Search Provider Routing 결정으로 대체한다.
 - query refinement와 relevance filtering의 OpenAI 모델은 모두 `gpt-5-mini`로 고정한다.
@@ -316,8 +316,9 @@
 - 저장 범위는 RSS의 제목, 링크, 요약, 발행시각, 매체명, raw RSS item으로 제한하고 기사 본문 HTML은 수집하지 않는다.
 - 중복 기준은 `publisher_key + normalized_url` unique로 둔다.
 - 오늘의 헤드라인 분석은 저장된 RSS 제목/요약/매체명만 기반으로 OpenAI structured output을 사용한다.
+- 분석 summary는 2~3문장의 개요 문단과 `- ` bullet 3~5개로 주요 흐름, 반복 이슈, 매체별 표현 차이, 불확실성을 설명한다.
 - 분석 결과는 사건별 cluster와 매체별 표현 요약으로 저장하며 사실 판정, 매체 신뢰도 점수, 정치 성향 판단을 생성하지 않는다.
-- dev/mock provider mode에서는 OpenAI 호출 없이 임시 분석 cluster를 생성한다.
+- 헤드라인 분석은 `OPENAI_API_KEY`가 없으면 실패시키고 임시 분석 cluster를 생성하지 않는다.
 
 ### Query Refinement FactCheck Flag
 - `search_route` 값에서 `news`를 제거하고 신규 answer 생성 기준 `supported / unsupported`만 사용한다.

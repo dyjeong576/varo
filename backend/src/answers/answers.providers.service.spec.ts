@@ -49,9 +49,8 @@ describe("AnswersProvidersService", () => {
     jest.restoreAllMocks();
   });
 
-  it("real mode에서 OPENAI_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
+  it("OPENAI_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
     const service = createService({
-      answerProviderMode: "real",
       openAiApiKey: null,
     });
 
@@ -61,9 +60,8 @@ describe("AnswersProvidersService", () => {
     });
   });
 
-  it("real mode에서 NAVER_CLIENT_ID가 없으면 검색을 실패시킨다", async () => {
+  it("NAVER_CLIENT_ID가 없으면 검색을 실패시킨다", async () => {
     const service = createService({
-      answerProviderMode: "real",
       naverClientId: null,
       naverClientSecret: "naver-secret",
     });
@@ -127,7 +125,6 @@ describe("AnswersProvidersService", () => {
         searchRouteReason: "이유",
       });
     const service = createService({
-      answerProviderMode: "real",
       openAiApiKey: "openai-test-key",
     });
 
@@ -179,7 +176,6 @@ describe("AnswersProvidersService", () => {
         },
       ]);
     const service = createService({
-      answerProviderMode: "real",
       naverClientId: "naver-id",
       naverClientSecret: "naver-secret",
       tavilyApiKey: "tavily-key",
@@ -249,7 +245,6 @@ describe("AnswersProvidersService", () => {
         },
       ]);
     const service = createService({
-      answerProviderMode: "real",
       openAiApiKey: "openai-test-key",
     });
     const input = {
@@ -281,7 +276,6 @@ describe("AnswersProvidersService", () => {
       .spyOn(AnswersNaverClient.prototype, "searchNews")
       .mockResolvedValue([]);
     const service = createService({
-      answerProviderMode: "real",
       naverClientId: "naver-client-id",
       naverClientSecret: "naver-secret",
       tavilyApiKey: null,
