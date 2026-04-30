@@ -101,7 +101,7 @@ const UPDATE_KEYWORDS = [
   "slipped",
 ];
 const FALLBACK_ANALYSIS_SUMMARY =
-  "OpenAI summary가 아직 저장되지 않아 수집된 출처의 구조 정보만 표시합니다.";
+  "LLM summary가 아직 저장되지 않아 수집된 출처의 구조 정보만 표시합니다.";
 const FALLBACK_UNCERTAINTY_SUMMARY =
   "요약이 없는 기존 결과이므로 중요한 판단은 원문 출처를 직접 확인해 주세요.";
 

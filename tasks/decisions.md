@@ -338,3 +338,11 @@
 - 공개 API 경로는 `/api/v1/answers` 기준으로 전환하고, frontend route도 `/answers/[answerId]`를 사용한다.
 - Prisma 모델은 `Check`, `AnswerJob`을 사용하고 DB table/column은 `checks`, `answer_jobs`, `check_id`, `answer_job_id`로 전환한다.
 - 기존 DB는 rename migration으로 따라오며, 저장된 JSON artifact key/value도 새 명칭으로 변환한다.
+
+## 2026-05-01
+
+### Answers LLM Provider
+- answer query refinement, relevance/evidence signal classification, llm_direct direct answer provider는 OpenAI 대신 Perplexity Sonar API를 사용한다.
+- Perplexity Sonar 호출은 JSON Schema structured output을 사용하고, direct answer는 Perplexity citations/search_results를 source candidate metadata로 보존한다.
+- Perplexity Sonar 호출은 비용 절감을 위해 `sonar`, `search_context_size=low`, `reasoning_effort=low`를 기본값으로 사용한다.
+- 오늘의 헤드라인 분석 provider는 별도 변경 전까지 기존 OpenAI structured output 경로를 유지한다.

@@ -169,6 +169,9 @@ export interface AnswerGeneratedSummary {
 
 export interface DirectAnswerCitation {
   url: string;
+  title?: string | null;
+  publishedAt?: string | null;
+  snippet?: string | null;
 }
 
 export interface DirectAnswerResult {

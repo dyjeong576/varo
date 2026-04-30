@@ -1,7 +1,6 @@
 import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
-import { AnswersOpenAiClient } from "./providers/answers-openai.client";
 import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import { AnswersProvidersService } from "./answers.providers.service";
@@ -38,7 +37,6 @@ describe("AnswersProvidersService", () => {
   const createService = (values: Record<string, unknown>) =>
     new AnswersProvidersService(
       createConfigServiceMock(values) as never,
-      new AnswersOpenAiClient(),
       new AnswersTavilyClient(),
       new AnswersNaverClient(),
       new AnswersPerplexityClient(),
@@ -49,9 +47,9 @@ describe("AnswersProvidersService", () => {
     jest.restoreAllMocks();
   });
 
-  it("OPENAI_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
+  it("PERPLEXITY_API_KEY가 없으면 질의 정제를 실패시킨다", async () => {
     const service = createService({
-      openAiApiKey: null,
+      perplexityApiKey: null,
     });
 
     await expect(service.refineQuery("테슬라가 한국에서 철수한대")).rejects.toMatchObject({
@@ -111,9 +109,9 @@ describe("AnswersProvidersService", () => {
     });
   });
 
-  it("refineQuery는 OpenAI client에 위임한다", async () => {
+  it("refineQuery는 Perplexity client에 위임한다", async () => {
     const refineSpy = jest
-      .spyOn(AnswersOpenAiClient.prototype, "refineQuery")
+      .spyOn(AnswersPerplexityClient.prototype, "refineQuery")
       .mockResolvedValue({
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
@@ -125,13 +123,36 @@ describe("AnswersProvidersService", () => {
         searchRouteReason: "이유",
       });
     const service = createService({
-      openAiApiKey: "openai-test-key",
+      perplexityApiKey: "perplexity-test-key",
     });
 
     const result = await service.refineQuery("트럼프가 관세를 발표했다");
 
-    expect(refineSpy).toHaveBeenCalledWith("openai-test-key", "트럼프가 관세를 발표했다");
+    expect(refineSpy).toHaveBeenCalledWith(
+      "perplexity-test-key",
+      "트럼프가 관세를 발표했다",
+    );
     expect(result.coreCheck).toBe("트럼프의 관세 발표");
+  });
+
+  it("answerDirectly는 Perplexity client에 위임한다", async () => {
+    const answerSpy = jest
+      .spyOn(AnswersPerplexityClient.prototype, "answerDirectly")
+      .mockResolvedValue({
+        answerText: "2026년 기준 최저임금은 시간당 1만320원입니다.",
+        citations: [{ url: "https://www.minimumwage.go.kr/main.do" }],
+      });
+    const service = createService({
+      perplexityApiKey: "perplexity-test-key",
+    });
+
+    const result = await service.answerDirectly("2026년 최저임금 얼마야?");
+
+    expect(answerSpy).toHaveBeenCalledWith(
+      "perplexity-test-key",
+      "2026년 최저임금 얼마야?",
+    );
+    expect(result.answerText).toContain("최저임금");
   });
 
   it("searchSources는 searchRoute가 supported이면 Naver 검색 후 필요시 TavilyFallback을 호출한다", async () => {
@@ -230,9 +251,9 @@ describe("AnswersProvidersService", () => {
     expect(result[1]?.sourceProvider).toBe("tavily-search");
   });
 
-  it("classifyEvidenceSignals는 OpenAI client에 분류를 위임한다", async () => {
+  it("classifyEvidenceSignals는 Perplexity client에 분류를 위임한다", async () => {
     const classifySpy = jest
-      .spyOn(AnswersOpenAiClient.prototype, "classifyEvidenceSignals")
+      .spyOn(AnswersPerplexityClient.prototype, "classifyEvidenceSignals")
       .mockResolvedValue([
         {
           sourceId: "c1",
@@ -245,7 +266,7 @@ describe("AnswersProvidersService", () => {
         },
       ]);
     const service = createService({
-      openAiApiKey: "openai-test-key",
+      perplexityApiKey: "perplexity-test-key",
     });
     const input = {
       coreCheck: "테슬라 로드스터 4월 공개",
@@ -267,7 +288,7 @@ describe("AnswersProvidersService", () => {
 
     const result = await service.classifyEvidenceSignals(input);
 
-    expect(classifySpy).toHaveBeenCalledWith("openai-test-key", input);
+    expect(classifySpy).toHaveBeenCalledWith("perplexity-test-key", input);
     expect(result[0]?.currentAnswerImpact).toBe("overrides");
   });
 

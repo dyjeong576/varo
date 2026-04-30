@@ -90,8 +90,8 @@ describe("assembleAnswerResult", () => {
       evidenceSnippets,
       insufficiencyReason: null,
       answerSummary: {
-        analysisSummary: "OpenAI가 생성한 요약입니다.",
-        uncertaintySummary: "OpenAI가 생성한 불확실성 요약입니다.",
+        analysisSummary: "LLM이 생성한 요약입니다.",
+        uncertaintySummary: "LLM이 생성한 불확실성 요약입니다.",
         uncertaintyItems: ["공식 원문 추가 확인이 필요합니다."],
       },
     });
@@ -102,9 +102,9 @@ describe("assembleAnswerResult", () => {
     expect(result.result.sourceBreakdown.official).toBe(1);
     expect(result.result.agreementCount).toBe(2);
     expect(result.result.contextCount).toBe(1);
-    expect(result.result.analysisSummary).toBe("OpenAI가 생성한 요약입니다.");
+    expect(result.result.analysisSummary).toBe("LLM이 생성한 요약입니다.");
     expect(result.result.uncertaintySummary).toBe(
-      "OpenAI가 생성한 불확실성 요약입니다.",
+      "LLM이 생성한 불확실성 요약입니다.",
     );
     expect(result.result.uncertaintyItems).toEqual([
       "공식 원문 추가 확인이 필요합니다.",
@@ -364,7 +364,7 @@ describe("assembleAnswerResult", () => {
     expect(result.result.confidenceScore).toBeGreaterThanOrEqual(35);
     expect(result.result.confidenceScore).toBeLessThanOrEqual(98);
     expect(result.result.analysisSummary).toBe(
-      "OpenAI summary가 아직 저장되지 않아 수집된 출처의 구조 정보만 표시합니다.",
+      "LLM summary가 아직 저장되지 않아 수집된 출처의 구조 정보만 표시합니다.",
     );
     expect(result.result.uncertaintySummary).toBe(
       "요약이 없는 기존 결과이므로 중요한 판단은 원문 출처를 직접 확인해 주세요.",
