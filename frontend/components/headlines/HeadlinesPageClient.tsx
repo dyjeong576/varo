@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
-import type { HeadlineCategory, HeadlinesTodayResponse } from "@/lib/types/headlines";
+import type { HeadlineCategory, HeadlinesAnalysisResponse, HeadlinesTodayResponse } from "@/lib/types/headlines";
 
 const MIN_HEADLINE_DATE = "2026-04-30";
 
@@ -29,6 +29,7 @@ export function HeadlinesPageClient() {
   const [selectedDate, setSelectedDate] = useState(getKstDateKey);
   const [dateInput, setDateInput] = useState(getKstDateKey);
   const [today, setToday] = useState<HeadlinesTodayResponse | null>(null);
+  const [analysis, setAnalysis] = useState<HeadlinesAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -38,13 +39,17 @@ export function HeadlinesPageClient() {
     async function loadHeadlines() {
       try {
         setIsLoading(true);
-        const todayResponse = await api.headlines.getToday({ date: selectedDate, category: activeCategory });
+        const [todayResponse, analysisResponse] = await Promise.all([
+          api.headlines.getToday({ date: selectedDate, category: activeCategory }),
+          api.headlines.getAnalysis({ date: selectedDate, category: activeCategory }),
+        ]);
 
         if (!isMounted) {
           return;
         }
 
         setToday(todayResponse);
+        setAnalysis(analysisResponse);
         setErrorMessage(null);
       } catch (error) {
         if (!isMounted) {
@@ -81,6 +86,7 @@ export function HeadlinesPageClient() {
       .reduce((count, publisher) => count + publisher.articles.length, 0) ?? 0,
     [activeCategory, today],
   );
+  const clusterCount = analysis?.clusters.length ?? 0;
 
   function openDatePicker() {
     const input = dateInputRef.current;
@@ -132,11 +138,12 @@ export function HeadlinesPageClient() {
         <p className="text-sm font-semibold text-primary">{today.dateKey}</p>
         <h1 className="text-3xl font-bold tracking-normal text-foreground">오늘의 헤드라인</h1>
         <p className="text-sm leading-6 text-on-surface-variant">
-          여러 매체의 주요 뉴스를 한눈에 비교해보세요. 핵심 헤드라인만 빠르게 모아드립니다.
+          같은 사건을 다룬 여러 매체의 헤드라인 표현을 수집된 제목과 요약 기준으로 비교합니다.
         </p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
           <span className="rounded-full bg-white px-3 py-1 shadow-sm">기사 {articleCount}개</span>
           <span className="rounded-full bg-white px-3 py-1 shadow-sm">매체 {publisherCount}곳</span>
+          <span className="rounded-full bg-white px-3 py-1 shadow-sm">사건 {clusterCount}개</span>
           <button
             type="button"
             onClick={openDatePicker}
@@ -177,81 +184,91 @@ export function HeadlinesPageClient() {
         </button>
       </div>
 
-      <HeadlineList today={today} category={activeCategory} />
+      <HeadlineAnalysis analysis={analysis} category={activeCategory} />
     </div>
   );
 }
 
-function HeadlineList({ today, category }: { today: HeadlinesTodayResponse; category: HeadlineCategory }) {
-  const visiblePublishers = today.publishers.filter((publisher) => getPublisherCategory(publisher) === category && publisher.articles.length > 0);
-
-  if (visiblePublishers.length === 0) {
+function HeadlineAnalysis({ analysis, category }: { analysis: HeadlinesAnalysisResponse | null; category: HeadlineCategory }) {
+  if (!analysis || analysis.status === "pending") {
     return (
       <div className="rounded-2xl bg-white px-6 py-14 text-center shadow-sm">
-        <p className="text-sm text-on-surface-variant">아직 저장된 {category === "politics" ? "정치" : "경제"} 헤드라인이 없습니다.</p>
+        <p className="text-sm text-on-surface-variant">아직 {category === "politics" ? "정치" : "경제"} 사건별 분석이 준비되지 않았습니다.</p>
       </div>
     );
   }
 
-  const maxArticleCount = Math.max(...visiblePublishers.map((publisher) => publisher.articles.length));
+  if (analysis.status === "failed") {
+    return (
+      <div className="rounded-2xl bg-white px-6 py-14 text-center shadow-sm">
+        <p className="text-sm text-on-surface-variant">{analysis.errorMessage ?? "헤드라인 분석에 실패했습니다."}</p>
+      </div>
+    );
+  }
+
+  if (analysis.clusters.length === 0) {
+    return (
+      <div className="rounded-2xl bg-white px-6 py-14 text-center shadow-sm">
+        <p className="text-sm text-on-surface-variant">비교할 사건 묶음이 없습니다.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-      <table className="min-w-[960px] w-full table-fixed border-collapse">
-        <thead>
-          <tr className="border-b border-gray-100">
-            {visiblePublishers.map((publisher) => (
-              <th key={publisher.publisherKey} scope="col" className="w-40 px-4 py-3 text-left align-top lg:w-1/6">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-bold text-foreground">{publisher.publisherName}</p>
-                    <p className="mt-1 text-[11px] font-medium text-on-surface-variant">RSS 기사 {publisher.articles.length}개</p>
-                  </div>
-                  <a
-                    href={publisher.feedUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container-low"
-                    aria-label={`${publisher.publisherName} RSS 열기`}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {Array.from({ length: maxArticleCount }).map((_, rowIndex) => (
-            <tr key={rowIndex}>
-              {visiblePublishers.map((publisher) => {
-                const article = publisher.articles[rowIndex];
+    <div className="space-y-4">
+      {analysis.clusters.map((cluster) => (
+        <article key={cluster.id} className="rounded-2xl bg-white p-5 shadow-sm">
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">{cluster.eventName}</h2>
+              <p className="mt-2 text-sm leading-6 text-on-surface-variant">{cluster.eventSummary}</p>
+            </div>
 
-                return (
-                  <td key={publisher.publisherKey} className="px-4 py-4 align-top">
-                    {article ? (
-                      <a
-                        href={article.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="line-clamp-3 text-sm font-semibold leading-6 text-foreground">{article.title}</h3>
-                          <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-on-surface-variant" />
-                        </div>
-                        {article.summary ? (
-                          <p className="mt-2 line-clamp-2 text-xs leading-5 text-on-surface-variant">{article.summary}</p>
-                        ) : null}
-                      </a>
-                    ) : null}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            {cluster.commonFacts.length > 0 ? (
+              <div className="rounded-xl bg-surface-container-low p-4">
+                <p className="text-xs font-semibold text-on-surface-variant">공통으로 확인되는 내용</p>
+                <ul className="mt-2 space-y-1">
+                  {cluster.commonFacts.map((fact) => (
+                    <li key={fact} className="text-sm leading-6 text-foreground">{fact}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-5 divide-y divide-gray-100">
+            {cluster.items.map((item) => (
+              <a
+                key={`${cluster.id}-${item.articleId ?? item.articleUrl}`}
+                href={item.articleUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block py-4 first:pt-0 last:pb-0"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-primary">{item.publisherName}</p>
+                    <h3 className="mt-1 text-sm font-semibold leading-6 text-foreground">{item.articleTitle}</h3>
+                  </div>
+                  <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-on-surface-variant" />
+                </div>
+                <p className="mt-2 text-sm leading-6 text-on-surface-variant">{item.expressionSummary}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-on-surface-variant">
+                  {item.emphasis ? <span className="rounded-full bg-surface-container-low px-3 py-1">강조: {item.emphasis}</span> : null}
+                  {item.framing ? <span className="rounded-full bg-surface-container-low px-3 py-1">표현: {item.framing}</span> : null}
+                </div>
+              </a>
+            ))}
+          </div>
+
+          {cluster.uncertainty ? (
+            <div className="mt-5 rounded-xl border border-gray-100 px-4 py-3">
+              <p className="text-xs font-semibold text-on-surface-variant">남은 불확실성</p>
+              <p className="mt-1 text-sm leading-6 text-on-surface-variant">{cluster.uncertainty}</p>
+            </div>
+          ) : null}
+        </article>
+      ))}
     </div>
   );
 }

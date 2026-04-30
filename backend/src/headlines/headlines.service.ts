@@ -65,10 +65,12 @@ export class HeadlinesService {
 
   async scrapeHeadlines(trigger: HeadlineScrapeTrigger, category?: string): Promise<{ dateKey: string; fetchedCount: number; savedCount: number }> {
     const dateKey = this.getDateKey();
-    const feeds = this.getFeeds(category);
+    const normalizedCategory = this.normalizeCategory(category) ?? "politics";
+    const feeds = this.getFeeds(normalizedCategory);
     const run = await this.db.headlineScrapeRun.create({
       data: {
         dateKey,
+        category: normalizedCategory,
         status: "running",
         trigger,
       },
@@ -108,7 +110,7 @@ export class HeadlinesService {
         },
       });
 
-      await this.generateAnalysis(dateKey);
+      await this.generateAnalysis(dateKey, normalizedCategory);
 
       return {
         dateKey,
@@ -130,7 +132,8 @@ export class HeadlinesService {
 
   async getToday(date?: string, category?: string): Promise<HeadlinesTodayResponseDto> {
     const dateKey = this.getDateKey(date);
-    const feeds = this.getFeeds(category);
+    const normalizedCategory = this.normalizeCategory(category);
+    const feeds = this.getFeeds(normalizedCategory);
     const publisherKeys = feeds.map((feed) => feed.publisherKey);
     const [articles, lastScrapeRun] = await Promise.all([
       this.db.headlineArticle.findMany({
@@ -145,7 +148,7 @@ export class HeadlinesService {
         ],
       }),
       this.db.headlineScrapeRun.findFirst({
-        where: { dateKey },
+        where: normalizedCategory ? { dateKey, category: normalizedCategory } : { dateKey },
         orderBy: { startedAt: "desc" },
       }),
     ]);
@@ -179,6 +182,7 @@ export class HeadlinesService {
       totalArticleCount: articles.length,
       lastScrapeRun: lastScrapeRun
         ? {
+            category: lastScrapeRun.category,
             status: lastScrapeRun.status,
             trigger: lastScrapeRun.trigger,
             startedAt: lastScrapeRun.startedAt.toISOString(),
@@ -194,7 +198,8 @@ export class HeadlinesService {
 
   async getLive(category?: string): Promise<HeadlinesTodayResponseDto> {
     const dateKey = this.getDateKey();
-    const feeds = this.getFeeds(category);
+    const normalizedCategory = this.normalizeCategory(category);
+    const feeds = this.getFeeds(normalizedCategory);
     const settled = await Promise.allSettled(
       feeds.map((feed) => this.fetchFeed(feed)),
     );
@@ -234,6 +239,7 @@ export class HeadlinesService {
       dateKey,
       totalArticleCount: articles.length,
       lastScrapeRun: {
+        category: normalizedCategory ?? "politics",
         status: failedFeeds.length > 0 ? "partial" : "live",
         trigger: "live",
         startedAt: new Date().toISOString(),
@@ -248,9 +254,9 @@ export class HeadlinesService {
 
   async getAnalysis(date?: string, category?: string): Promise<HeadlinesAnalysisResponseDto> {
     const dateKey = this.getDateKey(date);
-    const normalizedCategory = this.normalizeCategory(category);
+    const normalizedCategory = this.normalizeCategory(category) ?? "politics";
     const analysis = await this.db.headlineAnalysis.findUnique({
-      where: { dateKey },
+      where: { dateKey_category: { dateKey, category: normalizedCategory } },
       include: {
         clusters: {
           orderBy: { sortOrder: "asc" },
@@ -304,9 +310,14 @@ export class HeadlinesService {
     };
   }
 
-  async generateAnalysis(dateKey: string): Promise<void> {
+  async generateAnalysis(dateKey: string, category: HeadlineCategory): Promise<void> {
+    const feeds = this.getFeeds(category);
+    const publisherKeys = feeds.map((feed) => feed.publisherKey);
     const articles = await this.db.headlineArticle.findMany({
-      where: { dateKey },
+      where: {
+        dateKey,
+        publisherKey: { in: publisherKeys },
+      },
       orderBy: [
         { publishedAt: "desc" },
         { scrapedAt: "desc" },
@@ -315,19 +326,20 @@ export class HeadlinesService {
     });
 
     if (articles.length === 0) {
-      await this.upsertFailedAnalysis(dateKey, "분석할 헤드라인이 없습니다.");
+      await this.upsertFailedAnalysis(dateKey, category, "분석할 헤드라인이 없습니다.");
       return;
     }
 
     await this.db.headlineAnalysis.upsert({
-      where: { dateKey },
-      create: { dateKey, status: "pending" },
+      where: { dateKey_category: { dateKey, category } },
+      create: { dateKey, category, status: "pending" },
       update: { status: "pending", errorMessage: null },
     });
 
     try {
       const payload = await this.buildAnalysisPayload(
         dateKey,
+        category,
         articles.map((article) => ({
           id: article.id,
           publisherKey: article.publisherKey,
@@ -339,10 +351,11 @@ export class HeadlinesService {
         })),
       );
 
-      await this.persistAnalysis(dateKey, payload, articles);
+      await this.persistAnalysis(dateKey, category, payload, articles);
     } catch (error) {
       await this.upsertFailedAnalysis(
         dateKey,
+        category,
         error instanceof Error ? error.message : "헤드라인 분석에 실패했습니다.",
       );
     }
@@ -404,6 +417,7 @@ export class HeadlinesService {
 
   private async buildAnalysisPayload(
     dateKey: string,
+    category: HeadlineCategory,
     articles: HeadlineAnalysisArticleInput[],
   ): Promise<HeadlineAnalysisPayload> {
     const providerMode = this.configService.get<string>("answerProviderMode", "mock");
@@ -421,7 +435,7 @@ export class HeadlinesService {
       );
     }
 
-    return this.openAiClient.analyzeHeadlines(apiKey, dateKey, articles);
+    return this.openAiClient.analyzeHeadlines(apiKey, dateKey, category, articles);
   }
 
   private buildMockAnalysis(articles: HeadlineAnalysisArticleInput[]): HeadlineAnalysisPayload {
@@ -450,6 +464,7 @@ export class HeadlinesService {
 
   private async persistAnalysis(
     dateKey: string,
+    category: HeadlineCategory,
     payload: HeadlineAnalysisPayload,
     articles: Array<{ id: string; publisherKey: string; publisherName: string; title: string; url: string }>,
   ): Promise<void> {
@@ -457,9 +472,10 @@ export class HeadlinesService {
 
     await this.db.$transaction(async (tx: any) => {
       const analysis = await tx.headlineAnalysis.upsert({
-        where: { dateKey },
+        where: { dateKey_category: { dateKey, category } },
         create: {
           dateKey,
+          category,
           status: "ready",
           summary: payload.summary,
           errorMessage: null,
@@ -516,11 +532,12 @@ export class HeadlinesService {
     });
   }
 
-  private async upsertFailedAnalysis(dateKey: string, errorMessage: string): Promise<void> {
+  private async upsertFailedAnalysis(dateKey: string, category: HeadlineCategory, errorMessage: string): Promise<void> {
     await this.db.headlineAnalysis.upsert({
-      where: { dateKey },
+      where: { dateKey_category: { dateKey, category } },
       create: {
         dateKey,
+        category,
         status: "failed",
         errorMessage,
       },

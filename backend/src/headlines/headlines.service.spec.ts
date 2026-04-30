@@ -66,11 +66,12 @@ describe("HeadlinesService", () => {
         }),
       }),
     );
+    expect(service.generateAnalysis).toHaveBeenCalledWith(result.dateKey, "politics");
     expect(result.savedCount).toBe(1);
   });
 
   it("category가 economy이면 경제 RSS만 수집한다", async () => {
-    const { service } = createService();
+    const { service, db } = createService();
     const fetchMock = jest.spyOn(global, "fetch" as any).mockResolvedValue({
       ok: true,
       text: async () => `
@@ -90,5 +91,41 @@ describe("HeadlinesService", () => {
     const requestedUrls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(requestedUrls).toHaveLength(6);
     expect(requestedUrls.every((url) => url.includes("economy"))).toBe(true);
+    expect(db.headlineScrapeRun.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: "economy",
+        }),
+      }),
+    );
+    expect(service.generateAnalysis).toHaveBeenCalledWith(expect.any(String), "economy");
+  });
+
+  it("분석 조회는 dateKey와 category 조합으로 조회한다", async () => {
+    const db = {
+      headlineAnalysis: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const service = new HeadlinesService(
+      db as any,
+      new ConfigService({ answerProviderMode: "mock" }),
+      new HeadlinesRssParserService(),
+      {} as HeadlinesOpenAiClient,
+    );
+
+    const result = await service.getAnalysis("2026-04-30", "economy");
+
+    expect(db.headlineAnalysis.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          dateKey_category: {
+            dateKey: "2026-04-30",
+            category: "economy",
+          },
+        },
+      }),
+    );
+    expect(result.status).toBe("pending");
   });
 });

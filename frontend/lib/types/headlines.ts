@@ -20,6 +20,7 @@ export interface HeadlinePublisherGroup {
 }
 
 export interface HeadlineScrapeRun {
+  category: HeadlineCategory;
   status: string;
   trigger: string;
   startedAt: string;

@@ -229,6 +229,12 @@
 - `sourceStances`, `verdict`, `confidenceScore`, `consensusLevel`, count, source breakdown은 기존 API 계약 유지를 위해 서버에서 파생한다.
 - DB schema와 API 응답 shape는 변경하지 않는다.
 
+### Today Headlines Category Analysis
+- `/headlines` 기본 경험은 매체별 RSS 표 없이 사건별 헤드라인 표현 비교만 노출하는 것으로 둔다.
+- `headline_analyses`는 `date_key + category` 단위로 저장하고, unique 기준도 `date_key + category`로 둔다.
+- 새벽 1시 cron은 정치 RSS와 경제 RSS를 각각 수집하고, 각 카테고리별 분석을 별도로 생성한다.
+- OpenAI 분석은 RSS 제목/요약/매체명만 사용하며, 사실 판정이나 매체 신뢰도 점수로 확장하지 않는다.
+
 ## 2026-04-28
 
 ### Tavily KR Trusted Domain Registry

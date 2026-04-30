@@ -221,6 +221,7 @@ MVP 기준 현재 출처 범위:
 - `GET /api/v1/headlines/today`는 날짜, 마지막 수집 상태, 전체 기사 수, 매체별 기사 목록을 반환해야 하며 `date`, `category=politics|economy` 필터를 지원해야 한다.
 - `GET /api/v1/headlines/live`는 DB 저장 없이 RSS를 즉시 조회해 매체별 기사 목록을 반환해야 하며 `category=politics|economy` 필터를 지원해야 한다.
 - `GET /api/v1/headlines/today/analysis`는 분석 상태와 사건별 cluster를 반환해야 하며 `category=politics|economy` 필터를 지원해야 한다.
+- 헤드라인 분석 결과는 정치/경제 분석이 섞이지 않도록 `date + category` 단위로 저장하고 조회해야 한다.
 - 수동 수집 API는 내부 secret header로 보호해야 하며 `category=politics|economy`로 정치 또는 경제 RSS만 수집할 수 있어야 한다.
 
 ## 12. Non-Functional Requirements

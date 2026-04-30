@@ -44,6 +44,9 @@ export class HeadlinePublisherGroupDto {
 }
 
 export class HeadlineScrapeRunDto {
+  @ApiProperty({ description: "헤드라인 카테고리", example: "politics", enum: ["politics", "economy"] })
+  category!: string;
+
   @ApiProperty({ description: "수집 실행 상태", example: "completed" })
   status!: string;
 

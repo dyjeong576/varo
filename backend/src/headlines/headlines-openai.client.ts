@@ -16,6 +16,7 @@ export class HeadlinesOpenAiClient {
   async analyzeHeadlines(
     apiKey: string,
     dateKey: string,
+    category: "politics" | "economy",
     articles: HeadlineAnalysisArticleInput[],
   ): Promise<HeadlineAnalysisPayload> {
     const payload = await this.requestStructuredOutput<HeadlineAnalysisPayload>(
@@ -73,6 +74,7 @@ export class HeadlinesOpenAiClient {
           role: "system",
           content: `한국어 뉴스 RSS 헤드라인을 사건별로 묶어 비교하세요.
 현재 날짜: ${dateKey}
+분석 카테고리: ${category === "politics" ? "정치" : "경제"}
 
 규칙:
 - 입력으로 제공된 RSS 제목, 요약, 매체명만 사용하세요.
@@ -83,7 +85,7 @@ export class HeadlinesOpenAiClient {
         },
         {
           role: "user",
-          content: JSON.stringify({ dateKey, articles }, null, 2),
+          content: JSON.stringify({ dateKey, category, articles }, null, 2),
         },
       ],
     );

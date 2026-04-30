@@ -29,7 +29,7 @@ const HEADLINE_CATEGORY_QUERY = {
     type: "string",
     enum: ["politics", "economy"],
   },
-  description: "조회 또는 수집할 RSS 카테고리입니다. politics는 정치, economy는 경제입니다. 생략하면 정치와 경제를 모두 대상으로 합니다.",
+  description: "조회 또는 수집할 RSS 카테고리입니다. politics는 정치, economy는 경제입니다.",
   example: "economy",
 };
 

@@ -10,13 +10,15 @@ export class HeadlinesScheduler {
 
   @Cron("0 0 1 * * *", { timeZone: "Asia/Seoul" })
   async scrapeDailyHeadlines(): Promise<void> {
-    try {
-      await this.headlinesService.scrapeHeadlines("cron");
-    } catch (error) {
-      this.logger.error(
-        `daily headline scrape failed: ${error instanceof Error ? error.message : "unknown error"}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+    for (const category of ["politics", "economy"] as const) {
+      try {
+        await this.headlinesService.scrapeHeadlines("cron", category);
+      } catch (error) {
+        this.logger.error(
+          `daily headline scrape failed; category=${category}: ${error instanceof Error ? error.message : "unknown error"}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
   }
 }

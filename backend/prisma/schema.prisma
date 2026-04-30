@@ -253,6 +253,7 @@ model UserNotificationPreference {
 model HeadlineScrapeRun {
   id           String    @id @default(uuid())
   dateKey      String    @map("date_key")
+  category     String    @default("politics")
   status       String
   trigger      String
   startedAt    DateTime  @default(now()) @map("started_at")
@@ -262,7 +263,7 @@ model HeadlineScrapeRun {
   errorMessage String?   @map("error_message")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  @@index([dateKey, startedAt])
+  @@index([dateKey, category, startedAt])
   @@map("headline_scrape_runs")
 }
 
@@ -290,7 +291,8 @@ model HeadlineArticle {
 
 model HeadlineAnalysis {
   id           String                 @id @default(uuid())
-  dateKey      String                 @unique @map("date_key")
+  dateKey      String                 @map("date_key")
+  category     String                 @default("politics")
   status       String
   summary      String?
   errorMessage String?                @map("error_message")
@@ -298,6 +300,7 @@ model HeadlineAnalysis {
   updatedAt    DateTime               @updatedAt @map("updated_at")
   clusters     HeadlineEventCluster[]
 
+  @@unique([dateKey, category])
   @@map("headline_analyses")
 }
 
