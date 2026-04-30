@@ -1,8 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AuthModule } from "./auth/auth.module";
 import { CommunityModule } from "./community/community.module";
 import { TraceIdMiddleware } from "./common/middleware/trace-id.middleware";
+import { HeadlinesModule } from "./headlines/headlines.module";
 import { HealthModule } from "./health/health.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PopularModule } from "./popular/popular.module";
@@ -18,10 +20,12 @@ import { UsersModule } from "./users/users.module";
       cache: true,
       load: [getAppConfig],
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
     AnswersModule,
+    HeadlinesModule,
     CommunityModule,
     NotificationsModule,
     PopularModule,

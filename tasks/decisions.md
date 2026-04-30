@@ -294,6 +294,25 @@
 
 ## 2026-04-30
 
+### Today Headlines v1
+- 오늘의 헤드라인은 `/headlines` 탭으로 노출한다.
+- 수집 대상은 초기 v1에서 코드 설정 파일의 주요 매체 정치/경제 RSS 목록으로 관리한다.
+- `/headlines`의 1차 사용자 메뉴는 `정치 / 경제` 카테고리 전환으로 둔다.
+- 저장 조회, 실시간 조회, 분석 조회, 내부 수동 수집 API는 `category=politics|economy` 쿼리로 정치 또는 경제 RSS 범위를 지정할 수 있다.
+- `/headlines` 화면은 실시간 조회 버튼 대신 날짜 검색으로 저장된 헤드라인을 조회한다.
+- 날짜 검색의 최소 선택일은 헤드라인 수집 시작일인 2026-04-30으로 둔다.
+- RSS 발행시각은 매체별 제공 여부가 달라 화면에 표시하지 않는다.
+- `/headlines` 화면은 선택 날짜/카테고리의 수집 기사 전체를 노출한다.
+- 기존 사건별 표현 비교 분석 API는 유지하되, 화면의 기본 탭에서는 제외한다.
+- RSS 수집은 NestJS scheduler가 `Asia/Seoul` 기준 매일 01:00에 실행한다.
+- 수동 수집은 `POST /api/v1/headlines/internal/scrape`로 제공하고 `HEADLINE_JOB_SECRET` 기반 내부 헤더 검증을 사용한다.
+- 실시간 조회는 `GET /api/v1/headlines/live`로 제공하고 DB 저장 없이 RSS를 즉시 조회해 반환한다.
+- 저장 범위는 RSS의 제목, 링크, 요약, 발행시각, 매체명, raw RSS item으로 제한하고 기사 본문 HTML은 수집하지 않는다.
+- 중복 기준은 `publisher_key + normalized_url` unique로 둔다.
+- 오늘의 헤드라인 분석은 저장된 RSS 제목/요약/매체명만 기반으로 OpenAI structured output을 사용한다.
+- 분석 결과는 사건별 cluster와 매체별 표현 요약으로 저장하며 사실 판정, 매체 신뢰도 점수, 정치 성향 판단을 생성하지 않는다.
+- dev/mock provider mode에서는 OpenAI 호출 없이 임시 분석 cluster를 생성한다.
+
 ### Query Refinement FactCheck Flag
 - `search_route` 값에서 `news`를 제거하고 신규 answer 생성 기준 `supported / unsupported`만 사용한다.
 - 한국 정치·경제 뉴스성 check은 `supported`, 지원 범위 밖 check은 `unsupported/out_of_scope`로 처리한다.

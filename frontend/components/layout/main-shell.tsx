@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import Image from "next/image";
-import { Bell, Home, TrendingUp, MessageSquare } from "lucide-react";
+import { Bell, Home, TrendingUp, MessageSquare, Newspaper } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HistoryDrawer } from "@/components/ui/history-drawer";
@@ -72,6 +72,10 @@ export function MainShell({ children }: { children: React.ReactNode }) {
         <Link href="/popular" className={`flex flex-col items-center justify-center w-full h-full ${pathname === "/popular" ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
           <TrendingUp className="w-6 h-6 mb-1" />
           <span className="text-[10px] font-semibold">인기</span>
+        </Link>
+        <Link href="/headlines" className={`flex flex-col items-center justify-center w-full h-full ${pathname === "/headlines" ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
+          <Newspaper className="w-6 h-6 mb-1" />
+          <span className="text-[10px] font-semibold">헤드라인</span>
         </Link>
         <Link href="/community" className={`flex flex-col items-center justify-center w-full h-full ${pathname?.startsWith("/community") ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
           <MessageSquare className="w-6 h-6 mb-1" />

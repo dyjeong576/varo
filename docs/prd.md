@@ -156,6 +156,17 @@ MVP 기준 현재 출처 범위:
 - 기사 수가 아니라 근거 성격과 출처 유형 차이를 함께 고려한다.
 - 출처 간 일치도는 사실 확률이 아니며, 최신성, 상충, 업데이트 신호와 분리해 해석한다.
 
+### 10.6 Today Headlines
+
+- 시스템은 매일 새벽 1시(KST)에 주요 매체 RSS의 제목, 링크, 요약, 발행시각을 수집해 저장한다.
+- 시스템은 정치 RSS와 경제 RSS를 수집해 저장한다.
+- 사용자는 `/headlines`에서 정치/경제 메뉴와 날짜 검색으로 수집된 매체별 헤드라인을 비교할 수 있어야 한다.
+- 날짜 검색은 헤드라인 수집 시작일인 2026-04-30 이후 날짜만 선택할 수 있어야 한다.
+- `/headlines`의 기사 카드에는 매체별 RSS 발행시각을 표시하지 않는다.
+- `/headlines`는 선택한 날짜와 카테고리에서 수집된 기사를 일부로 제한하지 않고 모두 노출한다.
+- 분석 API는 저장된 RSS 제목/요약/매체명만 기반으로 사건별 묶음과 매체별 표현 차이를 제공한다.
+- 오늘의 헤드라인 분석은 사실 판정이나 매체 신뢰도 점수가 아니라 수집된 헤드라인 기준의 표현 비교로 제한한다.
+
 ## 11. Functional Requirements
 
 ### 11.1 Input and Answer Flow
@@ -203,6 +214,15 @@ MVP 기준 현재 출처 범위:
 - 각 결과는 어떤 `check`에 대한 것인지 연결되어야 한다.
 - 각 해석은 어떤 `source`와 evidence signal을 기반으로 했는지 추적 가능해야 한다. snippet row가 있는 경우에는 snippet까지 연결해야 한다.
 
+### 11.6 Today Headlines Flow
+
+- 시스템은 RSS 수집 실행 상태, 수집 기사 수, 저장 기사 수, 오류 메시지를 기록해야 한다.
+- RSS 중복 저장 기준은 `publisher_key + normalized_url`로 둔다.
+- `GET /api/v1/headlines/today`는 날짜, 마지막 수집 상태, 전체 기사 수, 매체별 기사 목록을 반환해야 하며 `date`, `category=politics|economy` 필터를 지원해야 한다.
+- `GET /api/v1/headlines/live`는 DB 저장 없이 RSS를 즉시 조회해 매체별 기사 목록을 반환해야 하며 `category=politics|economy` 필터를 지원해야 한다.
+- `GET /api/v1/headlines/today/analysis`는 분석 상태와 사건별 cluster를 반환해야 하며 `category=politics|economy` 필터를 지원해야 한다.
+- 수동 수집 API는 내부 secret header로 보호해야 하며 `category=politics|economy`로 정치 또는 경제 RSS만 수집할 수 있어야 한다.
+
 ## 12. Non-Functional Requirements
 
 - 결과는 차분하고 과장 없는 톤으로 표현해야 한다.
@@ -229,6 +249,8 @@ MVP 기준 현재 출처 범위:
 | `source`           | 수집된 기사 또는 뉴스 검색 결과에서 확인된 출처         |
 | `evidence signal`  | 각 source가 check에 대해 수행하는 지지/충돌/맥락 역할   |
 | `answer result`    | verdict, interpretation, uncertainty를 포함한 결과 단위 |
+| `headline article` | RSS에서 수집한 매체별 기사 제목/요약/링크 단위          |
+| `headline cluster` | 여러 매체 헤드라인을 사건별로 묶은 표현 비교 단위       |
 
 페이지 구조는 아래와 같다.
 
@@ -236,6 +258,7 @@ MVP 기준 현재 출처 범위:
 - 검토 진행 상태 페이지
 - 결과 페이지
 - 인기 주제 페이지
+- 오늘의 헤드라인 페이지
 
 ## 15. Screen-by-Screen Spec
 

@@ -249,3 +249,88 @@ model UserNotificationPreference {
 
   @@map("user_notification_preferences")
 }
+
+model HeadlineScrapeRun {
+  id           String    @id @default(uuid())
+  dateKey      String    @map("date_key")
+  status       String
+  trigger      String
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  fetchedCount Int       @default(0) @map("fetched_count")
+  savedCount   Int       @default(0) @map("saved_count")
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([dateKey, startedAt])
+  @@map("headline_scrape_runs")
+}
+
+model HeadlineArticle {
+  id             String                     @id @default(uuid())
+  dateKey        String                     @map("date_key")
+  publisherKey   String                     @map("publisher_key")
+  publisherName  String                     @map("publisher_name")
+  feedUrl        String                     @map("feed_url")
+  title          String
+  url            String
+  summary        String?
+  publishedAt    DateTime?                  @map("published_at")
+  scrapedAt      DateTime                   @default(now()) @map("scraped_at")
+  normalizedUrl  String                     @map("normalized_url")
+  normalizedHash String                     @map("normalized_hash")
+  rawItem        Json                       @map("raw_item")
+  clusterItems   HeadlineEventClusterItem[]
+
+  @@index([dateKey, publisherKey])
+  @@index([dateKey, publishedAt])
+  @@unique([publisherKey, normalizedUrl])
+  @@map("headline_articles")
+}
+
+model HeadlineAnalysis {
+  id           String                 @id @default(uuid())
+  dateKey      String                 @unique @map("date_key")
+  status       String
+  summary      String?
+  errorMessage String?                @map("error_message")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  clusters     HeadlineEventCluster[]
+
+  @@map("headline_analyses")
+}
+
+model HeadlineEventCluster {
+  id            String                     @id @default(uuid())
+  analysisId    String                     @map("analysis_id")
+  eventName     String                     @map("event_name")
+  eventSummary  String                     @map("event_summary")
+  commonFacts   Json?                      @map("common_facts")
+  uncertainty   String?
+  sortOrder     Int                        @default(0) @map("sort_order")
+  analysis      HeadlineAnalysis           @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  items         HeadlineEventClusterItem[]
+
+  @@index([analysisId, sortOrder])
+  @@map("headline_event_clusters")
+}
+
+model HeadlineEventClusterItem {
+  id                String               @id @default(uuid())
+  clusterId         String               @map("cluster_id")
+  articleId         String?              @map("article_id")
+  publisherKey      String               @map("publisher_key")
+  publisherName     String               @map("publisher_name")
+  articleTitle      String               @map("article_title")
+  articleUrl        String               @map("article_url")
+  expressionSummary String               @map("expression_summary")
+  emphasis          String?
+  framing           String?
+  cluster           HeadlineEventCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  article           HeadlineArticle?     @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@index([clusterId])
+  @@index([articleId])
+  @@map("headline_event_cluster_items")
+}

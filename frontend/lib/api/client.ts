@@ -30,6 +30,11 @@ import type {
 import type { PopularTopic } from "@/lib/types/popular";
 import type { TrendType } from "@/lib/types/popular";
 import type {
+  HeadlineCategory,
+  HeadlinesAnalysisResponse,
+  HeadlinesTodayResponse,
+} from "@/lib/types/headlines";
+import type {
   NotificationPreferences,
   NotificationsListResponse,
 } from "@/lib/notifications/types";
@@ -227,6 +232,45 @@ export const api = {
       );
 
       return response.map(normalizePopularTopic);
+    },
+  },
+  headlines: {
+    getToday: async (params?: { date?: string; category?: HeadlineCategory }): Promise<HeadlinesTodayResponse> => {
+      const query = new URLSearchParams();
+
+      if (params?.date) {
+        query.set("date", params.date);
+      }
+
+      if (params?.category) {
+        query.set("category", params.category);
+      }
+
+      const queryString = query.toString();
+
+      return apiRequest<HeadlinesTodayResponse>(`/api/v1/headlines/today${queryString ? `?${queryString}` : ""}`);
+    },
+    getLive: async (params?: { category?: HeadlineCategory }): Promise<HeadlinesTodayResponse> => {
+      const query = params?.category ? `?category=${encodeURIComponent(params.category)}` : "";
+
+      return apiRequest<HeadlinesTodayResponse>(`/api/v1/headlines/live${query}`);
+    },
+    getAnalysis: async (params?: { date?: string; category?: HeadlineCategory }): Promise<HeadlinesAnalysisResponse> => {
+      const query = new URLSearchParams();
+
+      if (params?.date) {
+        query.set("date", params.date);
+      }
+
+      if (params?.category) {
+        query.set("category", params.category);
+      }
+
+      const queryString = query.toString();
+
+      return apiRequest<HeadlinesAnalysisResponse>(
+        `/api/v1/headlines/today/analysis${queryString ? `?${queryString}` : ""}`,
+      );
     },
   },
   notifications: {

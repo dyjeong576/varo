@@ -25,6 +25,7 @@ export interface AppConfig {
   naverClientId: string | null;
   naverClientSecret: string | null;
   naverSearchTimeoutMs: number;
+  headlineJobSecret: string | null;
   tavilyApiKey: string | null;
   tavilySearchTimeoutMs: number;
   tavilyExtractTimeoutMs: number;
@@ -197,6 +198,7 @@ export function getAppConfig(): AppConfig {
     naverClientId: getOptional("NAVER_CLIENT_ID") ?? null,
     naverClientSecret: getOptional("NAVER_CLIENT_SECRET") ?? null,
     naverSearchTimeoutMs: readPositiveInteger("NAVER_SEARCH_TIMEOUT_MS", 40000),
+    headlineJobSecret: getOptional("HEADLINE_JOB_SECRET") ?? null,
     tavilyApiKey: getOptional("TAVILY_API_KEY") ?? null,
     tavilySearchTimeoutMs: readPositiveInteger("TAVILY_SEARCH_TIMEOUT_MS", 40000),
     tavilyExtractTimeoutMs: readPositiveInteger("TAVILY_EXTRACT_TIMEOUT_MS", 180000),
