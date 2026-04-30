@@ -7,7 +7,7 @@ const PROVIDER_HTTP_DEBUG_BODY = process.env.PROVIDER_HTTP_DEBUG_BODY === "true"
 export async function postJson<T>(
   url: string,
   init: RequestInit,
-  timeoutMs: number,
+  timeoutMs: number | null,
   errorCode: (typeof APP_ERROR_CODES)[keyof typeof APP_ERROR_CODES],
   errorMessage: string,
 ): Promise<T> {
@@ -16,7 +16,7 @@ export async function postJson<T>(
   try {
     response = await fetch(url, {
       ...init,
-      signal: AbortSignal.timeout(timeoutMs),
+      ...(timeoutMs === null ? {} : { signal: AbortSignal.timeout(timeoutMs) }),
     });
   } catch (error) {
     throw new AppException(errorCode, errorMessage, HttpStatus.BAD_GATEWAY, {

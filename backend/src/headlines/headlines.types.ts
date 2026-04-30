@@ -16,9 +16,12 @@ export interface HeadlineAnalysisArticleInput {
   publisherKey: string;
   publisherName: string;
   title: string;
-  url: string;
-  summary: string | null;
-  publishedAt: string | null;
+}
+
+export interface HeadlineAnalysisClusterInput {
+  clusterId: string;
+  representativeTitle: string;
+  articles: HeadlineAnalysisArticleInput[];
 }
 
 export interface HeadlineAnalysisClusterItemPayload {

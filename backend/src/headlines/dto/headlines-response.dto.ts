@@ -113,7 +113,7 @@ export class HeadlineClusterItemDto {
   @ApiProperty({ description: "기사 URL" })
   articleUrl!: string;
 
-  @ApiProperty({ description: "이 기사 제목/요약이 사건을 표현한 방식" })
+  @ApiProperty({ description: "이 기사 제목이 사건을 표현한 방식" })
   expressionSummary!: string;
 
   @ApiProperty({ description: "강조점", nullable: true })

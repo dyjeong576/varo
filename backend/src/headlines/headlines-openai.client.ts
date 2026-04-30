@@ -1,67 +1,53 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
 import { postJson } from "../answers/providers/answers-provider-http";
 import {
-  HeadlineAnalysisArticleInput,
+  HeadlineAnalysisClusterInput,
   HeadlineAnalysisPayload,
 } from "./headlines.types";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
-const OPENAI_TIMEOUT_MS = 300000;
 
-@Injectable()
-export class HeadlinesOpenAiClient {
-  async analyzeHeadlines(
-    apiKey: string,
-    dateKey: string,
-    category: "politics" | "economy",
-    articles: HeadlineAnalysisArticleInput[],
-  ): Promise<HeadlineAnalysisPayload> {
-    const payload = await this.requestStructuredOutput<HeadlineAnalysisPayload>(
-      apiKey,
-      {
-        name: "headline_event_analysis",
-        schema: {
+const HEADLINE_ANALYSIS_SCHEMA = {
+  name: "headline_event_analysis",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["summary", "clusters"],
+    properties: {
+      summary: { type: "string" },
+      clusters: {
+        type: "array",
+        items: {
           type: "object",
           additionalProperties: false,
-          required: ["summary", "clusters"],
+          required: ["eventName", "eventSummary", "commonFacts", "uncertainty", "items"],
           properties: {
-            summary: { type: "string" },
-            clusters: {
+            eventName: { type: "string" },
+            eventSummary: { type: "string" },
+            commonFacts: {
+              type: "array",
+              items: { type: "string" },
+            },
+            uncertainty: {
+              anyOf: [{ type: "string" }, { type: "null" }],
+            },
+            items: {
               type: "array",
               items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["eventName", "eventSummary", "commonFacts", "uncertainty", "items"],
+                required: ["articleId", "expressionSummary", "emphasis", "framing"],
                 properties: {
-                  eventName: { type: "string" },
-                  eventSummary: { type: "string" },
-                  commonFacts: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                  uncertainty: {
+                  articleId: { type: "string" },
+                  expressionSummary: { type: "string" },
+                  emphasis: {
                     anyOf: [{ type: "string" }, { type: "null" }],
                   },
-                  items: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      required: ["articleId", "expressionSummary", "emphasis", "framing"],
-                      properties: {
-                        articleId: { type: "string" },
-                        expressionSummary: { type: "string" },
-                        emphasis: {
-                          anyOf: [{ type: "string" }, { type: "null" }],
-                        },
-                        framing: {
-                          anyOf: [{ type: "string" }, { type: "null" }],
-                        },
-                      },
-                    },
+                  framing: {
+                    anyOf: [{ type: "string" }, { type: "null" }],
                   },
                 },
               },
@@ -69,28 +55,44 @@ export class HeadlinesOpenAiClient {
           },
         },
       },
-      [
-        {
-          role: "system",
-          content: `한국어 뉴스 RSS 헤드라인을 사건별로 묶어 비교하세요.
-현재 날짜: ${dateKey}
-분석 카테고리: ${category === "politics" ? "정치" : "경제"}
+    },
+  },
+} as const;
 
-규칙:
-- 입력으로 제공된 RSS 제목, 요약, 매체명만 사용하세요.
+const ANALYSIS_SYSTEM_RULES = `규칙:
+- 입력으로 제공된 RSS 제목과 매체명만 사용하세요.
 - 기사 본문을 읽었다고 가정하지 마세요.
 - 사실 판정, 매체 신뢰도 점수, 정치 성향 판단을 하지 마세요.
 - summary는 2~3문장의 개요 문단 뒤에 빈 줄을 두고, "- "로 시작하는 핵심 bullet 3~5개를 포함하세요.
 - summary bullet은 주요 사건 흐름, 반복 노출된 이슈, 매체별 표현 차이, 남은 불확실성을 다루세요.
-- 같은 사건을 다루는 기사만 하나의 cluster로 묶고, 근거가 약하면 uncertainty에 명시하세요.
-- expressionSummary는 각 매체가 제목/요약에서 사건을 어떻게 표현했는지 짧게 설명하세요.`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ dateKey, category, articles }, null, 2),
-        },
-      ],
-    );
+- 입력 clusters는 RSS 제목만으로 1차 군집화된 후보입니다. 각 입력 cluster를 기준으로 사건명과 표현 차이만 다듬으세요.
+- 모든 입력 article은 빠짐없이 정확히 하나의 cluster.items에 포함하세요. 단 하나의 articleId도 누락하지 마세요.
+- cluster는 서로 다른 publisherKey 수가 많은 사건 순으로 정렬하고, 같은 매체의 복수 기사도 모두 items에 포함하세요.
+- 입력 수와 무관하게 반드시 전체 입력을 처리하세요. 사용자에게 진행 여부, 우선순위 지정, 범위 축소를 요청하는 것은 엄격히 금지됩니다.
+- summary와 어떤 필드에도 작업 가능 여부, 시간 부족, 분량 초과, 범위 축소 요청 같은 메타 설명을 절대 쓰지 마세요.
+- expressionSummary는 각 매체가 제목에서 사건을 어떻게 표현했는지 짧게 설명하세요.`;
+
+@Injectable()
+export class HeadlinesOpenAiClient {
+  private readonly logger = new Logger(HeadlinesOpenAiClient.name);
+
+  async analyzeHeadlines(
+    apiKey: string,
+    dateKey: string,
+    category: "politics" | "economy",
+    clusters: HeadlineAnalysisClusterInput[],
+  ): Promise<HeadlineAnalysisPayload> {
+    const startedAt = Date.now();
+    let payload: HeadlineAnalysisPayload;
+    const articleCount = clusters.reduce((sum, cluster) => sum + cluster.articles.length, 0);
+
+    try {
+      payload = await this.requestAnalysis(apiKey, dateKey, category, clusters);
+      this.logger.log(`headline openai analysis completed; dateKey=${dateKey}; category=${category}; articleCount=${articleCount}; inputClusterCount=${clusters.length}; clusterCount=${payload.clusters?.length ?? 0}; elapsedMs=${Date.now() - startedAt}`);
+    } catch (error) {
+      this.logger.warn(`headline openai analysis failed; dateKey=${dateKey}; category=${category}; articleCount=${articleCount}; inputClusterCount=${clusters.length}; elapsedMs=${Date.now() - startedAt}; error=${error instanceof Error ? error.message : "unknown"}`);
+      throw error;
+    }
 
     if (!payload || !Array.isArray(payload.clusters) || typeof payload.summary !== "string") {
       throw new AppException(
@@ -101,8 +103,8 @@ export class HeadlinesOpenAiClient {
     }
 
     return {
-      summary: this.normalizeText(payload.summary, "수집된 헤드라인 기준으로 사건 표현을 비교했습니다."),
-      clusters: payload.clusters.slice(0, 12).map((cluster) => ({
+      summary: this.normalizeSummary(payload.summary),
+      clusters: payload.clusters.map((cluster) => ({
         eventName: this.normalizeText(cluster.eventName, "분류되지 않은 사건"),
         eventSummary: this.normalizeText(cluster.eventSummary, "수집된 헤드라인 기준 사건 요약입니다."),
         commonFacts: Array.isArray(cluster.commonFacts)
@@ -123,10 +125,38 @@ export class HeadlinesOpenAiClient {
     };
   }
 
+  private async requestAnalysis(
+    apiKey: string,
+    dateKey: string,
+    category: "politics" | "economy",
+    clusters: HeadlineAnalysisClusterInput[],
+  ): Promise<HeadlineAnalysisPayload> {
+    return this.requestStructuredOutput<HeadlineAnalysisPayload>(
+      apiKey,
+      HEADLINE_ANALYSIS_SCHEMA,
+      [
+        {
+          role: "system",
+          content: `한국어 뉴스 RSS 헤드라인의 로컬 사건 묶음 후보를 다듬어 비교하세요.
+현재 날짜: ${dateKey}
+분석 카테고리: ${category === "politics" ? "정치" : "경제"}
+
+${ANALYSIS_SYSTEM_RULES}`,
+        },
+        {
+          role: "user",
+          content: JSON.stringify({ dateKey, category, clusters }, null, 2),
+        },
+      ],
+      16000,
+    );
+  }
+
   private async requestStructuredOutput<T>(
     apiKey: string,
     schema: { name: string; schema: Record<string, unknown> },
     input: Array<{ role: "system" | "user"; content: string }>,
+    maxOutputTokens = 16000,
   ): Promise<T> {
     const response = await postJson<unknown>(
       OPENAI_RESPONSES_URL,
@@ -149,10 +179,10 @@ export class HeadlinesOpenAiClient {
             },
           },
           reasoning: { effort: "low" },
-          max_output_tokens: 6000,
+          max_output_tokens: maxOutputTokens,
         }),
       },
-      OPENAI_TIMEOUT_MS,
+      null,
       APP_ERROR_CODES.INTERNAL_ERROR,
       "헤드라인 분석 요청에 실패했습니다.",
     );
@@ -228,5 +258,36 @@ export class HeadlinesOpenAiClient {
 
   private normalizeText(value: unknown, fallback: string): string {
     return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  }
+
+  private normalizeSummary(value: unknown): string {
+    const summary = this.normalizeText(value, "수집된 헤드라인 기준으로 사건 표현을 비교했습니다.");
+    const invalidPhrases = [
+      "계속 진행",
+      "범위를 좁",
+      "우선순위",
+      "시간이 더 필요",
+      "가능하면",
+      "원하시면",
+      "추가 시간",
+      "지정해 주시면",
+      "분량",
+      "한 번에",
+      "기준에 맞춰",
+      "입력량",
+      "처리하겠습니다",
+    ];
+
+    if (invalidPhrases.some((phrase) => summary.includes(phrase))) {
+      return [
+        "수집된 RSS 제목을 기준으로 사건별 보도 표현을 비교했습니다.",
+        "",
+        "- 사건 묶음은 보도한 매체 수가 많은 순으로 정리했습니다.",
+        "- 각 사건은 입력 기사 제목 기준으로만 분류했습니다.",
+        "- 본문 확인이 필요한 세부 사실관계는 불확실성으로 남습니다.",
+      ].join("\n");
+    }
+
+    return summary;
   }
 }

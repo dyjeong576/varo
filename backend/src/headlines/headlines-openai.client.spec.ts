@@ -50,22 +50,107 @@ describe("HeadlinesOpenAiClient", () => {
     const client = new HeadlinesOpenAiClient();
     const result = await client.analyzeHeadlines("openai-test-key", "2026-04-30", "politics", [
       {
-        id: "article-1",
-        publisherKey: "khan-politics",
-        publisherName: "경향신문",
-        title: "정치 헤드라인",
-        url: "https://news.example.com/article-1",
-        summary: "정치 헤드라인 요약",
-        publishedAt: null,
+        clusterId: "cluster-1",
+        representativeTitle: "정치 헤드라인",
+        articles: [
+          {
+            id: "article-1",
+            publisherKey: "khan-politics",
+            publisherName: "경향신문",
+            title: "정치 헤드라인",
+          },
+        ],
       },
     ]);
     const requestBody = JSON.parse((global.fetch as jest.Mock).mock.calls[0]?.[1]?.body as string);
     const systemPrompt = requestBody.input[0].content as string;
+    const userPayload = JSON.parse(requestBody.input[1].content as string);
 
     expect(result.summary).toContain("- 반복 노출된 이슈");
     expect(requestBody.text.verbosity).toBe("medium");
+    expect(userPayload.clusters[0].articles[0]).toEqual({
+      id: "article-1",
+      publisherKey: "khan-politics",
+      publisherName: "경향신문",
+      title: "정치 헤드라인",
+    });
+    expect(userPayload.clusters[0].articles[0]).not.toHaveProperty("summary");
+    expect(userPayload.clusters[0].articles[0]).not.toHaveProperty("url");
+    expect(userPayload.clusters[0].articles[0]).not.toHaveProperty("publishedAt");
     expect(systemPrompt).toContain("2~3문장의 개요 문단");
     expect(systemPrompt).toContain("\"- \"로 시작하는 핵심 bullet 3~5개");
     expect(systemPrompt).toContain("매체별 표현 차이");
+    expect(systemPrompt).toContain("범위 축소를 요청하는 것은 엄격히 금지");
+  });
+
+  it("50개를 초과해도 batch merge 없이 cluster payload를 한 번만 요청한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    summary: "수집된 제목 기준으로 정리했습니다.",
+                    clusters: [],
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new HeadlinesOpenAiClient();
+    await client.analyzeHeadlines("openai-test-key", "2026-04-30", "politics", Array.from({ length: 51 }, (_, index) => ({
+      clusterId: `cluster-${index + 1}`,
+      representativeTitle: `정치 헤드라인 ${index + 1}`,
+      articles: [
+        {
+          id: `article-${index + 1}`,
+          publisherKey: "khan-politics",
+          publisherName: "경향신문",
+          title: `정치 헤드라인 ${index + 1}`,
+        },
+      ],
+    })));
+    const requestBody = JSON.parse((global.fetch as jest.Mock).mock.calls[0]?.[1]?.body as string);
+    const userPayload = JSON.parse(requestBody.input[1].content as string);
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(userPayload.clusters).toHaveLength(51);
+    expect(userPayload).not.toHaveProperty("articles");
+    expect(userPayload).not.toHaveProperty("batches");
+  });
+
+  it("범위 축소 요청형 메타 요약은 저장 전에 대체한다", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      createFetchResponse({
+        jsonData: {
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    summary: "입력하신 기사 목록이 매우 방대합니다. 계속 진행하시겠습니까?",
+                    clusters: [],
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ) as typeof fetch;
+
+    const client = new HeadlinesOpenAiClient();
+    const result = await client.analyzeHeadlines("openai-test-key", "2026-04-30", "politics", []);
+
+    expect(result.summary).toContain("수집된 RSS 제목을 기준으로");
+    expect(result.summary).not.toContain("계속 진행");
   });
 });

@@ -270,6 +270,7 @@ model HeadlineScrapeRun {
 model HeadlineArticle {
   id             String                     @id @default(uuid())
   dateKey        String                     @map("date_key")
+  category       String                     @default("politics")
   publisherKey   String                     @map("publisher_key")
   publisherName  String                     @map("publisher_name")
   feedUrl        String                     @map("feed_url")
@@ -284,6 +285,7 @@ model HeadlineArticle {
   clusterItems   HeadlineEventClusterItem[]
 
   @@index([dateKey, publisherKey])
+  @@index([dateKey, category, publisherKey])
   @@index([dateKey, publishedAt])
   @@unique([publisherKey, normalizedUrl])
   @@map("headline_articles")

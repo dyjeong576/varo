@@ -19,7 +19,7 @@ function getBaseKey(publisherKey: string): string {
   return publisherKey.replace(/-politics|-economy$/, "");
 }
 
-function CoverageBadge({ covered, total }: { covered: number; total: number }) {
+function CoverageBadge({ covered, total, articleCount }: { covered: number; total: number; articleCount: number }) {
   const ratio = covered / total;
   const colorClass =
     ratio === 1
@@ -30,19 +30,19 @@ function CoverageBadge({ covered, total }: { covered: number; total: number }) {
 
   return (
     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${colorClass}`}>
-      {covered}/{total} 보도
+      {covered}/{total} 매체 · 기사 {articleCount}개
     </span>
   );
 }
 
 function PublisherCell({
   publisher,
-  item,
+  items,
 }: {
   publisher: (typeof PUBLISHER_ORDER)[number];
-  item: HeadlineClusterItem | undefined;
+  items: HeadlineClusterItem[];
 }) {
-  if (!item) {
+  if (items.length === 0) {
     return (
       <div className="flex flex-col rounded-xl border border-dashed border-gray-200 p-3">
         <div className="flex items-center gap-1.5">
@@ -64,15 +64,21 @@ function PublisherCell({
         </span>
         <span className="text-xs font-bold text-foreground">{publisher.name}</span>
       </div>
-      <a href={item.articleUrl} target="_blank" rel="noreferrer" className="group mt-2 flex items-start gap-1">
-        <p className="line-clamp-3 text-xs font-semibold leading-5 text-foreground group-hover:text-primary">
-          {item.articleTitle}
-        </p>
-        <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-on-surface-variant" />
-      </a>
-      {item.expressionSummary && (
-        <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.expressionSummary}</p>
-      )}
+      <div className="mt-2 space-y-3">
+        {items.map((item) => (
+          <div key={item.articleId ?? item.articleUrl}>
+            <a href={item.articleUrl} target="_blank" rel="noreferrer" className="group flex items-start gap-1">
+              <p className="line-clamp-3 text-xs font-semibold leading-5 text-foreground group-hover:text-primary">
+                {item.articleTitle}
+              </p>
+              <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-on-surface-variant" />
+            </a>
+            {item.expressionSummary && (
+              <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.expressionSummary}</p>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -85,10 +91,12 @@ interface HeadlineEventCardProps {
 export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEventCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
-  const itemsByBaseKey = new Map<string, HeadlineClusterItem>(
-    cluster.items.map((item) => [getBaseKey(item.publisherKey), item]),
-  );
-  const coveredPublisherCount = PUBLISHER_ORDER.filter((pub) => itemsByBaseKey.has(pub.baseKey)).length;
+  const itemsByBaseKey = new Map<string, HeadlineClusterItem[]>();
+  for (const item of cluster.items) {
+    const baseKey = getBaseKey(item.publisherKey);
+    itemsByBaseKey.set(baseKey, [...(itemsByBaseKey.get(baseKey) ?? []), item]);
+  }
+  const coveredPublisherCount = PUBLISHER_ORDER.filter((pub) => (itemsByBaseKey.get(pub.baseKey) ?? []).length > 0).length;
 
   return (
     <div className="rounded-2xl bg-white shadow-sm">
@@ -102,7 +110,7 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
           <p className="mt-0.5 line-clamp-1 text-sm text-on-surface-variant">{cluster.eventSummary}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-0.5">
-          <CoverageBadge covered={coveredPublisherCount} total={PUBLISHER_ORDER.length} />
+          <CoverageBadge covered={coveredPublisherCount} total={PUBLISHER_ORDER.length} articleCount={cluster.items.length} />
           <ChevronDown
             className={`h-4 w-4 text-on-surface-variant transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
@@ -113,7 +121,7 @@ export function HeadlineEventCard({ cluster, defaultOpen = false }: HeadlineEven
         <div className="space-y-4 border-t border-gray-100 px-5 pb-5 pt-4">
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
             {PUBLISHER_ORDER.map((pub) => (
-              <PublisherCell key={pub.baseKey} publisher={pub} item={itemsByBaseKey.get(pub.baseKey)} />
+              <PublisherCell key={pub.baseKey} publisher={pub} items={itemsByBaseKey.get(pub.baseKey) ?? []} />
             ))}
           </div>
 

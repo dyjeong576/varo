@@ -14,6 +14,7 @@ import {
 } from "./dto/headlines-response.dto";
 import {
   HeadlineAnalysisArticleInput,
+  HeadlineAnalysisClusterInput,
   HeadlineAnalysisPayload,
   HeadlineCategory,
   HeadlineScrapeTrigger,
@@ -22,10 +23,20 @@ import {
 
 const RSS_FETCH_TIMEOUT_MS = 12000;
 const MAX_ARTICLES_PER_FEED = 30;
-const MAX_ANALYSIS_ARTICLES = 120;
 const RSS_FETCH_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const HEADLINE_FEED_BY_KEY = new Map(HEADLINE_FEEDS.map((feed) => [feed.publisherKey, feed]));
+const HEADLINE_CLUSTER_SIMILARITY_THRESHOLD = 0.42;
+
+interface HeadlineTitleSignature {
+  tokens: Set<string>;
+  bigrams: Set<string>;
+}
+
+type HeadlineClusterDraft = HeadlineAnalysisClusterInput & {
+  sortIndex: number;
+  signatures: HeadlineTitleSignature[];
+};
 
 @Injectable()
 export class HeadlinesService {
@@ -77,16 +88,30 @@ export class HeadlinesService {
     });
 
     try {
+      const existingPublishers = await this.db.headlineArticle.findMany({
+        where: { dateKey, category: normalizedCategory },
+        select: { publisherKey: true },
+        distinct: ["publisherKey"],
+      });
+      const existingPublisherKeys = new Set(existingPublishers.map((article: { publisherKey: string }) => article.publisherKey));
+      const feedsToFetch = feeds.filter((feed) => !existingPublisherKeys.has(feed.publisherKey));
+      const skippedFeedCount = feeds.length - feedsToFetch.length;
       const settled = await Promise.allSettled(
-        feeds.map((feed) => this.fetchFeed(feed)),
+        feedsToFetch.map((feed) => this.fetchFeed(feed)),
       );
       const articles = settled.flatMap((result) =>
         result.status === "fulfilled" ? result.value : [],
       );
       const failedFeeds = settled.filter((result) => result.status === "rejected");
+      const runMessages: string[] = [];
 
       if (failedFeeds.length > 0) {
         this.logger.warn(`headline rss partial failure; failedFeeds=${failedFeeds.length}`);
+        runMessages.push(`${failedFeeds.length}개 RSS 수집에 실패했습니다.`);
+      }
+
+      if (skippedFeedCount > 0) {
+        runMessages.push(`${skippedFeedCount}개 매체는 이미 수집되어 건너뛰었습니다.`);
       }
 
       const createResult = articles.length > 0
@@ -106,11 +131,13 @@ export class HeadlinesService {
           finishedAt: new Date(),
           fetchedCount: articles.length,
           savedCount: createResult.count,
-          errorMessage: failedFeeds.length > 0 ? `${failedFeeds.length}개 RSS 수집에 실패했습니다.` : null,
+          errorMessage: runMessages.length > 0 ? runMessages.join(" ") : null,
         },
       });
 
-      await this.generateAnalysis(dateKey, normalizedCategory);
+      if (articles.length > 0) {
+        await this.generateAnalysis(dateKey, normalizedCategory);
+      }
 
       return {
         dateKey,
@@ -134,13 +161,9 @@ export class HeadlinesService {
     const dateKey = this.getDateKey(date);
     const normalizedCategory = this.normalizeCategory(category);
     const feeds = this.getFeeds(normalizedCategory);
-    const publisherKeys = feeds.map((feed) => feed.publisherKey);
     const [articles, lastScrapeRun] = await Promise.all([
       this.db.headlineArticle.findMany({
-        where: {
-          dateKey,
-          publisherKey: { in: publisherKeys },
-        },
+        where: normalizedCategory ? { dateKey, category: normalizedCategory } : { dateKey },
         orderBy: [
           { publisherName: "asc" },
           { publishedAt: "desc" },
@@ -159,7 +182,7 @@ export class HeadlinesService {
       const group = byPublisher.get(article.publisherKey) ?? {
         publisherKey: article.publisherKey,
         publisherName: article.publisherName,
-        category: this.getCategoryForPublisher(article.publisherKey),
+        category: article.category,
         feedUrl: article.feedUrl,
         articles: [],
       };
@@ -168,7 +191,7 @@ export class HeadlinesService {
         id: article.id,
         publisherKey: article.publisherKey,
         publisherName: article.publisherName,
-        category: this.getCategoryForPublisher(article.publisherKey),
+        category: article.category,
         title: article.title,
         url: article.url,
         summary: article.summary,
@@ -217,7 +240,7 @@ export class HeadlinesService {
       const group = byPublisher.get(article.publisherKey) ?? {
         publisherKey: article.publisherKey,
         publisherName: article.publisherName,
-        category: this.getCategoryForPublisher(article.publisherKey),
+        category: article.category ?? this.getCategoryForPublisher(article.publisherKey),
         feedUrl: article.feedUrl,
         articles: [],
       };
@@ -226,7 +249,7 @@ export class HeadlinesService {
         id: article.normalizedHash,
         publisherKey: article.publisherKey,
         publisherName: article.publisherName,
-        category: this.getCategoryForPublisher(article.publisherKey),
+        category: article.category ?? this.getCategoryForPublisher(article.publisherKey),
         title: article.title,
         url: article.url,
         summary: article.summary ?? null,
@@ -285,7 +308,6 @@ export class HeadlinesService {
       clusters: analysis.clusters
         .map((cluster) => {
           const items = cluster.items
-            .filter((item) => !normalizedCategory || this.getCategoryForPublisher(item.publisherKey) === normalizedCategory)
             .map((item) => ({
               articleId: item.articleId,
               publisherKey: item.publisherKey,
@@ -306,23 +328,20 @@ export class HeadlinesService {
             items,
           };
         })
-        .filter((cluster) => !normalizedCategory || cluster.items.length > 0),
+        .filter((cluster) => cluster.items.length > 0),
     };
   }
 
   async generateAnalysis(dateKey: string, category: HeadlineCategory): Promise<void> {
-    const feeds = this.getFeeds(category);
-    const publisherKeys = feeds.map((feed) => feed.publisherKey);
     const articles = await this.db.headlineArticle.findMany({
       where: {
         dateKey,
-        publisherKey: { in: publisherKeys },
+        category,
       },
       orderBy: [
         { publishedAt: "desc" },
         { scrapedAt: "desc" },
       ],
-      take: MAX_ANALYSIS_ARTICLES,
     });
 
     if (articles.length === 0) {
@@ -340,18 +359,17 @@ export class HeadlinesService {
       const payload = await this.buildAnalysisPayload(
         dateKey,
         category,
-        articles.map((article) => ({
-          id: article.id,
-          publisherKey: article.publisherKey,
-          publisherName: article.publisherName,
-          title: article.title,
-          url: article.url,
-          summary: article.summary,
-          publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
-        })),
+        this.createTitleClusters(
+          articles.map((article) => ({
+            id: article.id,
+            publisherKey: article.publisherKey,
+            publisherName: article.publisherName,
+            title: article.title,
+          })),
+        ),
       );
 
-      await this.persistAnalysis(dateKey, category, payload, articles);
+      await this.persistAnalysis(dateKey, category, this.normalizeAnalysisPayload(payload, articles), articles);
     } catch (error) {
       await this.upsertFailedAnalysis(
         dateKey,
@@ -402,6 +420,7 @@ export class HeadlinesService {
     const normalizedUrl = buildCanonicalUrl(item.url);
 
     return {
+      category: feed.category,
       publisherKey: feed.publisherKey,
       publisherName: feed.publisherName,
       feedUrl: feed.feedUrl,
@@ -418,7 +437,7 @@ export class HeadlinesService {
   private async buildAnalysisPayload(
     dateKey: string,
     category: HeadlineCategory,
-    articles: HeadlineAnalysisArticleInput[],
+    clusters: HeadlineAnalysisClusterInput[],
   ): Promise<HeadlineAnalysisPayload> {
     const apiKey = this.configService.get<string | null>("openAiApiKey", null);
 
@@ -430,7 +449,107 @@ export class HeadlinesService {
       );
     }
 
-    return this.openAiClient.analyzeHeadlines(apiKey, dateKey, category, articles);
+    return this.openAiClient.analyzeHeadlines(apiKey, dateKey, category, clusters);
+  }
+
+  private createTitleClusters(articles: HeadlineAnalysisArticleInput[]): HeadlineAnalysisClusterInput[] {
+    const clusters: HeadlineClusterDraft[] = [];
+
+    for (const article of articles) {
+      const signature = this.createHeadlineSignature(article.title);
+      const cluster = clusters.find((candidate) =>
+        candidate.signatures.some((candidateSignature) => this.isSameHeadlineCluster(signature, candidateSignature)),
+      );
+
+      if (cluster) {
+        cluster.articles.push(article);
+        cluster.signatures.push(signature);
+        continue;
+      }
+
+      clusters.push({
+        clusterId: `cluster-${clusters.length + 1}`,
+        representativeTitle: article.title,
+        articles: [article],
+        sortIndex: clusters.length,
+        signatures: [signature],
+      });
+    }
+
+    return clusters
+      .sort((a, b) => {
+        const publisherDiff = new Set(b.articles.map((article) => article.publisherKey)).size
+          - new Set(a.articles.map((article) => article.publisherKey)).size;
+
+        if (publisherDiff !== 0) {
+          return publisherDiff;
+        }
+
+        return b.articles.length - a.articles.length || a.sortIndex - b.sortIndex;
+      })
+      .map(({ sortIndex, signatures, ...cluster }) => cluster);
+  }
+
+  private createHeadlineSignature(title: string): HeadlineTitleSignature {
+    const normalized = title
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&(?:quot|amp|lt|gt|nbsp|#39);/gi, " ")
+      .toLowerCase()
+      .replace(/[\[\(（【［][^\]\)）】］]{0,30}[\]\)）】］]/g, " ")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const compact = normalized.replace(/\s+/g, "");
+
+    return {
+      tokens: new Set(normalized.split(" ").filter((token) => token.length >= 2)),
+      bigrams: this.toBigrams(compact),
+    };
+  }
+
+  private isSameHeadlineCluster(a: HeadlineTitleSignature, b: HeadlineTitleSignature): boolean {
+    return this.jaccard(a.tokens, b.tokens) >= HEADLINE_CLUSTER_SIMILARITY_THRESHOLD
+      || this.dice(a.bigrams, b.bigrams) >= HEADLINE_CLUSTER_SIMILARITY_THRESHOLD;
+  }
+
+  private toBigrams(value: string): Set<string> {
+    const bigrams = new Set<string>();
+
+    for (let i = 0; i < value.length - 1; i += 1) {
+      bigrams.add(value.slice(i, i + 2));
+    }
+
+    return bigrams;
+  }
+
+  private jaccard(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 && b.size === 0) {
+      return 0;
+    }
+
+    let intersection = 0;
+    for (const value of a) {
+      if (b.has(value)) {
+        intersection += 1;
+      }
+    }
+
+    return intersection / (a.size + b.size - intersection);
+  }
+
+  private dice(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 || b.size === 0) {
+      return 0;
+    }
+
+    let intersection = 0;
+    for (const value of a) {
+      if (b.has(value)) {
+        intersection += 1;
+      }
+    }
+
+    return (2 * intersection) / (a.size + b.size);
   }
 
   private async persistAnalysis(
@@ -501,6 +620,64 @@ export class HeadlinesService {
         }
       }
     });
+  }
+
+  private normalizeAnalysisPayload(
+    payload: HeadlineAnalysisPayload,
+    articles: Array<{ id: string; publisherKey: string; publisherName: string; title: string; url: string }>,
+  ): HeadlineAnalysisPayload {
+    const articleMap = new Map(articles.map((article) => [article.id, article]));
+    const assignedArticleIds = new Set<string>();
+    const clusters = payload.clusters
+      .map((cluster, index) => ({
+        ...cluster,
+        sortIndex: index,
+        items: cluster.items.filter((item) => {
+          if (!articleMap.has(item.articleId) || assignedArticleIds.has(item.articleId)) {
+            return false;
+          }
+
+          assignedArticleIds.add(item.articleId);
+          return true;
+        }),
+      }))
+      .filter((cluster) => cluster.items.length > 0);
+
+    for (const article of articles) {
+      if (assignedArticleIds.has(article.id)) {
+        continue;
+      }
+
+      clusters.push({
+        sortIndex: clusters.length,
+        eventName: article.title,
+        eventSummary: "RSS 제목 기준으로 별도 사건으로 보존했습니다.",
+        commonFacts: [],
+        uncertainty: "분석 응답에서 기존 사건 묶음에 포함되지 않아 단일 기사 사건으로 보존했습니다.",
+        items: [{
+          articleId: article.id,
+          expressionSummary: "RSS 제목 기준으로 별도 사건으로 보존했습니다.",
+          emphasis: null,
+          framing: null,
+        }],
+      });
+    }
+
+    return {
+      summary: payload.summary,
+      clusters: clusters
+        .sort((a, b) => {
+          const publisherDiff = new Set(b.items.map((item) => articleMap.get(item.articleId)?.publisherKey ?? "")).size
+            - new Set(a.items.map((item) => articleMap.get(item.articleId)?.publisherKey ?? "")).size;
+
+          if (publisherDiff !== 0) {
+            return publisherDiff;
+          }
+
+          return b.items.length - a.items.length || a.sortIndex - b.sortIndex;
+        })
+        .map(({ sortIndex, ...cluster }) => cluster),
+    };
   }
 
   private async upsertFailedAnalysis(dateKey: string, category: HeadlineCategory, errorMessage: string): Promise<void> {

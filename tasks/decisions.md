@@ -232,8 +232,12 @@
 ### Today Headlines Category Analysis
 - `/headlines` 기본 경험은 매체별 RSS 표 없이 사건별 헤드라인 표현 비교만 노출하는 것으로 둔다.
 - `headline_analyses`는 `date_key + category` 단위로 저장하고, unique 기준도 `date_key + category`로 둔다.
+- `headline_articles`는 정치/경제를 별도 테이블로 나누지 않고 `category` 컬럼으로 구분한다.
 - 새벽 1시 cron은 정치 RSS와 경제 RSS를 각각 수집하고, 각 카테고리별 분석을 별도로 생성한다.
-- OpenAI 분석은 RSS 제목/요약/매체명만 사용하며, 사실 판정이나 매체 신뢰도 점수로 확장하지 않는다.
+- 같은 날짜/카테고리에 이미 저장된 `publisher_key`가 있으면 수동 수집에서 해당 매체 RSS는 다시 추가하지 않는다.
+- 헤드라인 분석은 RSS 제목만으로 1차 군집화하고, OpenAI는 cluster 후보의 사건명, 짧은 요약, 매체별 표현 차이 정리에만 사용하며 사실 판정이나 매체 신뢰도 점수로 확장하지 않는다.
+- 분석 사건 묶음은 서로 다른 보도 매체 수가 많은 순으로 표시하고, 동률이면 포함 기사 수를 다음 정렬 기준으로 사용한다.
+- OpenAI 분석 응답에서 누락된 기사는 단일 기사 사건으로 보존해 분석 결과에서 사라지지 않게 한다.
 
 ## 2026-04-28
 
@@ -315,7 +319,8 @@
 - 실시간 조회는 `GET /api/v1/headlines/live`로 제공하고 DB 저장 없이 RSS를 즉시 조회해 반환한다.
 - 저장 범위는 RSS의 제목, 링크, 요약, 발행시각, 매체명, raw RSS item으로 제한하고 기사 본문 HTML은 수집하지 않는다.
 - 중복 기준은 `publisher_key + normalized_url` unique로 둔다.
-- 오늘의 헤드라인 분석은 저장된 RSS 제목/요약/매체명만 기반으로 OpenAI structured output을 사용한다.
+- 오늘의 헤드라인 분석은 저장된 RSS 제목만 기반으로 먼저 로컬 군집화하고, OpenAI structured output은 해당 cluster 후보의 사건명, 짧은 요약, 매체별 표현 차이 정리에만 사용한다.
+- 오늘의 헤드라인 분석은 선택 날짜/카테고리의 저장된 전체 RSS 기사를 대상으로 한다.
 - 분석 summary는 2~3문장의 개요 문단과 `- ` bullet 3~5개로 주요 흐름, 반복 이슈, 매체별 표현 차이, 불확실성을 설명한다.
 - 분석 결과는 사건별 cluster와 매체별 표현 요약으로 저장하며 사실 판정, 매체 신뢰도 점수, 정치 성향 판단을 생성하지 않는다.
 - 헤드라인 분석은 `OPENAI_API_KEY`가 없으면 실패시키고 임시 분석 cluster를 생성하지 않는다.
