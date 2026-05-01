@@ -341,6 +341,11 @@
 - `isFactCheckQuestion`은 결과 화면의 정보 합의성 노출 조건으로 사용한다.
 - `checkType`은 `scheduled_event` 등 내부 결과 계산 힌트로만 유지한다.
 - Naver News Search는 query별 `display=8`, `sort=sim`으로 요청한다.
+- Naver News Search의 분석 후보는 조선일보, 동아일보, 한국경제, 매일경제, 세계일보, 연합뉴스, 중앙일보, 한국일보, YTN, KBS, MBC, SBS, 한겨레, 경향신문, 오마이뉴스, 프레시안으로 제한한다.
+
+### Naver-Only Source Search
+- 신규 answer preview source search에서는 Naver News Search 결과가 부족해도 Tavily Search fallback을 호출하지 않는다.
+- Tavily Extract 설정과 client는 후속 본문 추출 확장용으로 유지하되, 후보 부족 보조검색에는 사용하지 않는다.
 
 ### Check/Answer Naming Migration
 - 제품 및 코드 용어에서 검토 대상 입력 단위는 `check`, 검토 결과 단위는 `answer`로 통일한다.

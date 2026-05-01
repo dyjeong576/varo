@@ -195,6 +195,10 @@ export class AnswersTavilyClient {
             : null;
         const registryMatch = matchDomainRegistryEntry(canonicalUrl, input.registry);
 
+        if (input.bucket === "fallback" && !registryMatch) {
+          return null;
+        }
+
         return {
           id: `${input.query.id}-${input.bucket}-c${index + 1}`,
           searchRoute: input.searchRoute,
@@ -211,7 +215,7 @@ export class AnswersTavilyClient {
           originQueryIds: [input.query.id],
           originQueryPurposes: input.query.purpose ? [input.query.purpose] : [],
           retrievalBucket: input.bucket,
-          domainRegistryId: null,
+          domainRegistryId: registryMatch?.id ?? null,
           sourcePoliticalLean: registryMatch?.politicalLean ?? null,
         };
       })

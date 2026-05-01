@@ -1,10 +1,11 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../../common/constants/app-error-codes";
 import { AppException } from "../../common/exceptions/app-exception";
-import { QueryPurpose, SearchCandidate } from "../answers.types";
+import { DomainRegistryEntry, QueryPurpose, SearchCandidate } from "../answers.types";
 import {
   buildCanonicalUrl,
   buildNormalizedHash,
+  matchDomainRegistryEntry,
 } from "../answers.utils";
 import { NaverNewsSearchSort } from "../dto/naver-news-search-test.dto";
 
@@ -33,6 +34,7 @@ export class AnswersNaverClient {
     display?: number;
     start?: number;
     sort?: NaverNewsSearchSort;
+    domainRegistry: DomainRegistryEntry[];
   }): Promise<SearchCandidate[]> {
     const display = params.display ?? 5;
     const start = params.start ?? 1;
@@ -62,6 +64,7 @@ export class AnswersNaverClient {
           start + index,
           params.queryId ?? "q1",
           params.queryPurpose,
+          params.domainRegistry,
         ),
       )
       .filter((candidate): candidate is SearchCandidate => candidate !== null);
@@ -121,6 +124,7 @@ export class AnswersNaverClient {
     rank: number,
     queryId: string,
     queryPurpose?: QueryPurpose,
+    domainRegistry: DomainRegistryEntry[] = [],
   ): SearchCandidate | null {
     const rawTitle = this.cleanNaverText(item.title ?? "");
     const rawSnippet = this.cleanNaverText(item.description ?? "");
@@ -133,13 +137,18 @@ export class AnswersNaverClient {
 
     const canonicalUrl = buildCanonicalUrl(canonicalSourceUrl);
     const originalUrl = originalSourceUrl.trim();
+    const registryMatch = matchDomainRegistryEntry(canonicalUrl, domainRegistry);
+
+    if (!registryMatch) {
+      return null;
+    }
 
     return {
       id: `naver-${queryId}-c${rank}`,
       searchRoute: "supported",
       sourceProvider: "naver-search",
       sourceType: "news",
-      publisherName: this.inferPublisherName(canonicalUrl),
+      publisherName: registryMatch.publisherName ?? null,
       publishedAt: this.readPublishedAt(item.pubDate),
       canonicalUrl,
       originalUrl,
@@ -149,7 +158,8 @@ export class AnswersNaverClient {
       originQueryIds: [queryId],
       originQueryPurposes: queryPurpose ? [queryPurpose] : [],
       retrievalBucket: "familiar",
-      domainRegistryId: null,
+      domainRegistryId: registryMatch.id,
+      sourcePoliticalLean: registryMatch.politicalLean ?? null,
     };
   }
 
@@ -158,15 +168,6 @@ export class AnswersNaverClient {
     const fallbackUrl = typeof fallback === "string" ? fallback.trim() : "";
 
     return primaryUrl || fallbackUrl || null;
-  }
-
-  private inferPublisherName(url: string): string | null {
-    try {
-      const hostname = new URL(url).hostname.replace(/^www\./, "");
-      return hostname || null;
-    } catch {
-      return null;
-    }
   }
 
   private readPublishedAt(value?: string): string | null {

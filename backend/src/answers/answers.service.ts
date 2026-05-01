@@ -85,7 +85,7 @@ export class AnswersService {
           candidate.relevanceReason ?? "Naver 뉴스 검색 테스트 결과입니다.",
         originQueryIds: candidate.originQueryIds,
         retrievalBucket: candidate.retrievalBucket,
-        domainRegistryMatched: false,
+        domainRegistryMatched: Boolean(candidate.domainRegistryId),
         stance: "unknown",
       })),
     };

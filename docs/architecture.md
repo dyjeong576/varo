@@ -32,7 +32,7 @@
 - Infra / Runtime: Amazon Linux EC2, Docker Compose, nginx container, certbot container, GHCR, GitHub Actions self-hosted runner
 - External Auth: Google login
 - External Search / AI:
-  - Provider router for Naver News Search and Tavily Search fallback
+  - Provider router for Naver News Search
   - OpenAI structured outputs
 
 ## 4. 서비스 도메인 구조
@@ -95,7 +95,7 @@ VARO는 아래 도메인으로 구성한다.
 [NestJS API]
     |-- auth/session ----------> [Google Auth]
     |-- read/write ------------> [PostgreSQL]
-    |-- answer preview pipeline -> [Naver News Search / Tavily Search fallback / OpenAI]
+    |-- answer preview pipeline -> [Naver News Search / OpenAI]
     |-- enqueue future jobs ----> [Redis]
     |
     +--> [Workers]

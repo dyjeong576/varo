@@ -68,8 +68,15 @@ describe("answers utils", () => {
       expect.arrayContaining([
         expect.objectContaining({ publisherName: "한겨레", politicalLean: "progressive" }),
         expect.objectContaining({ publisherName: "연합뉴스", politicalLean: "centrist" }),
+        expect.objectContaining({ publisherName: "YTN", politicalLean: "centrist" }),
         expect.objectContaining({ publisherName: "조선일보", politicalLean: "conservative" }),
-        expect.objectContaining({ publisherName: "매일경제", politicalLean: "business" }),
+        expect.objectContaining({ publisherName: "매일경제", politicalLean: "conservative" }),
+      ]),
+    );
+    expect(getKoreanSearchDomainRegistry()).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ publisherName: "뉴스1" }),
+        expect.objectContaining({ publisherName: "국민일보" }),
       ]),
     );
   });

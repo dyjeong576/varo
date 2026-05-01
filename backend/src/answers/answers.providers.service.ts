@@ -18,12 +18,10 @@ import {
   SearchCandidate,
   SearchSourcesInput,
 } from "./answers.types";
-import { selectDomainsForBucket } from "./answers.utils";
+import { getKoreanSearchDomainRegistry } from "./answers.utils";
 
-const NAVER_SEARCH_DISPLAY = 10;
-const NAVER_SUFFICIENT_SOURCE_COUNT = 15;
+const NAVER_SEARCH_DISPLAY = 20;
 const NAVER_SEARCH_TIMEOUT_CAP_MS = 8000;
-const TAVILY_FALLBACK_SOFT_TIMEOUT_MS = 8000;
 
 @Injectable()
 export class AnswersProvidersService {
@@ -54,9 +52,14 @@ export class AnswersProvidersService {
       const clientId = this.getRequiredNaverClientId();
       const clientSecret = this.getRequiredNaverClientSecret();
       const timeoutMs = Math.min(this.getNaverSearchTimeoutMs(), NAVER_SEARCH_TIMEOUT_CAP_MS);
-      const startedAt = Date.now();
+      const sourceSearchInput = {
+        ...input,
+        domainRegistry: input.domainRegistry.length > 0
+          ? input.domainRegistry
+          : getKoreanSearchDomainRegistry(),
+      };
       const naverSettledResults = await Promise.allSettled(
-        input.queries.map((query) =>
+        sourceSearchInput.queries.map((query) =>
           this.naverClient.searchNews({
             clientId,
             clientSecret,
@@ -67,6 +70,7 @@ export class AnswersProvidersService {
             display: NAVER_SEARCH_DISPLAY,
             start: 1,
             sort: "sim",
+            domainRegistry: sourceSearchInput.domainRegistry,
           }),
         ),
       );
@@ -83,22 +87,7 @@ export class AnswersProvidersService {
         );
       }
 
-      if (naverResults.length >= NAVER_SUFFICIENT_SOURCE_COUNT) {
-        return naverResults;
-      }
-
-      const tavilyStartedAt = Date.now();
-      const tavilyResults = await this.searchTavilyFallbackSources({
-        apiKey: this.getRequiredTavilyApiKey(),
-        timeoutMs: this.getTavilySearchTimeoutMs(),
-        input,
-      });
-
-      this.logger.log(
-        `answer source search tavily fallback completed in ${Date.now() - tavilyStartedAt}ms; candidates=${tavilyResults.length}`,
-      );
-
-      return [...naverResults, ...tavilyResults];
+      return naverResults;
     }
 
     throw new AppException(
@@ -123,6 +112,7 @@ export class AnswersProvidersService {
       display: input.display,
       start: input.start,
       sort: input.sort,
+      domainRegistry: getKoreanSearchDomainRegistry(),
     });
   }
 
@@ -230,43 +220,7 @@ export class AnswersProvidersService {
     return this.configService.get<number>("naverSearchTimeoutMs", 40000);
   }
 
-  private getTavilySearchTimeoutMs(): number {
-    return this.configService.get<number>("tavilySearchTimeoutMs", 40000);
-  }
-
   private getTavilyExtractTimeoutMs(): number {
     return this.configService.get<number>("tavilyExtractTimeoutMs", 180000);
-  }
-
-  private buildKoreanTavilyIncludeDomains(input: SearchSourcesInput): string[] {
-    return selectDomainsForBucket(input.domainRegistry, "familiar")
-      .map((domain) => domain.replace(/^\*\./, ""))
-      .filter((domain, index, domains) => domains.indexOf(domain) === index);
-  }
-
-  private async searchTavilyFallbackSources(params: {
-    apiKey: string;
-    timeoutMs: number;
-    input: SearchSourcesInput;
-  }): Promise<SearchCandidate[]> {
-    try {
-      const candidates = await this.tavilyClient.searchSources({
-        apiKey: params.apiKey,
-        timeoutMs: Math.min(params.timeoutMs, TAVILY_FALLBACK_SOFT_TIMEOUT_MS),
-        input: params.input,
-        bucket: "fallback",
-        includeDomains: this.buildKoreanTavilyIncludeDomains(params.input),
-      });
-
-      return candidates;
-    } catch (error) {
-      this.logger.warn(
-        `Tavily fallback source search skipped: ${
-          error instanceof Error ? error.message : "unknown error"
-        }`,
-      );
-
-      return [];
-    }
   }
 }

@@ -38,8 +38,8 @@ test("style.txt 기준 주요 뉴스사 성향을 도메인으로 분류한다",
   assert.equal(
     getSourcePoliticalLeanBadge({
       publisherName: null,
-      canonicalUrl: "https://www.news1.kr/politics/test",
-      originalUrl: "https://www.news1.kr/politics/test",
+      canonicalUrl: "https://www.ytn.co.kr/_ln/0101_202604010000000001",
+      originalUrl: "https://www.ytn.co.kr/_ln/0101_202604010000000001",
     }).lean,
     "centrist",
   );
@@ -49,7 +49,23 @@ test("style.txt 기준 주요 뉴스사 성향을 도메인으로 분류한다",
       canonicalUrl: "https://imnews.imbc.com/news/test",
       originalUrl: "https://imnews.imbc.com/news/test",
     }).lean,
-    "progressive",
+    "centrist",
+  );
+  assert.equal(
+    getSourcePoliticalLeanBadge({
+      publisherName: "중앙일보",
+      canonicalUrl: "https://n.news.naver.com/mnews/article/025/0000000001",
+      originalUrl: "https://n.news.naver.com/mnews/article/025/0000000001",
+    }).lean,
+    "centrist",
+  );
+  assert.equal(
+    getSourcePoliticalLeanBadge({
+      publisherName: null,
+      canonicalUrl: "https://www.news1.kr/politics/test",
+      originalUrl: "https://www.news1.kr/politics/test",
+    }).lean,
+    "other",
   );
   assert.equal(
     getSourcePoliticalLeanBadge({

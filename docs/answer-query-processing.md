@@ -56,10 +56,7 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
    - query별 `display=8`, `sort=sim`으로 병렬 호출한다.
    - Naver timeout은 코드에서 최대 8초로 제한한다.
    - 일부 Naver query가 실패해도 성공한 결과가 있으면 계속 진행한다.
-   - Naver 후보가 15개 이상이면 Tavily를 호출하지 않는다.
-   - 15개 미만이면 Tavily Search fallback을 호출한다.
-   - Tavily fallback은 코드에 고정된 한국 뉴스 domain registry를 `includeDomains`로 사용하고, timeout은 최대 8초다.
-   - Tavily 실패는 전체 실패가 아니라 fallback skip으로 처리한다.
+   - Naver 후보가 부족해도 Tavily Search fallback을 호출하지 않는다.
 
 6. 후보 선택
    - 검색 후보를 canonical URL 기준으로 deduplicate한다.
@@ -106,8 +103,7 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
 | 역할 | 구현 |
 | --- | --- |
 | query refinement | OpenAI `gpt-5-mini` |
-| source search 기본 | Naver News Search |
-| source search fallback | Tavily Search |
+| source search | Naver News Search |
 | content extraction | 현재 preview 경로에서는 사용하지 않음 |
 | relevance / evidence signal / summary | OpenAI `gpt-5-mini` structured output |
 
@@ -120,7 +116,6 @@ sequenceDiagram
   participant DB as PostgreSQL
   participant OAI as OpenAI
   participant Naver as Naver News
-  participant Tavily as Tavily
 
   FE->>API: POST /answers/query-processing-preview/async
   API->>DB: create checks, answer_jobs(searching)
@@ -131,10 +126,6 @@ sequenceDiagram
     API-->>FE: out_of_scope response
   else supported
     API->>Naver: search queries(display=8)
-    alt Naver candidates < 15
-      API->>Tavily: fallback search
-      Tavily-->>API: fallback candidates
-    end
     API->>DB: save preview sources
     API-->>FE: searching response with sources
     API->>OAI: relevance + evidence signal + summary

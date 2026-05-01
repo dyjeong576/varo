@@ -8,7 +8,7 @@ VARO(Verified Analysis, Reasoned Opinion)는 사용자가 뉴스, 기사, 온라
 
 MVP의 목적은 "진실을 판정"하는 것이 아니라, 사용자가 직접 판단할 수 있도록 근거와 맥락을 정리해 제공하는 것이다. 따라서 결과는 항상 수집된 출처 기준의 해석이어야 하며, 불확실성이 남아 있으면 이를 숨기지 않는다.
 
-이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하며, 검토 범위는 **한국 정치·경제** 도메인의 사실성 check으로 고정한다. 한국 정치·경제 뉴스성 check은 네이버 뉴스 검색 API를 기본 검색 경로로 사용하고, 네이버 후보가 충분하지 않을 때만 Tavily Search를 보조 검색 provider로 사용한다. query refinement와 fact-check source 분석은 OpenAI를 기본 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 한국 정치·경제 범위를 벗어나는 사실성 check은 지원 범위 밖으로 안내한다. 출처 기반 사실성 검토 대상이 아닌 입력은 fact-check verdict를 만들지 않고 Perplexity 직접 답변으로 처리한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
+이번 MVP는 한국어 뉴스 소비자를 주요 대상으로 하며, 검토 범위는 **한국 정치·경제** 도메인의 사실성 check으로 고정한다. 한국 정치·경제 뉴스성 check은 네이버 뉴스 검색 API를 검색 경로로 사용하며, Tavily Search fallback은 사용하지 않는다. query refinement와 fact-check source 분석은 OpenAI를 기본 provider로 사용한다. 현재 preview 생성 경로에서는 원문 본문 추출보다 검색 결과의 제목과 스니펫, source metadata, evidence signal을 우선 사용한다. 한국 정치·경제 범위를 벗어나는 사실성 check은 지원 범위 밖으로 안내한다. 출처 기반 사실성 검토 대상이 아닌 입력은 fact-check verdict를 만들지 않고 Perplexity 직접 답변으로 처리한다. 핵심 경험은 결과 페이지이며, 결론보다 근거를 먼저 이해할 수 있게 설계한다.
 
 ## 2. Product Vision
 
@@ -134,10 +134,11 @@ MVP 기준 현재 출처 범위:
 ### 10.2 Source Collection
 
 - 시스템이 관련 `source`를 수집한다.
-- 현재 수집 범위는 Naver News Search와 필요 시 Tavily Search fallback으로 확인되는 뉴스 source다.
+- 현재 수집 범위는 Naver News Search로 확인되는 뉴스 source다.
+- Naver News Search의 분석 후보는 조선일보, 동아일보, 한국경제, 매일경제, 세계일보, 연합뉴스, 중앙일보, 한국일보, YTN, KBS, MBC, SBS, 한겨레, 경향신문, 오마이뉴스, 프레시안으로 제한한다.
 - 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, check 검증 목적에 맞는 search plan을 생성한다.
 - 기본 검색 목적은 `check_specific`, `current_state`, `primary_source`, `contradiction_or_update`로 구분한다.
-- 시스템은 뉴스 검색에서 Naver News Search를 먼저 사용하고, 후보가 부족할 때만 Tavily Search fallback을 사용한다.
+- 시스템은 뉴스 검색에서 Naver News Search를 사용하고, 후보가 부족해도 Tavily Search fallback을 사용하지 않는다.
 
 ### 10.3 Evidence Preparation
 
@@ -182,7 +183,7 @@ MVP 기준 현재 출처 범위:
 - 시스템은 query refinement에서 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 분류해야 한다.
 - `isFactCheckQuestion=false`이면 시스템은 뉴스 검색과 verdict 생성을 수행하지 않고 Perplexity 직접 답변으로 처리해야 한다.
 - 시스템은 `search_route`와 별도로 검증 목적별 `search_plan`을 생성해야 한다.
-- 시스템은 Naver 후보가 충분하면 Tavily를 호출하지 않아야 한다.
+- 시스템은 Naver 후보가 부족해도 Tavily Search fallback을 호출하지 않아야 한다.
 - 사용자는 검토가 끝난 뒤 결과 페이지로 이동할 수 있어야 한다.
 
 ### 11.2 Source Display
@@ -428,7 +429,7 @@ MVP에서 최소한 아래 출처 유형을 구분할 필요가 있다.
 
 - 초기 타깃은 **한국 정치·경제 뉴스**를 소비하는 한국어 사용자로 둔다.
 - 한국 정치·경제 뉴스성 check은 네이버 뉴스 검색 API를 기본 검색 provider로 사용한다.
-- Tavily Search는 Naver 후보가 부족할 때만 한국 뉴스 보조 검색 provider로 사용한다.
+- Tavily Search fallback은 신규 answer preview source search에서 사용하지 않는다.
 - Tavily Extract는 후속 본문 추출 확장용으로 유지하되, 현재 preview 생성 경로에서는 사용하지 않는다.
 - 핵심 경험은 결과 페이지 중심으로 설계한다.
 - 입력은 단일 check 중심으로 단순하게 시작한다.

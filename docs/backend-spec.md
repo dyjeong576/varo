@@ -16,7 +16,6 @@
 - External Auth: Google login
 - External Providers:
   - Naver News Search
-  - Tavily Search fallback
   - Tavily Extract (후속 확장용, 현재 query-processing preview 생성 경로에서는 미사용)
   - OpenAI structured outputs
 
@@ -118,11 +117,10 @@
 1. check 접수와 `answer_jobs` 생성
 2. check understanding / scope gate / search planning
 3. `unsupported`이면 `out_of_scope` 저장 후 종료
-4. `news`이면 Naver News Search 우선 검색
-5. Naver 후보가 15건 미만이면 Tavily Search fallback 호출
-6. canonical URL 기준 dedup 후 relevance, evidence signal, summary를 단일 OpenAI 호출로 생성
-7. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
-8. source, `handoff_payload.evidenceSignals[]`, `handoff_payload.answerSummary` 저장
+4. `news`이면 Naver News Search 검색
+5. canonical URL 기준 dedup 후 relevance, evidence signal, summary를 단일 OpenAI 호출로 생성
+6. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
+7. source, `handoff_payload.evidenceSignals[]`, `handoff_payload.answerSummary` 저장
 9. 저장된 summary와 preview artifact 기반 결과 계산
 10. 완료 알림 생성
 11. history 반영
@@ -155,9 +153,8 @@
 - OpenAI는 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 함께 분류한다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 check은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
-- **한국 정치·경제 뉴스성 check**은 Naver News Search를 먼저 사용하고, Naver 후보가 부족할 때만 Tavily Search 보조검색을 사용한다.
+- **한국 정치·경제 뉴스성 check**은 Naver News Search를 사용하고, Naver 후보가 부족해도 Tavily Search 보조검색을 사용하지 않는다.
 - 한국 정치·경제를 벗어나는 해외/글로벌 뉴스 check은 `unsupported/out_of_scope`로 처리한다.
-- Tavily Search는 코드에 고정된 한국 뉴스 도메인 레지스트리 기반 include domain으로 제한하고, 신뢰할 수 있는 출처로 확인되는 후보만 유지한다.
 
 ### 6.4 현재 API 책임
 
@@ -331,16 +328,13 @@
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
 - search plan query별 상위 8개를 요청한다.
 - Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
-- Naver 후보가 15건 이상이면 Tavily Search fallback을 호출하지 않는다.
+- Naver 후보가 부족해도 Tavily Search fallback을 호출하지 않는다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
 
 ### 10.3 Tavily Search / Extract
 
-- Tavily Search는 Naver 후보가 15건 미만일 때만 **한국 뉴스** 보조 source 후보 수집에 사용한다.
-- Tavily Search는 코드 고정 **한국 뉴스 도메인 레지스트리**를 `include_domains`로 사용한다.
-- Tavily Search fallback timeout은 최대 8초로 제한한다.
-- Tavily Search 실패 또는 timeout은 전체 answer 실패로 처리하지 않고, Naver 결과만으로 partial preview를 계속 만든다.
+- Tavily Search fallback은 현재 query-processing preview 생성 경로에서 사용하지 않는다.
 - Tavily Extract는 env와 client가 남아 있지만 현재 query-processing preview 생성 경로에서는 호출하지 않는다.
 - `dev`에서는 mock 가능
 - `prod`에서는 실제 provider 사용
@@ -387,7 +381,7 @@
 - `partial`은 정상 응답 본문 내 상태값으로 표현한다.
 - 근거 부족은 결과 내부의 `uncertainty`와 도메인 상태로 드러낸다.
 - `SOURCE_SEARCH_FAILED`는 사용자 노출 문구에서는 일반 검색 실패로 표현하되, 내부 로그와 provider error detail에는 `naver-search` 또는 `tavily-search` 원인을 구분해 남긴다.
-- Tavily fallback 실패/timeout은 warning log만 남기고 Naver 결과가 있으면 계속 진행한다.
+- Tavily Search fallback은 현재 preview source search에서 호출하지 않는다.
 
 ## 12. 보안 / env / 운영
 

@@ -167,7 +167,7 @@ describe("AnswersService", () => {
         {
           id: "naver-c1",
           sourceType: "news",
-          publisherName: "yna.co.kr",
+          publisherName: "연합뉴스",
           publishedAt: "2026-04-01T00:00:00.000Z",
           canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
           originalUrl: "https://n.news.naver.com/mnews/article/001/0010000001",
@@ -176,7 +176,7 @@ describe("AnswersService", () => {
           normalizedHash: "hash-1",
           originQueryIds: ["q1"],
           retrievalBucket: "familiar",
-          domainRegistryId: null,
+          domainRegistryId: "kr-centrist-yna",
         },
       ]),
     } as unknown as AnswersProvidersService;
@@ -193,7 +193,7 @@ describe("AnswersService", () => {
     expect(result.items[0]).toMatchObject({
       id: "naver-c1",
       relevanceTier: "reference",
-      domainRegistryMatched: false,
+      domainRegistryMatched: true,
       stance: "unknown",
     });
     expect(providersService.searchNaverNewsForTest).toHaveBeenCalledWith({

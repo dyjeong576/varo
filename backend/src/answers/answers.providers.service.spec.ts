@@ -5,6 +5,7 @@ import { AnswersOpenAiClient } from "./providers/answers-openai.client";
 import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import { AnswersProvidersService } from "./answers.providers.service";
+import { getKoreanSearchDomainRegistry } from "./answers.utils";
 
 function createConfigServiceMock(values: Record<string, unknown>) {
   return {
@@ -175,7 +176,7 @@ describe("AnswersProvidersService", () => {
     expect(result.answerText).toContain("최저임금");
   });
 
-  it("searchSources는 searchRoute가 supported이면 Naver 검색 후 필요시 TavilyFallback을 호출한다", async () => {
+  it("searchSources는 searchRoute가 supported이면 Naver 검색 결과만 반환한다", async () => {
     const naverSpy = jest
       .spyOn(AnswersNaverClient.prototype, "searchNews")
       .mockResolvedValue([
@@ -198,24 +199,7 @@ describe("AnswersProvidersService", () => {
       ]);
     const searchSourcesSpy = jest
       .spyOn(AnswersTavilyClient.prototype, "searchSources")
-      .mockResolvedValue([
-        {
-          id: "q2-fallback-c1",
-          searchRoute: "supported",
-          sourceProvider: "tavily-search",
-          sourceType: "news",
-          publisherName: "yna.co.kr",
-          publishedAt: null,
-          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100002",
-          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100002",
-          rawTitle: "테슬라 한국 사업 철수 관련 보도",
-          rawSnippet: "Tavily fallback 결과입니다.",
-          normalizedHash: "hash-2",
-          originQueryIds: ["q2"],
-          retrievalBucket: "fallback",
-          domainRegistryId: null,
-        },
-      ]);
+      .mockResolvedValue([]);
     const service = createService({
       naverClientId: "naver-id",
       naverClientSecret: "naver-secret",
@@ -226,49 +210,16 @@ describe("AnswersProvidersService", () => {
       searchRoute: "supported",
       queries: [{ id: "q2", text: "테슬라 한국 철수", rank: 1 }],
       coreCheck: "테슬라 한국 철수",
-      domainRegistry: [
-        {
-          id: "kr-news",
-          domain: "*.yna.co.kr",
-          sourceKind: "news_agency",
-          usageRole: "familiar_news",
-          priority: 10,
-          isActive: true,
-        },
-        {
-          id: "kr-official",
-          domain: "*.go.kr",
-          sourceKind: "government",
-          usageRole: "verification_official",
-          priority: 20,
-          isActive: true,
-        },
-        {
-          id: "kr-social",
-          domain: "youtube.com",
-          sourceKind: "social_platform",
-          usageRole: "familiar_social",
-          priority: 30,
-          isActive: true,
-        },
-        {
-          id: "us-verification",
-          domain: "reuters.com",
-          sourceKind: "news_agency",
-          usageRole: "verification_news",
-          priority: 5,
-          isActive: true,
-        },
-      ],
+      domainRegistry: getKoreanSearchDomainRegistry(),
     });
 
     expect(naverSpy).toHaveBeenCalled();
     expect(naverSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ display: 8 }),
+      expect.objectContaining({ display: 20 }),
     );
-    expect(searchSourcesSpy).toHaveBeenCalled();
-    expect(result.length).toBe(2);
-    expect(result[1]?.sourceProvider).toBe("tavily-search");
+    expect(searchSourcesSpy).not.toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0]?.sourceProvider).toBe("naver-search");
   });
 
   it("classifyEvidenceSignals는 OpenAI client에 분류를 위임한다", async () => {
@@ -340,9 +291,12 @@ describe("AnswersProvidersService", () => {
     expect(result.answerSummary?.analysisSummary).toContain("요약");
   });
 
-  it("한국 뉴스 보조검색에서 TAVILY_API_KEY가 없으면 실패시킨다", async () => {
+  it("Naver 후보가 부족해도 Tavily fallback을 호출하지 않는다", async () => {
     jest
       .spyOn(AnswersNaverClient.prototype, "searchNews")
+      .mockResolvedValue([]);
+    const searchSourcesSpy = jest
+      .spyOn(AnswersTavilyClient.prototype, "searchSources")
       .mockResolvedValue([]);
     const service = createService({
       naverClientId: "naver-client-id",
@@ -350,16 +304,14 @@ describe("AnswersProvidersService", () => {
       tavilyApiKey: null,
     });
 
-    await expect(
-      service.searchSources({
-        searchRoute: "supported",
-        queries: [{ id: "q1", text: "한국은행 기준금리", rank: 1 }],
-        coreCheck: "한국은행 기준금리",
-        domainRegistry: [],
-      }),
-    ).rejects.toMatchObject({
-      code: APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    const result = await service.searchSources({
+      searchRoute: "supported",
+      queries: [{ id: "q1", text: "한국은행 기준금리", rank: 1 }],
+      coreCheck: "한국은행 기준금리",
+      domainRegistry: [],
     });
+
+    expect(result).toEqual([]);
+    expect(searchSourcesSpy).not.toHaveBeenCalled();
   });
 });
