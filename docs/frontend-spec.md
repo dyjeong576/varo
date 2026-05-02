@@ -237,12 +237,13 @@
 
 ### 8.3 answer 관련
 
+- `POST /api/v1/answers/query-processing-preview/async`
 - `POST /api/v1/answers/query-processing-preview`
 - `GET /api/v1/answers`
 - `GET /api/v1/answers/{answerId}`
 - `POST /api/v1/answers/{answerId}/reopen`
 
-`POST /api/v1/answers/query-processing-preview`는 현재 최종 완료까지 오래 걸리는 비동기 job id만 반환하지 않고, 백엔드가 동기적으로 preview pipeline을 실행한 뒤 detail을 반환한다. 프론트의 loading 단계 메시지는 실제 backend stage polling이 아니라 local task store 기반 안내용 진행 상태다.
+프론트의 실제 생성 경로는 `POST /api/v1/answers/query-processing-preview/async`다. source search 직후 detail을 먼저 받고, 결과 화면은 `GET /api/v1/answers/{answerId}` polling으로 background signal 분류 완료를 확인한다.
 
 ### 8.4 서비스 기능 관련
 

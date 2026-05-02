@@ -18,6 +18,7 @@
   - Naver News Search
   - Tavily Extract (후속 확장용, 현재 query-processing preview 생성 경로에서는 미사용)
   - OpenAI structured outputs
+  - Perplexity Sonar direct answer
 
 ## 3. 서비스 모듈 구조
 
@@ -116,11 +117,12 @@
 
 1. check 접수와 `answer_jobs` 생성
 2. check understanding / scope gate / search planning
-3. `unsupported`이면 `out_of_scope` 저장 후 종료
-4. `news`이면 Naver News Search 검색
-5. canonical URL 기준 dedup 후 relevance, evidence signal, summary를 단일 OpenAI 호출로 생성
-6. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
-7. source, `handoff_payload.evidenceSignals[]`, `handoff_payload.answerSummary` 저장
+3. `isFactCheckQuestion=false`이면 Perplexity 직접 답변으로 처리
+4. `unsupported`이면 `out_of_scope` 저장 후 종료
+5. `supported`이면 Naver News Search 검색
+6. canonical URL 기준 dedup 후 relevance, evidence signal, summary를 단일 OpenAI 호출로 생성
+7. `discard`가 아니고 raw snippet이 있는 source의 source-level evidence signal 생성
+8. source, `handoff_payload.evidenceSignals[]`, `handoff_payload.answerSummary` 저장
 9. 저장된 summary와 preview artifact 기반 결과 계산
 10. 완료 알림 생성
 11. history 반영
@@ -151,6 +153,7 @@
 - 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 판정 이유는 `search_route_reason`에 남긴다.
 - OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 check**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
 - OpenAI는 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 함께 분류한다.
+- `isFactCheckQuestion=false`이면 `unsupported`라도 `out_of_scope`가 아니라 Perplexity 직접 답변으로 처리하고 fact-check verdict를 생성하지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 check은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - **한국 정치·경제 뉴스성 check**은 Naver News Search를 사용하고, Naver 후보가 부족해도 Tavily Search 보조검색을 사용하지 않는다.
@@ -158,7 +161,8 @@
 
 ### 6.4 현재 API 책임
 
-- `POST /api/v1/answers/query-processing-preview` 요청 안에서 동기적으로 preview 파이프라인을 실행한다.
+- 프론트 생성 경로는 `POST /api/v1/answers/query-processing-preview/async`이며, source search 직후 먼저 응답하고 background에서 relevance/evidence signal/summary 생성을 이어간다.
+- `POST /api/v1/answers/query-processing-preview`는 동기 preview 생성 경로로 테스트/호환용 유지한다.
 - search provider 호출, relevance/evidence signal/summary 통합 생성, source/handoff 저장을 처리한다.
 - source fetch / 본문 추출과 OpenAI structured final interpretation 저장은 현재 preview 경로에서 수행하지 않는다.
 - 단계별 소요시간은 backend logger에 남긴다.
@@ -226,7 +230,8 @@
 
 #### Answers
 
-- `POST /api/v1/answers/query-processing-preview`: check을 받아 answer preview 생성 파이프라인을 시작하고 preview detail을 반환한다.
+- `POST /api/v1/answers/query-processing-preview/async`: check을 받아 answer preview 생성 파이프라인을 시작하고 source search 직후 preview detail을 먼저 반환한다.
+- `POST /api/v1/answers/query-processing-preview`: 동기 preview 생성 경로로 테스트/호환용 유지한다.
 - `GET /api/v1/answers`: 현재 사용자의 최근 answer preview 목록을 조회한다.
 - `GET /api/v1/answers/:answerId`: 특정 answer의 detail과 preview artifact 기반 임시 result를 조회한다.
 - `POST /api/v1/answers/:answerId/reopen`: 기존 answer 재진입 이벤트를 기록한다.
@@ -326,7 +331,7 @@
 
 - **한국 정치·경제 뉴스성 check**의 source 후보 수집
 - `title`, `description`, `originallink`, `link`, `pubDate`를 source candidate로 정규화
-- search plan query별 상위 8개를 요청한다.
+- 현재 코드 상수 기준 search plan query별 상위 20개를 요청한다.
 - Naver 검색 timeout은 최대 8초로 제한하고, 일부 query 실패는 성공한 query 결과만으로 계속 진행한다.
 - Naver 후보가 부족해도 Tavily Search fallback을 호출하지 않는다.
 - `dev`에서는 mock 가능

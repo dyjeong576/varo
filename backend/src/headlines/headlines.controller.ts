@@ -122,4 +122,35 @@ export class HeadlinesController {
 
     return { ok: true, ...result };
   }
+
+  @Post("internal/analysis")
+  @ApiHeader({ name: "x-varo-job-secret", required: true })
+  @ApiQuery({ name: "date", required: false, type: String, description: "재분석 날짜입니다. YYYY-MM-DD 형식이며 생략하면 KST 오늘 날짜를 사용합니다.", example: "2026-05-02" })
+  @ApiQuery(HEADLINE_CATEGORY_QUERY)
+  @ApiOperation({
+    summary: "오늘의 헤드라인 분석 수동 재생성",
+    description: "이미 저장된 RSS 헤드라인을 다시 OpenAI로 분석합니다. RSS 재수집은 수행하지 않습니다.",
+  })
+  @ApiOkResponse({ type: HeadlineScrapeResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
+  async regenerateAnalysisManually(
+    @Headers("x-varo-job-secret") secret?: string,
+    @Query("date") date?: string,
+    @Query("category") category?: string,
+  ): Promise<{ ok: true; dateKey: string; category: string; status: string; errorMessage: string | null }> {
+    const expectedSecret = this.configService.get<string | null>("headlineJobSecret", null);
+
+    if (!expectedSecret || secret !== expectedSecret) {
+      throw new AppException(
+        APP_ERROR_CODES.FORBIDDEN,
+        "헤드라인 수동 분석 권한이 없습니다.",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const result = await this.headlinesService.regenerateAnalysis(date, category);
+
+    return { ok: true, ...result };
+  }
 }

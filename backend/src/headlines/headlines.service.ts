@@ -379,6 +379,25 @@ export class HeadlinesService {
     }
   }
 
+  async regenerateAnalysis(date?: string, category?: string): Promise<{ dateKey: string; category: HeadlineCategory; status: string; errorMessage: string | null }> {
+    const dateKey = this.getDateKey(date);
+    const normalizedCategory = this.normalizeCategory(category) ?? "politics";
+
+    await this.generateAnalysis(dateKey, normalizedCategory);
+
+    const analysis = await this.db.headlineAnalysis.findUnique({
+      where: { dateKey_category: { dateKey, category: normalizedCategory } },
+      select: { status: true, errorMessage: true },
+    });
+
+    return {
+      dateKey,
+      category: normalizedCategory,
+      status: analysis?.status ?? "pending",
+      errorMessage: analysis?.errorMessage ?? null,
+    };
+  }
+
   private async fetchFeed(feed: HeadlineFeedConfig): Promise<Array<Omit<Prisma.HeadlineArticleCreateManyInput, "dateKey">>> {
     const response = await fetch(feed.feedUrl, {
       signal: AbortSignal.timeout(RSS_FETCH_TIMEOUT_MS),

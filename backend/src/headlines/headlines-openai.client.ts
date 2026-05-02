@@ -93,7 +93,11 @@ export class HeadlinesOpenAiClient {
       payload = await this.requestAnalysis(apiKey, dateKey, category, clusters);
       this.logger.log(`headline openai analysis completed; dateKey=${dateKey}; category=${category}; articleCount=${articleCount}; inputClusterCount=${clusters.length}; clusterCount=${payload.clusters?.length ?? 0}; elapsedMs=${Date.now() - startedAt}`);
     } catch (error) {
-      this.logger.warn(`headline openai analysis failed; dateKey=${dateKey}; category=${category}; articleCount=${articleCount}; inputClusterCount=${clusters.length}; elapsedMs=${Date.now() - startedAt}; error=${error instanceof Error ? error.message : "unknown"}`);
+      const details = error instanceof AppException && error.details
+        ? `; details=${JSON.stringify(error.details)}`
+        : "";
+
+      this.logger.warn(`headline openai analysis failed; dateKey=${dateKey}; category=${category}; articleCount=${articleCount}; inputClusterCount=${clusters.length}; elapsedMs=${Date.now() - startedAt}; error=${error instanceof Error ? error.message : "unknown"}${details}`);
       throw error;
     }
 

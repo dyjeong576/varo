@@ -27,13 +27,14 @@
 ## 3. 기술 스택
 - Frontend: Next.js 16, React 19, TypeScript, App Router, Tailwind CSS 4
 - Backend API: NestJS, TypeScript, REST API
-- Worker / Async Processing: Node.js worker + Redis queue는 후속 확장 축이다. 현재 answer preview 생성은 API 요청 안에서 동기 처리한다.
+- Worker / Async Processing: Node.js worker + Redis queue는 후속 확장 축이다. 현재 answer preview 생성은 API가 source search 직후 먼저 응답하고 background promise로 signal 분류를 이어간다.
 - Primary Database: PostgreSQL
 - Infra / Runtime: Amazon Linux EC2, Docker Compose, nginx container, certbot container, GHCR, GitHub Actions self-hosted runner
 - External Auth: Google login
 - External Search / AI:
   - Provider router for Naver News Search
   - OpenAI structured outputs
+  - Perplexity Sonar direct answer
 
 ## 4. 서비스 도메인 구조
 VARO는 아래 도메인으로 구성한다.
@@ -95,7 +96,7 @@ VARO는 아래 도메인으로 구성한다.
 [NestJS API]
     |-- auth/session ----------> [Google Auth]
     |-- read/write ------------> [PostgreSQL]
-    |-- answer preview pipeline -> [Naver News Search / OpenAI]
+    |-- answer preview pipeline -> [Naver News Search / OpenAI / Perplexity]
     |-- enqueue future jobs ----> [Redis]
     |
     +--> [Workers]
@@ -111,7 +112,7 @@ VARO는 아래 도메인으로 구성한다.
 - 프론트엔드는 answer preview, 인기, 커뮤니티, 히스토리, 알림 UI를 담당한다.
 - 프론트엔드는 일부 UI 상태를 localStorage에 유지한다.
 - 백엔드는 도메인 API와 공통 비즈니스 규칙을 담당한다.
-- 현재 answer preview 생성은 NestJS API가 동기 처리한다.
+- 현재 answer preview 생성은 NestJS API가 source search까지 처리해 먼저 응답하고, relevance/evidence signal 분류는 같은 인스턴스의 background promise로 이어간다.
 - worker는 장기적 answer job, source extraction, 알림 fan-out 같은 후속 확장 책임으로 둔다.
 - PostgreSQL은 서비스 전반의 기준 데이터 저장소다.
 - Redis는 queue와 일시적 비동기 제어를 담당한다.
