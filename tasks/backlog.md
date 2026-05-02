@@ -2,7 +2,6 @@
 
 ## 현재 구현 지도 후속 정리
 
-- `tasks/decisions.md`의 2026-05-01 Perplexity provider 결정과 현재 OpenAI 중심 코드/PRD 중 어느 쪽을 최신 기준으로 삼을지 확정한다.
 - Naver News Search query별 요청 개수를 PRD의 `display=8`과 현재 코드 상수 `NAVER_SEARCH_DISPLAY = 20` 중 하나로 맞춘다.
 - fact-check 결과 화면 source card에서 stance badge를 숨기는 현재 UI 동작을 유지할지 검토한다.
 - 기존 저장 데이터 호환용 `llm_direct` route와 `perplexity-sonar` source provider의 legacy 범위를 정리한다.

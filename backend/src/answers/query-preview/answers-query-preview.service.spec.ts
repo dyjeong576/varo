@@ -1093,7 +1093,7 @@ describe("AnswersQueryPreviewService", () => {
     expect(providers.extractContent).not.toHaveBeenCalled();
   });
 
-  it("isFactCheckQuestion false면 out_of_scope가 아니라 Perplexity 직접 답변으로 저장한다", async () => {
+  it("isFactCheckQuestion false면 out_of_scope가 아니라 OpenAI 직접 답변으로 저장한다", async () => {
     const persistence = createPersistenceMock();
     persistence.persistQueryPreviewResult.mockResolvedValue({
       createdSources: [
@@ -1108,7 +1108,7 @@ describe("AnswersQueryPreviewService", () => {
           rawSnippet: "직접 답변 참고 링크입니다.",
           originQueryIds: ["q1"],
           relevanceTier: "primary",
-          relevanceReason: "Perplexity sonar 실시간 검색 인용 출처",
+          relevanceReason: "OpenAI 직접 답변 인용 출처",
           retrievalBucket: "familiar",
           domainRegistryId: null,
           fetchStatus: "pending",
@@ -1123,7 +1123,7 @@ describe("AnswersQueryPreviewService", () => {
       answerSummary: {
         analysisSummary: "정치 뉴스는 여러 출처를 비교해 읽는 것이 좋습니다.",
         uncertaintySummary:
-          "Perplexity 직접 답변입니다. 출처 기반 사실성 검토 결과가 아닙니다.",
+          "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아닙니다.",
         uncertaintyItems: [],
       },
     });

@@ -34,7 +34,6 @@
 - External Search / AI:
   - Provider router for Naver News Search
   - OpenAI structured outputs
-  - Perplexity Sonar direct answer
 
 ## 4. 서비스 도메인 구조
 VARO는 아래 도메인으로 구성한다.
@@ -96,7 +95,7 @@ VARO는 아래 도메인으로 구성한다.
 [NestJS API]
     |-- auth/session ----------> [Google Auth]
     |-- read/write ------------> [PostgreSQL]
-    |-- answer preview pipeline -> [Naver News Search / OpenAI / Perplexity]
+    |-- answer preview pipeline -> [Naver News Search / OpenAI]
     |-- enqueue future jobs ----> [Redis]
     |
     +--> [Workers]

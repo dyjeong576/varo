@@ -360,3 +360,11 @@
 - Perplexity Sonar 호출은 JSON Schema structured output을 사용하고, direct answer는 Perplexity citations/search_results를 source candidate metadata로 보존한다.
 - Perplexity Sonar 호출은 비용 절감을 위해 `sonar`, `search_context_size=low`, `reasoning_effort=low`를 기본값으로 사용한다.
 - 오늘의 헤드라인 분석 provider는 별도 변경 전까지 기존 OpenAI structured output 경로를 유지한다.
+
+## 2026-05-02
+
+### Perplexity Provider Disconnect
+- 신규 answer 생성의 LLM provider는 OpenAI로 통일하고 Perplexity Sonar 호출 경로는 사용하지 않는다.
+- `isFactCheckQuestion=false` 직접 답변도 OpenAI structured output으로 생성한다.
+- `PERPLEXITY_API_KEY`는 신규 런타임 설정에서 제거한다.
+- 기존 저장 데이터 호환을 위해 `llm_direct` route parsing과 `perplexity-sonar` source provider 값은 당장 삭제하지 않는다.

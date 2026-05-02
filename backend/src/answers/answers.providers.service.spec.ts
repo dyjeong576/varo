@@ -2,7 +2,6 @@ import { HttpStatus } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
 import { AnswersOpenAiClient } from "./providers/answers-openai.client";
-import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import { AnswersProvidersService } from "./answers.providers.service";
 import { getKoreanSearchDomainRegistry } from "./answers.utils";
@@ -42,7 +41,6 @@ describe("AnswersProvidersService", () => {
       new AnswersTavilyClient(),
       new AnswersNaverClient(),
       new AnswersOpenAiClient(),
-      new AnswersPerplexityClient(),
     );
 
   afterEach(() => {
@@ -156,21 +154,21 @@ describe("AnswersProvidersService", () => {
     expect(result.coreCheck).toBe("트럼프의 관세 발표");
   });
 
-  it("answerDirectly는 Perplexity client에 위임한다", async () => {
+  it("answerDirectly는 OpenAI client에 위임한다", async () => {
     const answerSpy = jest
-      .spyOn(AnswersPerplexityClient.prototype, "answerDirectly")
+      .spyOn(AnswersOpenAiClient.prototype, "answerDirectly")
       .mockResolvedValue({
         answerText: "2026년 기준 최저임금은 시간당 1만320원입니다.",
         citations: [{ url: "https://www.minimumwage.go.kr/main.do" }],
       });
     const service = createService({
-      perplexityApiKey: "perplexity-test-key",
+      openAiApiKey: "openai-test-key",
     });
 
     const result = await service.answerDirectly("2026년 최저임금 얼마야?");
 
     expect(answerSpy).toHaveBeenCalledWith(
-      "perplexity-test-key",
+      "openai-test-key",
       "2026년 최저임금 얼마야?",
     );
     expect(result.answerText).toContain("최저임금");

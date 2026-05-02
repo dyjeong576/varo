@@ -141,13 +141,13 @@ export class AnswersQueryPreviewService {
       if (searchRoute === "llm_direct") {
         const directAnswerStartedAt = Date.now();
         const directAnswer = await this.providersService.answerDirectly(refinement.coreCheck);
-        this.logStageDuration("llm_direct_answer", directAnswerStartedAt, answerJob.id);
+        this.logStageDuration("openai_direct_answer", directAnswerStartedAt, answerJob.id);
 
         const citationCandidates = this.buildCitationCandidates(directAnswer.citations);
         const answerSummary: AnswerGeneratedSummary = {
           analysisSummary: directAnswer.answerText,
           uncertaintySummary:
-            "실시간 웹 검색 기반 답변입니다. 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+            "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 공식 출처를 직접 확인하세요.",
           uncertaintyItems: [],
         };
 
@@ -342,13 +342,13 @@ export class AnswersQueryPreviewService {
       if (searchRoute === "llm_direct") {
         const directAnswerStartedAt = Date.now();
         const directAnswer = await this.providersService.answerDirectly(refinement.coreCheck);
-        this.logStageDuration("llm_direct_answer", directAnswerStartedAt, answerJob.id);
+        this.logStageDuration("openai_direct_answer", directAnswerStartedAt, answerJob.id);
 
         const citationCandidates = this.buildCitationCandidates(directAnswer.citations);
         const answerSummary: AnswerGeneratedSummary = {
           analysisSummary: directAnswer.answerText,
           uncertaintySummary:
-            "실시간 웹 검색 기반 답변입니다. 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+            "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 공식 출처를 직접 확인하세요.",
           uncertaintyItems: [],
         };
 
@@ -462,7 +462,7 @@ export class AnswersQueryPreviewService {
       params.refinement.coreCheck,
     );
     this.logStageDuration(
-      "perplexity_direct_answer",
+      "openai_direct_answer",
       directAnswerStartedAt,
       params.answerJob.id,
     );
@@ -471,7 +471,7 @@ export class AnswersQueryPreviewService {
     const answerSummary: AnswerGeneratedSummary = {
       analysisSummary: directAnswer.answerText,
       uncertaintySummary:
-        "Perplexity 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 원문을 직접 확인하세요.",
+        "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 공식 출처를 직접 확인하세요.",
       uncertaintyItems: [],
     };
 
@@ -564,9 +564,9 @@ export class AnswersQueryPreviewService {
       const hostname = extractHostname(canonicalUrl);
 
       return {
-        id: `perplexity-${index + 1}`,
+        id: `openai-direct-${index + 1}`,
         searchRoute: "llm_direct" as SearchRoute,
-        sourceProvider: "perplexity-sonar" as SearchProvider,
+        sourceProvider: "openai-direct" as SearchProvider,
         sourceType: classifySourceType(canonicalUrl, ""),
         publisherName: hostname,
         publishedAt: citation.publishedAt ?? null,
@@ -579,7 +579,7 @@ export class AnswersQueryPreviewService {
         retrievalBucket: "familiar" as RetrievalBucket,
         domainRegistryId: null,
         relevanceTier: "primary" as AnswerRelevanceTier,
-        relevanceReason: "Perplexity sonar 실시간 검색 인용 출처",
+        relevanceReason: "OpenAI 직접 답변 인용 출처",
       };
     });
   }

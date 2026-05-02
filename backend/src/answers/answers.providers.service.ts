@@ -5,7 +5,6 @@ import { AppException } from "../common/exceptions/app-exception";
 import { NaverNewsSearchTestRequestDto } from "./dto/naver-news-search-test.dto";
 import { AnswersNaverClient } from "./providers/answers-naver.client";
 import { AnswersOpenAiClient } from "./providers/answers-openai.client";
-import { AnswersPerplexityClient } from "./providers/answers-perplexity.client";
 import { AnswersTavilyClient } from "./providers/answers-tavily.client";
 import {
   DirectAnswerResult,
@@ -32,12 +31,11 @@ export class AnswersProvidersService {
     private readonly tavilyClient: AnswersTavilyClient,
     private readonly naverClient: AnswersNaverClient,
     private readonly openAiClient: AnswersOpenAiClient,
-    private readonly perplexityClient: AnswersPerplexityClient,
   ) {}
 
   async answerDirectly(coreCheck: string): Promise<DirectAnswerResult> {
-    const apiKey = this.getRequiredPerplexityApiKey();
-    return this.perplexityClient.answerDirectly(apiKey, coreCheck);
+    const apiKey = this.getRequiredOpenAiApiKey();
+    return this.openAiClient.answerDirectly(apiKey, coreCheck);
   }
 
   async refineQuery(rawCheck: string): Promise<QueryRefinementResult> {
@@ -141,20 +139,6 @@ export class AnswersProvidersService {
       timeoutMs,
       candidates,
     });
-  }
-
-  private getRequiredPerplexityApiKey(): string {
-    const apiKey = this.configService.get<string | null>("perplexityApiKey", null);
-
-    if (!apiKey) {
-      throw new AppException(
-        APP_ERROR_CODES.CONFIG_VALIDATION_ERROR,
-        "Perplexity 직접 답변에는 PERPLEXITY_API_KEY가 필요합니다.",
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-
-    return apiKey;
   }
 
   private getRequiredOpenAiApiKey(): string {

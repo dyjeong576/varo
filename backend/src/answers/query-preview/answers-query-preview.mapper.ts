@@ -310,7 +310,7 @@ function buildSearchProvider(searchRoute: string): string | null {
   }
 
   if (searchRoute === "llm_direct") {
-    return "perplexity-sonar";
+    return "openai-direct";
   }
 
   return null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Clock, ExternalLink, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
@@ -160,6 +160,10 @@ export function HeadlinesPageClient() {
           같은 사건을 다룬 여러 매체의 헤드라인 표현을 수집된 제목과 요약 기준으로 비교합니다.
         </p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 font-semibold text-primary ring-1 ring-primary/10">
+            <Clock className="h-3.5 w-3.5" />
+            매일 새벽 1시 업데이트
+          </span>
           <span className="rounded-full bg-white px-3 py-1 shadow-sm">기사 {articleCount}개</span>
           <span className="rounded-full bg-white px-3 py-1 shadow-sm">매체 {publisherCount}곳</span>
           <span className="rounded-full bg-white px-3 py-1 shadow-sm">사건 {clusterCount}개</span>

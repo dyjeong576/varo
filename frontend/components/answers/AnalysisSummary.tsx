@@ -45,7 +45,7 @@ export default function AnalysisSummary({
         <p className="mb-3 text-xs font-semibold text-[#6b7280]">
           {isFactCheckQuestion
             ? `수집된 출처 기준 · 출처 ${sourceCount}건 · 근거 ${evidenceSnippetCount}건`
-            : `Perplexity 직접 답변 · 인용 ${sourceCount}건`}
+            : `OpenAI 직접 답변 · 인용 ${sourceCount}건`}
         </p>
         <p className="text-[#191b24] leading-relaxed text-sm whitespace-pre-wrap">
           {interpretation}

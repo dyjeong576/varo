@@ -1,7 +1,7 @@
 export type AnswerRelevanceTier = "primary" | "reference" | "discard";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
 export type SearchRoute = "supported" | "unsupported" | "llm_direct";
-export type SearchProvider = "naver-search" | "tavily-search" | "perplexity-sonar";
+export type SearchProvider = "naver-search" | "tavily-search" | "openai-direct" | "perplexity-sonar";
 export type SourcePoliticalLean =
   | "progressive"
   | "centrist"

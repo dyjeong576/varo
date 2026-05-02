@@ -5,7 +5,7 @@
 이 문서는 현재 코드 기준의 answer query processing 흐름을 짧게 정리한다. 범위는 사용자가 `check`을 제출한 뒤 source를 수집하고, evidence signal을 저장해 preview 응답을 만드는 단계까지다.
 
 VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 항상 수집된 source와 signal 기준의 preview다. 결과 화면의 summary 문장은 OpenAI가 생성하되, 수집된 출처 밖의 사실을 만들지 않는 구조화 출력으로 제한한다.
-출처 기반 사실성 검토 대상이 아닌 입력은 fact-check verdict를 만들지 않고 Perplexity 직접 답변으로 분기한다.
+출처 기반 사실성 검토 대상이 아닌 입력은 fact-check verdict를 만들지 않고 OpenAI 직접 답변으로 분기한다.
 
 ## 주요 API
 
@@ -26,7 +26,7 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
 - `evidence_snippets`: 본문 snippet 저장용 모델이다. 현재 preview 경로에서는 보통 비어 있을 수 있다.
 - `answer_jobs.handoff_payload.evidenceSignals[]`: source별 evidence signal의 주 저장 위치다.
 - `answer_jobs.handoff_payload.answerSummary`: OpenAI가 생성한 결과 화면용 summary 저장 위치다.
-- Perplexity 직접 답변은 citation/search result를 `perplexity-sonar` source candidate로 정규화해 같은 preview 응답 계약으로 표시한다.
+- OpenAI 직접 답변은 같은 preview 응답 계약으로 표시하되 출처 기반 fact-check result로 취급하지 않는다.
 
 ## 처리 흐름
 
@@ -46,7 +46,7 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
    - `searchRoute`는 현재 `supported` 또는 `unsupported`만 사용한다.
    - `supported`는 한국 정치·경제 뉴스성 check이다.
    - `unsupported`는 지원 범위 밖이며 source search를 하지 않는다.
-   - `isFactCheckQuestion=false`이면 `searchRoute=unsupported`라도 out_of_scope가 아니라 Perplexity 직접 답변으로 처리한다.
+   - `isFactCheckQuestion=false`이면 `searchRoute=unsupported`라도 out_of_scope가 아니라 OpenAI 직접 답변으로 처리한다.
 
 4. search plan
    - `supported`이면 `searchPlan.queries`는 4개 purpose를 가진다.
@@ -72,9 +72,9 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
    - 응답은 `status=searching`, `currentStage=relevance_and_signal_classification`, `result=null`이다.
    - 이후 background promise가 relevance/evidence signal 분류를 이어간다.
 
-8. Perplexity 직접 답변
+8. OpenAI 직접 답변
    - `isFactCheckQuestion=false`이면 뉴스 검색과 fact-check verdict 생성을 건너뛴다.
-   - Perplexity direct answer를 호출하고, 인용 출처를 `perplexity-sonar` source로 저장한다.
+   - OpenAI direct answer를 호출한다.
    - 응답은 직접 답변 summary를 포함하지만 출처 기반 fact-check result가 아니다.
 
 9. relevance / evidence signal / summary 생성
@@ -112,7 +112,7 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
 | --- | --- |
 | query refinement | OpenAI `gpt-5-mini` |
 | source search | Naver News Search |
-| direct answer for non-fact-check input | Perplexity Sonar |
+| direct answer for non-fact-check input | OpenAI `gpt-5-mini` |
 | content extraction | 현재 preview 경로에서는 사용하지 않음 |
 | relevance / evidence signal / summary | OpenAI `gpt-5-mini` structured output |
 
@@ -125,15 +125,14 @@ sequenceDiagram
   participant DB as PostgreSQL
   participant OAI as OpenAI
   participant Naver as Naver News
-  participant PPLX as Perplexity
 
   FE->>API: POST /answers/query-processing-preview/async
   API->>DB: create checks, answer_jobs(searching)
   API->>OAI: query refinement
   OAI-->>API: isFactCheckQuestion, searchRoute, searchPlan
   alt isFactCheckQuestion=false
-    API->>PPLX: direct answer
-    PPLX-->>API: answer + citations
+    API->>OAI: direct answer
+    OAI-->>API: answer
     API->>DB: save direct answer preview
     API-->>FE: direct answer response
   else unsupported
@@ -161,8 +160,8 @@ sequenceDiagram
 
 ## 현재 불일치 목록
 
-- `tasks/decisions.md`의 2026-05-01 `Answers LLM Provider` 결정은 query refinement와 relevance/evidence signal classification을 Perplexity로 전환한다고 기록하지만, 현재 코드와 `tasks/current-task.md`, PRD는 OpenAI 중심 경로를 기준으로 한다.
+- `tasks/decisions.md`의 2026-05-02 `Perplexity Provider Disconnect` 결정에 따라 현재 코드와 PRD는 OpenAI 중심 경로를 기준으로 한다.
 - PRD와 일부 문서에는 Naver News Search query별 `display=8`이 남아 있지만, 현재 코드 상수는 `NAVER_SEARCH_DISPLAY = 20`이다.
 - 일부 오래된 문서는 `news` route, sync-only preview, Tavily Search fallback 가능성을 암시한다. 현재 신규 생성 경로는 `supported / unsupported`, async preview, Naver-only source search 기준이다.
 - 결과 화면 source card는 fact-check 결과일 때 stance badge를 숨긴다. 이 UI 동작이 evidence-first UX에 맞는지는 후속 검토가 필요하다.
-- `llm_direct` route와 `perplexity-sonar` source provider는 기존 저장 데이터 호환을 위해 파싱/표시 경로가 남아 있다. 신규 route 정책과 legacy 호환 범위는 별도 정리가 필요하다.
+- `llm_direct` route와 legacy `perplexity-sonar` source provider 값은 기존 저장 데이터 호환을 위해 남아 있다. legacy 호환 범위는 별도 정리가 필요하다.
