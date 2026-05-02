@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Loader2, CheckCircle2, RefreshCw, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getActiveAnswerTask,
@@ -80,10 +80,10 @@ function LoadingContent() {
   }, [draftId, router]);
 
   useEffect(() => {
-    if (isProcessing && task?.answerId) {
+    if ((isProcessing || isCompleted) && task?.answerId) {
       router.replace(`/answers/${encodeURIComponent(task.answerId)}`);
     }
-  }, [isProcessing, router, task?.answerId]);
+  }, [isCompleted, isProcessing, router, task?.answerId]);
 
   useEffect(() => {
     if (!isSubmitting || errorMessage) {
@@ -172,37 +172,6 @@ function LoadingContent() {
           })}
         </div>
       </div>
-
-      {isCompleted && task.answerId ? (
-        <div className={`w-full max-w-sm mx-auto mb-6 rounded-[18px] border px-5 py-4 ${
-          isOutOfScope
-            ? "border-slate-200 bg-white"
-            : "border-blue-100 bg-blue-50"
-        }`}>
-          <p className={`text-sm font-semibold ${
-            isOutOfScope ? "text-slate-700" : "text-blue-800"
-          }`}>
-            {isOutOfScope
-              ? "한국 관련성이 확인되지 않아 판단 없이 기록되었습니다. 상세 화면에서 범위 확인 이유를 볼 수 있습니다."
-              : "근거 수집이 완료되었습니다. 결과를 열어 source와 evidence를 확인할 수 있습니다."}
-          </p>
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={() => router.push(`/answers/${task.answerId}`)}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
-            >
-              {isOutOfScope ? "기록 보기" : "결과 보기"}
-              <ArrowRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => router.push("/")}
-              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700"
-            >
-              계속 둘러보기
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {errorMessage ? (
         <div className="w-full max-w-sm mx-auto mb-6 rounded-[18px] border border-red-100 bg-red-50 px-5 py-4">

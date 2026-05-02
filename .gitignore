@@ -53,3 +53,5 @@ yarn-error.log*
 .agents/
 /stitch_mobile_ux_concept/
 /logo/
+/CLAUDE.md
+/AGENTS.md
