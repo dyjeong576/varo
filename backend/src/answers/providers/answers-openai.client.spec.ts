@@ -178,6 +178,14 @@ describe("AnswersOpenAiClient", () => {
     expect(result.answerMode).toBe("context_answer_with_news");
     expect(result.searchRoute).toBe("supported");
     expect(result.searchPlan.queries).toHaveLength(4);
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0]?.[1]?.body as string,
+    ) as { input: Array<{ content: string }> };
+    const systemPrompt = requestBody.input[0]?.content ?? "";
+    expect(systemPrompt).toContain("뉴스 검색 의도로 변환");
+    expect(systemPrompt).toContain("질문어·요청어는 제거");
+    expect(systemPrompt).toContain("고유명사, 사건·행위, 정책·제도, 수치·발표, 쟁점·결과");
+    expect(systemPrompt).toContain("정확 사건, 최신 쟁점, 공식/원출처, 반박/해명/후속 보도");
   });
 
   it("단일 LLM 호출에서 search plan purpose가 중복되어도 누락 purpose를 fallback query로 보정한다", async () => {

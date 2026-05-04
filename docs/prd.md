@@ -141,7 +141,7 @@ MVP 기준 현재 출처 범위:
 - 시스템이 관련 `source`를 수집한다.
 - 현재 수집 범위는 Naver News Search로 확인되는 뉴스 source다.
 - Naver News Search의 분석 후보는 조선일보, 동아일보, 한국경제, 매일경제, 세계일보, 연합뉴스, 중앙일보, 한국일보, YTN, KBS, MBC, SBS, 한겨레, 경향신문, 오마이뉴스, 프레시안으로 제한한다.
-- 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, check 검증 목적에 맞는 search plan을 생성한다.
+- 시스템은 사용자 발화에서 추출한 단어를 그대로 검색하지 않고, 질문어·요청어를 제거한 뒤 네이버 뉴스 제목에 등장할 법한 사건·행위·쟁점 중심 search plan을 생성한다.
 - 기본 검색 목적은 `check_specific`, `current_state`, `primary_source`, `contradiction_or_update`로 구분한다.
 - 시스템은 뉴스 검색에서 Naver News Search를 사용하고, 후보가 부족해도 Tavily Search fallback을 사용하지 않는다.
 

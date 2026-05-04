@@ -51,6 +51,9 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
 4. search plan
    - `supported`이면 `searchPlan.queries`는 4개 purpose를 가진다.
    - purpose는 `check_specific`, `current_state`, `primary_source`, `contradiction_or_update`다.
+   - Naver News Search query는 사용자 질문 문장을 그대로 축약하지 않고, 질문어·요청어를 제거한 뉴스 검색 의도로 변환한다.
+   - query는 고유명사, 사건·행위, 정책·제도, 수치·발표, 쟁점·결과를 우선 보존한 제목형 명사구로 생성한다.
+   - 4개 query는 정확 사건, 최신 쟁점, 공식/원출처, 반박/해명/후속 보도 관점으로 다변화한다.
    - 실제 source search는 `searchPlan.queries`를 우선 사용한다.
    - `generatedQueries`는 응답과 audit용 파생 값이다.
 

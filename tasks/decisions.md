@@ -12,6 +12,13 @@
 - 기존 저장 데이터 호환을 위해 `answerMode`가 없는 artifact는 `searchRoute` 기준으로 fallback한다.
 - 이번 변경은 DB schema와 Prisma migration을 변경하지 않는다.
 
+### Naver News Query Generation
+- search plan query는 사용자 질문 문장의 단순 축약이 아니라 Naver News Search용 뉴스 검색 의도로 생성한다.
+- `누구`, `왜`, `어떻게`, `알려줘`, `궁금해` 같은 질문어·요청어는 query에서 제거한다.
+- query에는 고유명사, 사건·행위, 정책·제도, 수치·발표, 쟁점·결과를 우선 보존한다.
+- 직책·소속·상태 표현은 뉴스 제목에서 흔한 형태로 정규화하되 특정 예시 표현을 모든 케이스에 강제하지 않는다.
+- `searchPlan.queries` 4개는 정확 사건, 최신 쟁점, 공식/원출처, 반박/해명/후속 보도 관점으로 다변화한다.
+
 ### Guest Core Access
 - 홈, answer 생성/조회, 히스토리, 인기 주제, 헤드라인은 비로그인 사용자도 이용할 수 있게 한다.
 - 커뮤니티, 알림, 설정, 내 정보, 온보딩 프로필은 로그인 전용으로 유지한다.
