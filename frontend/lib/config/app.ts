@@ -1,4 +1,5 @@
 export type CanonicalHostStatus = "pending" | "live";
+export type AppEnv = "dev" | "prod";
 
 function readEnv(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -28,6 +29,11 @@ function readCanonicalHostStatus(value: string | undefined): CanonicalHostStatus
   return value === "live" ? "live" : "pending";
 }
 
+function readAppEnv(value: string | undefined): AppEnv {
+  return value === "dev" ? "dev" : "prod";
+}
+
+export const APP_ENV = readAppEnv(readEnv(process.env.NEXT_PUBLIC_APP_ENV));
 export const APP_NAME = readEnv(process.env.NEXT_PUBLIC_APP_NAME) ?? "VARO";
 export const APP_TAGLINE =
   readEnv(process.env.NEXT_PUBLIC_APP_TAGLINE) ?? "Verified Analysis, Reasoned Opinion";

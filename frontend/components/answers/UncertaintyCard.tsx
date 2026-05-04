@@ -5,6 +5,23 @@ interface UncertaintyCardProps {
   uncertaintyItems: string[];
 }
 
+function normalizeNotice(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function isOverlappingSourceCaution(left: string, right: string): boolean {
+  return (
+    left.includes("OpenAI") &&
+    right.includes("OpenAI") &&
+    (
+      left.includes("출처 검증 결과") ||
+      right.includes("출처 검증 결과") ||
+      left.includes("출처 기반 사실성 검토") ||
+      right.includes("출처 기반 사실성 검토")
+    )
+  );
+}
+
 /**
  * 데이터 한계 및 유의사항 안내 컴포넌트
  */
@@ -15,6 +32,15 @@ export default function UncertaintyCard({
   uncertaintyItems,
 }: UncertaintyCardProps) {
   const items = [...uncertaintyItems];
+  const normalizedUncertaintySummary = normalizeNotice(uncertaintySummary);
+  const normalizedPendingMessage = normalizeNotice(pendingMessage);
+  const shouldShowPendingMessage =
+    normalizedPendingMessage.length > 0 &&
+    normalizedPendingMessage !== normalizedUncertaintySummary &&
+    !isOverlappingSourceCaution(
+      normalizedUncertaintySummary,
+      normalizedPendingMessage,
+    );
 
   if (insufficiencyReason && !items.includes(insufficiencyReason)) {
     items.unshift(insufficiencyReason);
@@ -28,7 +54,7 @@ export default function UncertaintyCard({
       </h3>
       <div className="space-y-3 text-sm leading-6 text-[#495466]">
         <p>{uncertaintySummary}</p>
-        <p>{pendingMessage}</p>
+        {shouldShowPendingMessage ? <p>{pendingMessage}</p> : null}
         {items.length > 0 ? (
           <ul className="space-y-2 text-xs text-[#6b7280]">
             {items.map((item) => (

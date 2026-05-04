@@ -219,6 +219,9 @@
 - 결과 재진입은 선택적 `entry` query를 통해 source를 전달할 수 있어야 함
 - `entry` 값은 `popular | history | notification`만 허용
 - 해당 query가 있으면 프론트는 answer reopen API를 호출한 뒤 URL에서 query를 제거
+- 결과 페이지 source list는 source가 1건 이상일 때만 노출
+- query context 디버그 블록은 개발 환경에서만 노출
+- 데이터 한계 안내는 같은 OpenAI/출처 검증 주의 문구를 반복 표시하지 않음
 - 알림 클릭은 관련 화면으로 직접 이동해야 함
 
 ## 8. API 소비 방식
@@ -308,6 +311,7 @@ answer 도메인은 AGENTS와 PRD 원칙을 그대로 따른다.
 원칙:
 
 - 지원 환경은 `dev`, `prod` 두 개다.
+- `NEXT_PUBLIC_APP_ENV`가 `dev`가 아니면 프론트는 `prod`로 간주한다.
 - API shape는 환경 간 동일하다.
 - 비밀값은 프론트 env에 두지 않는다.
 - 앱 메타데이터와 브랜드 문구는 `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_TAGLINE`을 우선 사용한다.

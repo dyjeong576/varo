@@ -332,12 +332,15 @@ MVP 기준 현재 출처 범위:
 - evidence agreement / conflict / uncertainty 표시
 - source list
 - 원문 링크 이동
+- `answerMode=direct_answer`에서 연결된 source가 없으면 source list 블록을 노출하지 않는다.
 
 핵심 UX 포인트:
 
 - 근거가 결론보다 먼저 보이는 정보 구조여야 한다.
 - source card는 스캔하기 쉬워야 한다.
 - 사용자는 충돌하는 근거와 부족한 근거를 바로 식별할 수 있어야 한다.
+- 검색 query context는 내부 디버그 정보이므로 개발 환경에서만 노출한다.
+- 직접 답변의 데이터 한계 안내는 출처 검증 결과가 아니라는 점을 한 번만 명확히 표시하고, 뉴스 검색을 하지 않은 경우를 뉴스 미발견으로 표현하지 않는다.
 
 ### 15.4 인기 주제 화면
 

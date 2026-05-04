@@ -160,7 +160,7 @@ export class AnswersQueryPreviewService {
         const answerSummary: AnswerGeneratedSummary = {
           analysisSummary: directAnswer.answerText,
           uncertaintySummary:
-            "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+            "OpenAI 답변이며, 출처 검증 결과가 아닙니다. 필요 시 공식 자료를 확인하세요.",
           uncertaintyItems: [],
         };
 
@@ -373,7 +373,7 @@ export class AnswersQueryPreviewService {
         const answerSummary: AnswerGeneratedSummary = {
           analysisSummary: directAnswer.answerText,
           uncertaintySummary:
-            "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+            "OpenAI 답변이며, 출처 검증 결과가 아닙니다. 필요 시 공식 자료를 확인하세요.",
           uncertaintyItems: [],
         };
 
@@ -565,7 +565,7 @@ export class AnswersQueryPreviewService {
     const answerSummary: AnswerGeneratedSummary = {
       analysisSummary: directAnswer.answerText,
       uncertaintySummary:
-        "OpenAI 직접 답변입니다. 출처 기반 사실성 검토 결과가 아니므로 중요한 결정 전에 공식 출처를 직접 확인하세요.",
+        "OpenAI 답변이며, 출처 검증 결과가 아닙니다. 필요 시 공식 자료를 확인하세요.",
       uncertaintyItems: [],
     };
 

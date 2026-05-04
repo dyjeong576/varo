@@ -19,23 +19,20 @@ export default function AnalysisSummary({
   answerMode,
 }: AnalysisSummaryProps) {
   const hasOfficialSource = officialSourceCount > 0;
-  const badgeLabel = answerMode === "fact_check"
-    ? hasOfficialSource
-      ? "공식 발표/공식 출처 확인됨"
-      : "공식 발표/공식 출처는 아직 확인되지 않음"
-    : answerMode === "context_answer_with_news"
-      ? "관련 뉴스와 함께 보는 맥락 답변"
-      : "fact-check verdict 아님";
+  const badgeLabel =
+    answerMode === "fact_check"
+      ? hasOfficialSource
+        ? "공식 출처 확인됨"
+        : "공식 출처 미확인"
+      : answerMode === "context_answer_with_news"
+        ? "뉴스 기반 맥락 답변"
+        : "AI 답변";
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <h3 className="text-lg font-bold tracking-tight text-[#191b24]">
-          {answerMode === "fact_check"
-            ? "수집 뉴스 종합 요약"
-            : answerMode === "context_answer_with_news"
-              ? "맥락 답변"
-              : "직접 답변"}
+          종합 분석
         </h3>
         <span
           className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -53,7 +50,7 @@ export default function AnalysisSummary({
             ? `수집된 출처 기준 · 출처 ${sourceCount}건 · 근거 ${evidenceSnippetCount}건`
             : answerMode === "context_answer_with_news"
               ? `OpenAI 맥락 답변 · 관련 뉴스 ${sourceCount}건`
-            : `OpenAI 직접 답변 · 인용 ${sourceCount}건`}
+              : `OpenAI 직접 답변 · 인용 ${sourceCount}건`}
         </p>
         <p className="text-[#191b24] leading-relaxed text-sm whitespace-pre-wrap">
           {interpretation}
@@ -64,7 +61,7 @@ export default function AnalysisSummary({
               ? "현재 단계에서는 저장된 근거를 바탕으로 생성한 임시 요약입니다."
               : answerMode === "context_answer_with_news"
                 ? "출처 기반 fact-check verdict가 아닌 맥락 답변입니다."
-              : "출처 기반 사실성 검토 verdict가 아닌 직접 답변입니다."
+                : "출처 기반 사실성 검토 verdict가 아닌 직접 답변입니다."
             : ""}
         </p>
       </div>

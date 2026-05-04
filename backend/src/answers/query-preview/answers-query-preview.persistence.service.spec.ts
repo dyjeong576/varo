@@ -411,6 +411,49 @@ describe("AnswersQueryPreviewPersistenceService", () => {
     expect(result.evidenceSignals[0]?.sourceId).toBe("trump-tariff-update");
   });
 
+  it("direct_answer는 뉴스 검색 후보가 없어도 뉴스 미발견 insufficiencyReason을 저장하지 않는다", async () => {
+    const prisma = createPrismaMock();
+    const notificationsService = createNotificationsServiceMock();
+    const service = new AnswersQueryPreviewPersistenceService(
+      prisma as never,
+      notificationsService as never,
+    );
+
+    const result = await service.persistQueryPreviewResult({
+      userId: "user-1",
+      answerJob: { id: "answer-1" },
+      refinement: {
+        coreCheck: "정치 뉴스 읽는 방법",
+        normalizedCheck: "정치 뉴스를 어떻게 읽어야 하는지 묻는 질문",
+        checkType: "general_fact",
+        answerMode: "direct_answer",
+        searchPlan: { queries: [] },
+        generatedQueries: [{ id: "q1", text: "정치 뉴스 읽는 방법", rank: 1 }],
+        searchRoute: "unsupported",
+        searchRouteReason: "출처 기반 사실성 검토 대상이 아닙니다.",
+      },
+      generatedQueries: [{ id: "q1", text: "정치 뉴스 읽는 방법", rank: 1 }],
+      relevanceCandidates: [],
+      evidenceSignals: [],
+      answerSummary: {
+        analysisSummary: "정치 뉴스는 여러 출처를 비교해 읽는 것이 좋습니다.",
+        uncertaintySummary: "OpenAI 답변이며, 출처 검증 결과가 아닙니다.",
+        uncertaintyItems: [],
+      },
+      primaryExtractionLimit: 5,
+    });
+
+    expect(result.insufficiencyReason).toBeNull();
+    expect(prisma.answerJob.update).toHaveBeenCalledWith({
+      where: { id: "answer-1" },
+      data: expect.objectContaining({
+        handoffPayload: expect.objectContaining({
+          insufficiencyReason: null,
+        }),
+      }),
+    });
+  });
+
   it("app exception을 answer job failed 상태로 기록한다", async () => {
     const prisma = createPrismaMock();
     const notificationsService = createNotificationsServiceMock();

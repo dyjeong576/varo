@@ -79,6 +79,8 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
    - `answerMode=direct_answer`이면 뉴스 검색과 fact-check verdict 생성을 건너뛴다.
    - OpenAI direct answer를 호출한다.
    - 응답은 직접 답변 summary를 포함하지만 출처 기반 fact-check result가 아니다.
+   - 뉴스 검색을 수행하지 않았으므로 `insufficiencyReason`에 뉴스 미발견 사유를 저장하지 않는다.
+   - 연결된 source가 없으면 결과 화면에서 source list 블록을 노출하지 않는다.
 
 9. relevance / evidence signal / summary 생성
    - OpenAI structured output을 한 번 호출해 relevance, evidence signal, answer summary를 함께 생성한다.

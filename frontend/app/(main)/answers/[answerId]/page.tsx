@@ -273,6 +273,16 @@ export default function AnswerResultPage() {
     hasAnswerResult && answer.answerMode === "context_answer_with_news";
   const isSignalClassificationPending =
     !answer.isOutOfScope && answer.status === "searching";
+  const shouldShowSourceList = answer.sources.length > 0;
+  const shouldShowQueryContext = process.env.NODE_ENV === "development";
+  const uncertaintyItems =
+    answer.answerMode === "direct_answer"
+      ? answer.uncertaintyItems.filter(
+          (item) => item !== "입력하신 내용과 관련된 뉴스를 찾지 못했습니다.",
+        )
+      : answer.uncertaintyItems;
+  const insufficiencyReason =
+    answer.answerMode === "direct_answer" ? null : answer.insufficiencyReason;
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top,#f1f6ff_0%,#f8f9fc_32%,#f6f3fb_70%,#f5f1fb_100%)] px-4 py-5 sm:px-6 sm:py-6">
@@ -388,60 +398,64 @@ export default function AnswerResultPage() {
           <EvidenceSnippetList evidenceSnippets={answer.evidenceSnippets} />
         ) : null}
 
-        <section className="space-y-6">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="flex items-center gap-2 text-xl font-black tracking-[-0.03em] text-[#191b24]">
-              <span className="material-symbols-outlined text-[#0050cb]">list_alt</span>
-              Cross-Reference List
-              <span className="text-base font-bold text-[#8a94a6]">
-                {filteredSources.length}
-              </span>
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setFilter(option.value)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
-                    filter === option.value
-                      ? "bg-[#eef5ff] text-[#0050cb] ring-1 ring-[#c7dbff]"
-                      : "bg-white text-[#6b7280] ring-1 ring-[#e6ebf3]"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {filteredSources.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-[#cbd5e1] bg-white px-5 py-8 text-center text-sm text-[#6b7280] shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
-                해당 유형의 source가 없습니다.
+        {shouldShowSourceList ? (
+          <section className="space-y-6">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-xl font-black tracking-[-0.03em] text-[#191b24]">
+                <span className="material-symbols-outlined text-[#0050cb]">list_alt</span>
+                Cross-Reference List
+                <span className="text-base font-bold text-[#8a94a6]">
+                  {filteredSources.length}
+                </span>
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {FILTERS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setFilter(option.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                      filter === option.value
+                        ? "bg-[#eef5ff] text-[#0050cb] ring-1 ring-[#c7dbff]"
+                        : "bg-white text-[#6b7280] ring-1 ring-[#e6ebf3]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
-            ) : (
-              filteredSources.map((source) => (
-                <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} showStanceBadge={answer.answerMode !== "fact_check"} />
-              ))
-            )}
-          </div>
-        </section>
+            </div>
 
-        <QueryContextDisclosure
-          searchedSourceCount={answer.searchedSourceCount}
-          selectedSourceCount={answer.selectedSourceCount}
-          discardedSourceCount={answer.discardedSourceCount}
-          coreCheck={answer.coreCheck}
-          normalizedCheck={answer.normalizedCheck}
-          generatedQueries={answer.generatedQueries}
-        />
+            <div className="space-y-4">
+              {filteredSources.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-[#cbd5e1] bg-white px-5 py-8 text-center text-sm text-[#6b7280] shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+                  해당 유형의 자료를 찾을 수 없습니다.
+                </div>
+              ) : (
+                filteredSources.map((source) => (
+                  <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} showStanceBadge={answer.answerMode !== "fact_check"} />
+                ))
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        {shouldShowQueryContext ? (
+          <QueryContextDisclosure
+            searchedSourceCount={answer.searchedSourceCount}
+            selectedSourceCount={answer.selectedSourceCount}
+            discardedSourceCount={answer.discardedSourceCount}
+            coreCheck={answer.coreCheck}
+            normalizedCheck={answer.normalizedCheck}
+            generatedQueries={answer.generatedQueries}
+          />
+        ) : null}
 
         {hasAnswerResult ? (
           <UncertaintyCard
             pendingMessage={answer.pendingMessage}
-            insufficiencyReason={answer.insufficiencyReason}
+            insufficiencyReason={insufficiencyReason}
             uncertaintySummary={answer.uncertaintySummary!}
-            uncertaintyItems={answer.uncertaintyItems}
+            uncertaintyItems={uncertaintyItems}
           />
         ) : null}
       </main>

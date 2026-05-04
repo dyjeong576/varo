@@ -422,10 +422,13 @@ export class AnswersQueryPreviewPersistenceService {
     const discardedSourceCount = createdSources.filter(
       (source) => source.relevanceTier === "discard",
     ).length;
-    const insufficiencyReason = buildInsufficiencyReason(
-      input.relevanceCandidates,
-      input.primaryExtractionLimit,
-    );
+    const insufficiencyReason =
+      input.refinement.answerMode === "direct_answer"
+        ? null
+        : buildInsufficiencyReason(
+            input.relevanceCandidates,
+            input.primaryExtractionLimit,
+          );
     const handoffSourceIds = buildHandoffSourceIds(createdSources);
     const sourcePoliticalLeans = Object.fromEntries(
       input.relevanceCandidates.flatMap((candidate) => {

@@ -19,6 +19,12 @@
 - 직책·소속·상태 표현은 뉴스 제목에서 흔한 형태로 정규화하되 특정 예시 표현을 모든 케이스에 강제하지 않는다.
 - `searchPlan.queries` 4개는 정확 사건, 최신 쟁점, 공식/원출처, 반박/해명/후속 보도 관점으로 다변화한다.
 
+### Answer Result UI Guardrails
+- 결과 페이지 source list는 source가 1건 이상일 때만 노출한다.
+- query context는 내부 디버그 정보이므로 개발 환경에서만 노출한다.
+- `answerMode=direct_answer`는 뉴스 검색을 수행하지 않으므로 뉴스 미발견 `insufficiencyReason`을 저장하거나 노출하지 않는다.
+- 데이터 한계 안내는 OpenAI 답변과 출처 검증 주의 문구가 중복되지 않게 표시한다.
+
 ### Guest Core Access
 - 홈, answer 생성/조회, 히스토리, 인기 주제, 헤드라인은 비로그인 사용자도 이용할 수 있게 한다.
 - 커뮤니티, 알림, 설정, 내 정보, 온보딩 프로필은 로그인 전용으로 유지한다.
