@@ -162,18 +162,20 @@ export class AnswerAnalysisResultDto {
     description: "수집된 출처 기준 임시 verdict",
     example: "Likely True",
     enum: ["Likely True", "Mixed Evidence", "Unclear", "Likely False"],
+    nullable: true,
   })
-  verdict!: string;
+  verdict!: string | null;
 
-  @ApiProperty({ description: "규칙 기반 confidence 점수", example: 84 })
-  confidenceScore!: number;
+  @ApiProperty({ description: "규칙 기반 confidence 점수", example: 84, nullable: true })
+  confidenceScore!: number | null;
 
   @ApiProperty({
     description: "출처 간 합의 수준",
     example: "high",
     enum: ["high", "medium", "low"],
+    nullable: true,
   })
-  consensusLevel!: string;
+  consensusLevel!: string | null;
 
   @ApiProperty({
     description: "LLM structured output으로 생성한 결과 화면용 해석 요약",
@@ -254,10 +256,11 @@ export class AnswerQueryProcessingPreviewResponseDto {
   coreCheck!: string;
 
   @ApiProperty({
-    description: "출처 기반 사실성 검토 대상 질문인지 여부",
-    example: true,
+    description: "answer 처리 모드",
+    example: "fact_check",
+    enum: ["fact_check", "direct_answer", "context_answer_with_news"],
   })
-  isFactCheckQuestion!: boolean;
+  answerMode!: string;
 
   @ApiProperty({ description: "생성된 query 목록", type: [AnswerQueryArtifactDto] })
   generatedQueries!: AnswerQueryArtifactDto[];

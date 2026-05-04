@@ -116,7 +116,7 @@
 
 1. check 접수와 `answer_jobs` 생성
 2. check understanding / scope gate / search planning
-3. `isFactCheckQuestion=false`이면 OpenAI 직접 답변으로 처리
+3. `answerMode=direct_answer`이면 OpenAI 직접 답변으로 처리
 4. `unsupported`이면 `out_of_scope` 저장 후 종료
 5. `supported`이면 Naver News Search 검색
 6. canonical URL 기준 dedup 후 relevance, evidence signal, summary를 단일 OpenAI 호출로 생성
@@ -151,8 +151,8 @@
 - source와 snippet까지 추적 가능해야 한다.
 - 현재 공개 API 기준 지원 범위와 provider 선택의 authoritative field는 `search_route`다. 판정 이유는 `search_route_reason`에 남긴다.
 - OpenAI는 먼저 scope gate에서 **한국 정치·경제 뉴스성 check**인지 판정하고, `unsupported`이면 검색 query를 만들지 않는다.
-- OpenAI는 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 함께 분류한다.
-- `isFactCheckQuestion=false`이면 `unsupported`라도 `out_of_scope`가 아니라 OpenAI 직접 답변으로 처리하고 fact-check verdict를 생성하지 않는다.
+- OpenAI는 처리 모드를 `answerMode=fact_check|direct_answer|context_answer_with_news`로 분류한다.
+- `answerMode=direct_answer`이면 `unsupported`라도 `out_of_scope`가 아니라 OpenAI 직접 답변으로 처리하고 fact-check verdict를 생성하지 않는다.
 - provider 선택은 `search_route`, 검증 목적별 검색 질의 생성은 `search_plan`이 담당한다.
 - `search_route=unsupported`인 check은 `out_of_scope`로 기록하고 verdict를 생성하지 않는다.
 - **한국 정치·경제 뉴스성 check**은 Naver News Search를 사용하고, Naver 후보가 부족해도 Tavily Search 보조검색을 사용하지 않는다.

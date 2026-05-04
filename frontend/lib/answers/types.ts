@@ -49,7 +49,7 @@ export interface AnswerPreviewDetailResponse {
   currentStage: string;
   normalizedCheck: string;
   coreCheck: string;
-  isFactCheckQuestion: boolean;
+  answerMode: "fact_check" | "direct_answer" | "context_answer_with_news";
   generatedQueries: AnswerPreviewQueryArtifactResponse[];
 
   sources: AnswerPreviewSourceResponse[];
@@ -64,10 +64,10 @@ export interface AnswerPreviewDetailResponse {
     insufficiencyReason: string | null;
   };
   result: {
-    mode: "rule_based_preview";
-    verdict: "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False";
-    confidenceScore: number;
-    consensusLevel: "high" | "medium" | "low";
+    mode: "rule_based_preview" | "direct_answer" | "context_answer_with_news";
+    verdict: "Likely True" | "Mixed Evidence" | "Unclear" | "Likely False" | null;
+    confidenceScore: number | null;
+    consensusLevel: "high" | "medium" | "low" | null;
     analysisSummary: string;
     uncertaintySummary: string;
     uncertaintyItems: string[];
@@ -164,7 +164,7 @@ export interface AnswerPreviewDetail {
   statusTone: "blue" | "slate" | "red";
   pendingMessage: string;
   coreCheck: string;
-  isFactCheckQuestion: boolean;
+  answerMode: "fact_check" | "direct_answer" | "context_answer_with_news";
   generatedQueries: AnswerPreviewQueryArtifact[];
   sources: AnswerPreviewSource[];
   evidenceSnippets: AnswerPreviewEvidenceSnippet[];
@@ -190,7 +190,7 @@ export interface AnswerPreviewDetail {
     analysis: number;
     other: number;
   };
-  resultMode: "rule_based_preview" | null;
+  resultMode: "rule_based_preview" | "direct_answer" | "context_answer_with_news" | null;
 }
 
 export type AnswerTaskStatus =

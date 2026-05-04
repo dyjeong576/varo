@@ -2,6 +2,7 @@ export type AnswerRelevanceTier = "primary" | "reference" | "discard";
 export type RetrievalBucket = "familiar" | "verification" | "fallback";
 export type SearchRoute = "supported" | "unsupported" | "llm_direct";
 export type SearchProvider = "naver-search" | "tavily-search" | "openai-direct" | "perplexity-sonar";
+export type AnswerMode = "fact_check" | "direct_answer" | "context_answer_with_news";
 export type SourcePoliticalLean =
   | "progressive"
   | "centrist"
@@ -100,7 +101,7 @@ export interface QueryRefinementResult {
   coreCheck: string;
   normalizedCheck: string;
   checkType: AnswerCheckType;
-  isFactCheckQuestion: boolean;
+  answerMode: AnswerMode;
   searchPlan: SearchPlan;
   generatedQueries: QueryArtifact[];
   searchRoute: SearchRoute;

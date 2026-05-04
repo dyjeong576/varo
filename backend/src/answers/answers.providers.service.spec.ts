@@ -135,7 +135,7 @@ describe("AnswersProvidersService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
-        isFactCheckQuestion: true,
+        answerMode: "fact_check",
         searchPlan: { queries: [] },
         generatedQueries: [],
         searchRoute: "unsupported",

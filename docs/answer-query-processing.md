@@ -41,12 +41,12 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
 
 3. query refinement
    - OpenAI `gpt-5-mini` structured output을 호출한다.
-   - 출력은 `coreCheck`, `normalizedCheck`, `checkType`, `isFactCheckQuestion`, `searchRoute`, `searchPlan`이다.
-   - `isFactCheckQuestion`은 출처 기반 사실성 검토 대상 여부다.
+   - 출력은 `coreCheck`, `normalizedCheck`, `checkType`, `answerMode`, `searchRoute`, `searchPlan`이다.
+   - `answerMode`는 `fact_check`, `direct_answer`, `context_answer_with_news` 중 하나다.
    - `searchRoute`는 현재 `supported` 또는 `unsupported`만 사용한다.
    - `supported`는 한국 정치·경제 뉴스성 check이다.
    - `unsupported`는 지원 범위 밖이며 source search를 하지 않는다.
-   - `isFactCheckQuestion=false`이면 `searchRoute=unsupported`라도 out_of_scope가 아니라 OpenAI 직접 답변으로 처리한다.
+   - `answerMode=direct_answer`이면 `searchRoute=unsupported`라도 out_of_scope가 아니라 OpenAI 직접 답변으로 처리한다.
 
 4. search plan
    - `supported`이면 `searchPlan.queries`는 4개 purpose를 가진다.
@@ -73,7 +73,7 @@ VARO는 이 단계에서 절대적 사실 판정을 하지 않는다. 결과는 
    - 이후 background promise가 relevance/evidence signal 분류를 이어간다.
 
 8. OpenAI 직접 답변
-   - `isFactCheckQuestion=false`이면 뉴스 검색과 fact-check verdict 생성을 건너뛴다.
+   - `answerMode=direct_answer`이면 뉴스 검색과 fact-check verdict 생성을 건너뛴다.
    - OpenAI direct answer를 호출한다.
    - 응답은 직접 답변 summary를 포함하지만 출처 기반 fact-check result가 아니다.
 
@@ -129,8 +129,8 @@ sequenceDiagram
   FE->>API: POST /answers/query-processing-preview/async
   API->>DB: create checks, answer_jobs(searching)
   API->>OAI: query refinement
-  OAI-->>API: isFactCheckQuestion, searchRoute, searchPlan
-  alt isFactCheckQuestion=false
+  OAI-->>API: answerMode, searchRoute, searchPlan
+  alt answerMode=direct_answer
     API->>OAI: direct answer
     OAI-->>API: answer
     API->>DB: save direct answer preview

@@ -1,23 +1,22 @@
 # Current Task
 
 ## 작업명
-비로그인 코어 서비스 공개 전환
+설명형 질문용 context answer with news 모드 추가
 
 ## 목표
-- 홈, answer 생성/조회, 히스토리, 인기 주제, 헤드라인을 비로그인 사용자도 이용할 수 있게 한다.
-- 커뮤니티, 알림, 설정, 내 정보, 온보딩 프로필은 로그인 전용으로 유지한다.
-- 비로그인 사용자는 HttpOnly 게스트 쿠키 기반 브라우저별 기록을 사용한다.
+- 한국 정치·경제 설명형 질문에 대해 fact-check verdict 없이 OpenAI 맥락 답변과 Naver 관련 뉴스를 함께 제공한다.
+- 기존 fact-check 흐름은 유지하고 verdict는 `answerMode=fact_check`에서만 노출한다.
+- `checkType` 확장이 아니라 `answerMode`로 처리 모드를 구분한다.
 
 ## 이번 작업 범위
 - `tasks/current-task.md`
 - `tasks/decisions.md`
 - `docs/prd.md`
-- frontend main layout과 계정 전용 route guard
-- backend guest session 모델, guard, answer actor 처리
-- popular/headlines 공개 조회 처리
+- backend answer mode 타입, query refinement, context answer with news 분기
+- frontend answer result 화면의 answer mode별 표시
 - 관련 테스트
 
 ## 제외 범위
-- 게스트 결과의 로그인 계정 자동 병합
-- 커뮤니티 비로그인 읽기/쓰기
-- 알림/설정/내 정보 비로그인 공개
+- fact-check verdict를 context answer mode에 생성하는 것
+- DB migration
+- 한국 정치·경제 밖 설명형 질문의 뉴스 검색 지원

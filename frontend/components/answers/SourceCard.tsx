@@ -3,7 +3,7 @@ import { AnswerPreviewSource } from "@/lib/answers/types";
 interface SourceCardProps {
   source: AnswerPreviewSource;
   isClassifying?: boolean;
-  isFactCheckQuestion?: boolean;
+  showStanceBadge?: boolean;
 }
 
 function getSourceTone(source: AnswerPreviewSource): {
@@ -36,7 +36,7 @@ function getSourceTone(source: AnswerPreviewSource): {
 export default function SourceCard({
   source,
   isClassifying = false,
-  isFactCheckQuestion = false,
+  showStanceBadge = true,
 }: SourceCardProps) {
   const tone = getSourceTone(source);
 
@@ -61,13 +61,13 @@ export default function SourceCard({
                 <h4 className="truncate text-sm font-black text-[#191b24]">
                   {source.publisherName}
                 </h4>
-                {isFactCheckQuestion ? null : (
+                {showStanceBadge ? (
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.1em] ${tone.badge}`}
                   >
                     {source.stanceLabel}
                   </span>
-                )}
+                ) : null}
               </div>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a94a6]">
                 {source.sourceTypeLabel} · {source.publishedAtLabel}

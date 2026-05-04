@@ -42,10 +42,10 @@ interface AssembledSourceBreakdown {
 }
 
 interface AssembledAnswerResult {
-  mode: "rule_based_preview";
-  verdict: AnswerResultVerdict;
-  confidenceScore: number;
-  consensusLevel: AnswerConsensusLevel;
+  mode: "rule_based_preview" | "direct_answer" | "context_answer_with_news";
+  verdict: AnswerResultVerdict | null;
+  confidenceScore: number | null;
+  consensusLevel: AnswerConsensusLevel | null;
   analysisSummary: string;
   uncertaintySummary: string;
   uncertaintyItems: string[];

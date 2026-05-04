@@ -12,6 +12,7 @@ import {
   EvidenceSignalUpdateType,
   QueryRefinementResult,
   AnswerCheckType,
+  AnswerMode,
   RelevanceSignalClassificationInput,
   RelevanceSignalClassificationResult,
   AnswerRelevanceTier,
@@ -29,6 +30,11 @@ const OPENAI_TIMEOUT_MS = 300000;
 const QUERY_REFINEMENT_MAX_OUTPUT_TOKENS = 1000;
 const RELEVANCE_SIGNAL_MAX_OUTPUT_TOKENS = 3200;
 const SEARCH_ROUTES: SearchRoute[] = ["supported", "unsupported"];
+const ANSWER_MODES: AnswerMode[] = [
+  "fact_check",
+  "direct_answer",
+  "context_answer_with_news",
+];
 const CHECK_TYPES: AnswerCheckType[] = [
   "scheduled_event",
   "current_status",
@@ -88,7 +94,7 @@ interface OpenAiQueryRefinementPayload {
   coreCheck: string;
   normalizedCheck: string;
   checkType: AnswerCheckType;
-  isFactCheckQuestion: boolean;
+  answerMode: AnswerMode;
   searchPlan: OpenAiSearchPlanPayload;
   searchRoute: SearchRoute;
 }
@@ -189,7 +195,7 @@ export class AnswersOpenAiClient {
               "coreCheck",
               "normalizedCheck",
               "checkType",
-              "isFactCheckQuestion",
+              "answerMode",
               "searchRoute",
               "searchPlan",
             ],
@@ -200,7 +206,10 @@ export class AnswersOpenAiClient {
                 type: "string",
                 enum: CHECK_TYPES,
               },
-              isFactCheckQuestion: { type: "boolean" },
+              answerMode: {
+                type: "string",
+                enum: ANSWER_MODES,
+              },
               searchRoute: {
                 type: "string",
                 enum: SEARCH_ROUTES,
@@ -244,13 +253,17 @@ export class AnswersOpenAiClient {
 - coreCheck: 핵심 주장
 - normalizedCheck: 검증 가능한 형태로 정규화한 주장
 - checkType: scheduled_event | current_status | statistic | quote | policy | corporate_action | incident | general_fact
-- isFactCheckQuestion: 출처 기반으로 사실성 검토가 가능한 질문/주장이면 true, 의견·상담·창작·일반 설명·미래 예측이면 false
+- answerMode:
+  - fact_check: 한국 정치·경제 뉴스성 check의 사실성 검토
+  - direct_answer: 뉴스 검색 없이 답변할 일반 설명·상담·창작·범위 밖 질문
+  - context_answer_with_news: 한국 정치·경제 이슈의 배경·쟁점·이유를 묻는 설명형 질문
 - searchRoute:
   - supported: 한국 정치·경제 뉴스성 check — 뉴스 검색이 필요한 이슈, 루머, 사건, 인물 발언, 정책 변화
   - unsupported: 한국 관련 없음, 해외/글로벌 뉴스, 의료·연예·스포츠·투자 추천, 또는 출처 기반 사실성 검토 대상이 아닌 의견·상담·창작·일반 설명·미래 예측
 - route는 인물/기업의 국적보다 check이 다루는 사건·제도·영향의 관할, 장소, 시장을 우선해 판정.
 - 한국의 선거, 공직, 국회, 정부, 지자체, 법·정책, 규제, 기업 활동, 금융·부동산·소비자 시장에 관한 사실성 check이면 supported.
-- isFactCheckQuestion=false이면 searchRoute는 unsupported로 둡니다.
+- 최종 searchRoute 보정은 서버가 answerMode 기준으로 처리합니다.
+- answerMode=direct_answer이면 searchPlan은 빈 배열로 둡니다.
 
 ## searchPlan.queries
 supported면 정확히 4개, unsupported면 빈 배열.
@@ -284,13 +297,21 @@ supported면 정확히 4개, unsupported면 빈 배열.
     const checkType = CHECK_TYPES.includes(payload.checkType)
       ? payload.checkType
       : "general_fact";
-    const isFactCheckQuestion = payload.isFactCheckQuestion === true;
-    const searchRoute: SearchRoute =
+    const answerMode = ANSWER_MODES.includes(payload.answerMode)
+      ? payload.answerMode
+      : "direct_answer";
+    const rawSearchRoute: SearchRoute =
       payload.searchRoute === "unsupported"
         ? "unsupported"
         : payload.searchRoute === "llm_direct"
           ? "llm_direct"
           : "supported";
+    const searchRoute: SearchRoute =
+      answerMode === "context_answer_with_news"
+        ? "supported"
+        : answerMode === "direct_answer"
+          ? "unsupported"
+          : rawSearchRoute;
 
     let searchPlan: SearchPlan;
     let generatedQueries: QueryArtifact[];
@@ -312,7 +333,7 @@ supported면 정확히 4개, unsupported면 빈 배열.
       coreCheck,
       normalizedCheck,
       checkType,
-      isFactCheckQuestion,
+      answerMode,
       searchPlan,
       generatedQueries,
       searchRoute,

@@ -2,6 +2,16 @@
 
 ## 2026-05-04
 
+### Context Answer With News Mode
+- `checkType`은 검토 대상 성격 힌트로 유지하고 복합/설명형 흐름을 위해 확장하지 않는다.
+- 신규 answer 처리 구분값으로 `answerMode=fact_check|direct_answer|context_answer_with_news`를 도입한다.
+- 한국 정치·경제 설명형 질문은 `context_answer_with_news`로 분류하고, OpenAI 직접 답변과 Naver 관련 뉴스 목록을 함께 제공한다.
+- `answerMode`를 처리와 UI 분기의 기준값으로 사용한다.
+- `context_answer_with_news`는 서버에서 `searchRoute=supported`로 보정하며, Naver 검색용 `searchPlan.queries`를 생성한다.
+- `context_answer_with_news`에서는 fact-check verdict, confidence, consensus를 생성하거나 노출하지 않는다.
+- 기존 저장 데이터 호환을 위해 `answerMode`가 없는 artifact는 `searchRoute` 기준으로 fallback한다.
+- 이번 변경은 DB schema와 Prisma migration을 변경하지 않는다.
+
 ### Guest Core Access
 - 홈, answer 생성/조회, 히스토리, 인기 주제, 헤드라인은 비로그인 사용자도 이용할 수 있게 한다.
 - 커뮤니티, 알림, 설정, 내 정보, 온보딩 프로필은 로그인 전용으로 유지한다.
@@ -253,9 +263,9 @@
 
 ### Answer Provider Routing Cost Optimization
 - 신규 answer 생성의 query refinement는 항상 OpenAI structured output으로 수행한다.
-- `isFactCheckQuestion=true`이고 `searchRoute=supported`이면 Naver News Search로 출처를 수집하고 OpenAI로 relevance, evidence signal, answer summary를 생성한다.
-- `isFactCheckQuestion=false`이면 out_of_scope로 기록하지 않고 Perplexity direct answer를 사용하되, 이 결과는 출처 기반 fact-check verdict가 아니라 직접 답변으로 표시한다.
-- `isFactCheckQuestion=true`이고 `searchRoute=unsupported`이면 기존처럼 지원 범위 밖 answer로 기록하고 verdict를 생성하지 않는다.
+- `answerMode=fact_check`이고 `searchRoute=supported`이면 Naver News Search로 출처를 수집하고 OpenAI로 relevance, evidence signal, answer summary를 생성한다.
+- `answerMode=direct_answer`이면 out_of_scope로 기록하지 않고 직접 답변을 사용하되, 이 결과는 출처 기반 fact-check verdict가 아니라 직접 답변으로 표시한다.
+- `answerMode=fact_check`이고 `searchRoute=unsupported`이면 기존처럼 지원 범위 밖 answer로 기록하고 verdict를 생성하지 않는다.
 - 기존 저장 데이터 호환을 위해 `llm_direct` route parsing과 `perplexity-sonar` source provider는 유지한다.
 
 ## 2026-04-28
@@ -347,8 +357,7 @@
 ### Query Refinement FactCheck Flag
 - `search_route` 값에서 `news`를 제거하고 신규 answer 생성 기준 `supported / unsupported`만 사용한다.
 - 한국 정치·경제 뉴스성 check은 `supported`, 지원 범위 밖 check은 `unsupported/out_of_scope`로 처리한다.
-- query refinement는 `answerType`을 반환하지 않고, 출처 기반 사실성 검토 대상 여부를 `isFactCheckQuestion` boolean으로 반환한다.
-- `isFactCheckQuestion`은 결과 화면의 정보 합의성 노출 조건으로 사용한다.
+- 이 결정의 UI 분기 필드는 2026-05-04 `answerMode` 결정으로 대체되었다.
 - `checkType`은 `scheduled_event` 등 내부 결과 계산 힌트로만 유지한다.
 - Naver News Search는 query별 `display=8`, `sort=sim`으로 요청한다.
 - Naver News Search의 분석 후보는 조선일보, 동아일보, 한국경제, 매일경제, 세계일보, 연합뉴스, 중앙일보, 한국일보, YTN, KBS, MBC, SBS, 한겨레, 경향신문, 오마이뉴스, 프레시안으로 제한한다.
@@ -375,6 +384,6 @@
 
 ### Perplexity Provider Disconnect
 - 신규 answer 생성의 LLM provider는 OpenAI로 통일하고 Perplexity Sonar 호출 경로는 사용하지 않는다.
-- `isFactCheckQuestion=false` 직접 답변도 OpenAI structured output으로 생성한다.
+- `answerMode=direct_answer` 직접 답변도 OpenAI structured output으로 생성한다.
 - `PERPLEXITY_API_KEY`는 신규 런타임 설정에서 제거한다.
 - 기존 저장 데이터 호환을 위해 `llm_direct` route parsing과 `perplexity-sonar` source provider 값은 당장 삭제하지 않는다.

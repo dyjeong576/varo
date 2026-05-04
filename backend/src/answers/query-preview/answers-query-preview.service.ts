@@ -7,6 +7,7 @@ import { AnswerQueryProcessingPreviewResponseDto } from "../dto/answer-query-pro
 import { AnswersProvidersService } from "../answers.providers.service";
 import {
   AnswerGeneratedSummary,
+  AnswerMode,
   AnswerRelevanceTier,
   DirectAnswerCitation,
   QueryArtifact,
@@ -107,7 +108,19 @@ export class AnswersQueryPreviewService {
             }))
           : refinement.generatedQueries;
 
-      if (refinement.isFactCheckQuestion === false) {
+      if (this.getAnswerMode(refinement) === "context_answer_with_news") {
+        return this.createContextAnswerWithNewsPreviewResult({
+          userId,
+          answerJob,
+          check,
+          normalizedCheck,
+          refinement,
+          generatedQueries,
+          sourceQueries,
+        });
+      }
+
+      if (this.getAnswerMode(refinement) === "direct_answer") {
         return this.createDirectAnswerPreviewResult({
           userId,
           answerJob,
@@ -308,7 +321,19 @@ export class AnswersQueryPreviewService {
             }))
           : refinement.generatedQueries;
 
-      if (refinement.isFactCheckQuestion === false) {
+      if (this.getAnswerMode(refinement) === "context_answer_with_news") {
+        return this.createContextAnswerWithNewsPreviewResult({
+          userId,
+          answerJob,
+          check,
+          normalizedCheck,
+          refinement,
+          generatedQueries,
+          sourceQueries,
+        });
+      }
+
+      if (this.getAnswerMode(refinement) === "direct_answer") {
         return this.createDirectAnswerPreviewResult({
           userId,
           answerJob,
@@ -447,6 +472,75 @@ export class AnswersQueryPreviewService {
     const previewUser = await this.persistenceService.ensurePreviewUser();
 
     return this.createQueryProcessingPreview(previewUser.id, payload);
+  }
+
+  private getAnswerMode(refinement: QueryRefinementResult): AnswerMode {
+    return refinement.answerMode ?? "fact_check";
+  }
+
+  private async createContextAnswerWithNewsPreviewResult(params: {
+    userId: string;
+    answerJob: Pick<AnswerJob, "id" | "createdAt" | "clientRequestId">;
+    check: { id: string; rawText: string };
+    normalizedCheck: string;
+    refinement: QueryRefinementResult;
+    generatedQueries: QueryArtifact[];
+    sourceQueries: QueryArtifact[];
+  }): Promise<AnswerQueryProcessingPreviewResponseDto> {
+    const [directAnswer, initialCandidates] = await Promise.all([
+      this.providersService.answerDirectly(params.refinement.coreCheck),
+      this.providersService.searchSources({
+        searchRoute: "supported",
+        queries: params.sourceQueries,
+        coreCheck: params.refinement.coreCheck,
+        domainRegistry: getKoreanSearchDomainRegistry(),
+      }),
+    ]);
+    const contextCandidates = this.selectClassificationCandidates(
+      initialCandidates,
+      params.sourceQueries,
+    ).map((candidate) => ({
+      ...candidate,
+      relevanceTier: "reference" as AnswerRelevanceTier,
+      relevanceReason:
+        candidate.relevanceReason ??
+        "맥락 답변과 함께 확인할 관련 뉴스입니다.",
+    }));
+    const answerSummary: AnswerGeneratedSummary = {
+      analysisSummary: directAnswer.answerText,
+      uncertaintySummary:
+        "맥락 답변과 관련 뉴스 목록입니다. 출처 기반 fact-check verdict가 아니므로 중요한 판단 전 원문을 직접 확인하세요.",
+      uncertaintyItems: [],
+    };
+
+    const persistedArtifacts =
+      await this.persistenceService.persistQueryPreviewResult({
+        userId: params.userId,
+        answerJob: params.answerJob,
+        refinement: params.refinement,
+        generatedQueries: params.generatedQueries,
+        relevanceCandidates: contextCandidates,
+        evidenceSignals: [],
+        answerSummary,
+        primaryExtractionLimit: PRIMARY_EXTRACTION_LIMIT,
+      });
+
+    return mapPreviewResponse({
+      answerJob: params.answerJob,
+      check: params.check,
+      createdAt: params.answerJob.createdAt,
+      normalizedCheck: params.normalizedCheck,
+      refinement: params.refinement,
+      generatedQueries: params.generatedQueries,
+      sources: persistedArtifacts.createdSources,
+      evidenceSnippets: persistedArtifacts.evidenceSnippets,
+      selectedSourceCount: contextCandidates.length,
+      discardedSourceCount: 0,
+      handoffSourceIds: persistedArtifacts.handoffSourceIds,
+      insufficiencyReason: persistedArtifacts.insufficiencyReason,
+      evidenceSignals: [],
+      answerSummary,
+    });
   }
 
   private async createDirectAnswerPreviewResult(params: {

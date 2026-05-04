@@ -265,6 +265,7 @@ export function mapAnswerPreviewDetail(
 ): AnswerPreviewDetail {
   const sources = detail.sources.map(mapSource);
   const evidenceSnippets = mapEvidenceSnippets(detail, sources);
+  const answerMode = detail.answerMode;
   const pendingMessage =
     detail.status === "out_of_scope"
       ? "현재 지원 범위 밖 check으로 기록되었습니다. 이 기록은 판단 없이 범위 확인 결과만 표시합니다."
@@ -272,6 +273,10 @@ export function mapAnswerPreviewDetail(
       ? "임시 결과 생성이 중단되어 저장된 근거만 표시하고 있습니다."
       : detail.status === "searching"
       ? "출처 수집이 끝났고, 현재 수집된 출처 기준으로 근거 신호를 분류하고 있습니다."
+      : answerMode === "context_answer_with_news"
+      ? "이 결과는 OpenAI 맥락 답변과 관련 뉴스 목록입니다. fact-check verdict가 아닙니다."
+      : answerMode === "direct_answer"
+      ? "이 결과는 OpenAI 직접 답변입니다. fact-check verdict가 아닙니다."
       : "이 결과는 현재 수집된 출처 기준으로 계산된 임시 분석입니다.";
   const result = detail.result;
 
@@ -291,7 +296,7 @@ export function mapAnswerPreviewDetail(
     statusTone: getAnswerStatusTone(detail.status),
     pendingMessage,
     coreCheck: detail.coreCheck,
-    isFactCheckQuestion: detail.isFactCheckQuestion,
+    answerMode,
     generatedQueries: detail.generatedQueries,
     sources: sources.map((source) => {
       const evidenceSnippet = detail.evidenceSnippets.find(
@@ -309,7 +314,7 @@ export function mapAnswerPreviewDetail(
     discardedSourceCount: detail.discardedSourceCount,
     insufficiencyReason: detail.handoff.insufficiencyReason,
     verdict: result?.verdict ?? null,
-    verdictLabel: result ? getVerdictLabel(result.verdict) : null,
+    verdictLabel: result?.verdict ? getVerdictLabel(result.verdict) : null,
     confidenceScore: result?.confidenceScore ?? null,
     consensusLevel: result?.consensusLevel ?? null,
     consensusLabel: getConsensusLabel(result?.consensusLevel ?? null),

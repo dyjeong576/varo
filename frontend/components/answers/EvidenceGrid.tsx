@@ -7,7 +7,6 @@ interface EvidenceGridProps {
   conflictCount: number;
   contextCount: number;
   consensusLabel: string;
-  isFactCheckQuestion: boolean;
   sourceBreakdown: {
     official: number;
     press: number;
@@ -34,7 +33,6 @@ export default function EvidenceGrid({
   conflictCount,
   contextCount,
   consensusLabel,
-  isFactCheckQuestion,
   sourceBreakdown,
 }: EvidenceGridProps) {
   const stanceCount = agreementCount + conflictCount;
@@ -72,7 +70,7 @@ export default function EvidenceGrid({
         </div>
       </div>
 
-      <div className={`grid gap-4 ${isFactCheckQuestion ? "grid-cols-2" : "grid-cols-1"}`}>
+      <div className="grid gap-4 grid-cols-2">
         <div className="flex h-40 flex-col justify-between rounded-xl border border-[#dfe4f0] bg-white p-5">
           <p className="text-xs font-bold text-[#6b7280]">출처 분포</p>
           <div className="flex h-16 items-end gap-2">
@@ -93,20 +91,18 @@ export default function EvidenceGrid({
           </div>
         </div>
 
-        {isFactCheckQuestion ? (
-          <div className="flex h-40 flex-col justify-between rounded-xl border border-[#dfe4f0] bg-white p-5">
-            <p className="flex items-center gap-1 text-xs font-bold text-[#6b7280]">
-              정보 합의성
-              <InfoTooltip content="수집된 기사들이 얼마나 일관되게 같은 결론을 가리키는지를 나타냅니다. '높음'은 2건 이상의 기사가 주장을 뒷받침할 때만 표시되며, '거짓' 판정 시에는 항상 '낮음'으로 표시됩니다." />
-            </p>
-            <div className="flex flex-1 flex-col items-center justify-center">
-              <span className="text-3xl font-black text-[#0050cb]">{consensusLabel}</span>
-              <span className="mt-1 text-center text-[10px] text-[#6b7280]">
-                지지 {agreementCount} · 충돌 {conflictCount} · 맥락 {contextCount}
-              </span>
-            </div>
+        <div className="flex h-40 flex-col justify-between rounded-xl border border-[#dfe4f0] bg-white p-5">
+          <p className="flex items-center gap-1 text-xs font-bold text-[#6b7280]">
+            정보 합의성
+            <InfoTooltip content="수집된 기사들이 얼마나 일관되게 같은 결론을 가리키는지를 나타냅니다. '높음'은 2건 이상의 기사가 주장을 뒷받침할 때만 표시되며, '거짓' 판정 시에는 항상 '낮음'으로 표시됩니다." />
+          </p>
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <span className="text-3xl font-black text-[#0050cb]">{consensusLabel}</span>
+            <span className="mt-1 text-center text-[10px] text-[#6b7280]">
+              지지 {agreementCount} · 충돌 {conflictCount} · 맥락 {contextCount}
+            </span>
           </div>
-        ) : null}
+        </div>
       </div>
     </section>
   );

@@ -259,13 +259,18 @@ export default function AnswerResultPage() {
         : answer.sources.filter((source) => source.sourceCategory === filter);
   const hasAnswerResult =
     !answer.isOutOfScope &&
-    answer.verdictLabel !== null &&
-    answer.confidenceScore !== null &&
     answer.analysisSummary !== null &&
     answer.uncertaintySummary !== null &&
     answer.resultMode !== null;
-  const hasFactCheckResult = hasAnswerResult && answer.isFactCheckQuestion;
-  const hasDirectAnswerResult = hasAnswerResult && !answer.isFactCheckQuestion;
+  const hasFactCheckResult =
+    hasAnswerResult &&
+    answer.answerMode === "fact_check" &&
+    answer.verdictLabel !== null &&
+    answer.confidenceScore !== null;
+  const hasDirectAnswerResult =
+    hasAnswerResult && answer.answerMode === "direct_answer";
+  const hasContextAnswerResult =
+    hasAnswerResult && answer.answerMode === "context_answer_with_news";
   const isSignalClassificationPending =
     !answer.isOutOfScope && answer.status === "searching";
 
@@ -281,12 +286,12 @@ export default function AnswerResultPage() {
             currentStageLabel={answer.currentStageLabel}
             pendingMessage={answer.pendingMessage}
           />
-        ) : hasDirectAnswerResult ? (
+        ) : hasDirectAnswerResult || hasContextAnswerResult ? (
           <section className="space-y-4">
             <div className="rounded-xl border border-[#dfe4f0] bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#0050cb]">
-                  직접 답변
+                  {hasContextAnswerResult ? "맥락 답변" : "직접 답변"}
                 </span>
                 <span className="rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-bold text-[#0050cb]">
                   {answer.currentStageLabel}
@@ -359,11 +364,11 @@ export default function AnswerResultPage() {
             officialSourceCount={answer.sourceBreakdown.official}
             sourceCount={answer.sources.length}
             evidenceSnippetCount={answer.evidenceSnippets.length}
-            isFactCheckQuestion={answer.isFactCheckQuestion}
+            answerMode={answer.answerMode}
           />
         ) : null}
 
-        {answer.isFactCheckQuestion ? (
+        {answer.answerMode === "fact_check" ? (
           isSignalClassificationPending ? (
             <SignalClassificationSkeleton sourceCount={answer.sources.length} />
           ) : (
@@ -374,7 +379,6 @@ export default function AnswerResultPage() {
               conflictCount={answer.conflictCount}
               contextCount={answer.contextCount}
               consensusLabel={answer.consensusLabel}
-              isFactCheckQuestion={answer.isFactCheckQuestion}
               sourceBreakdown={answer.sourceBreakdown}
             />
           )
@@ -417,7 +421,7 @@ export default function AnswerResultPage() {
               </div>
             ) : (
               filteredSources.map((source) => (
-                <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} isFactCheckQuestion={answer.isFactCheckQuestion} />
+                <SourceCard key={source.id} source={source} isClassifying={isSignalClassificationPending} showStanceBadge={answer.answerMode !== "fact_check"} />
               ))
             )}
           </div>

@@ -81,7 +81,6 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
-        isFactCheckQuestion: true,
         searchPlan: {
           queries: [
             {
@@ -373,7 +372,6 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "한국은행 기준금리 동결",
         normalizedCheck: "한국은행이 기준금리를 동결했다",
         checkType: "policy",
-        isFactCheckQuestion: true,
         searchPlan: {
           queries: searchPlanQueries,
         },
@@ -432,7 +430,6 @@ describe("AnswersQueryPreviewService", () => {
       coreCheck: "한국은행 기준금리 동결",
       normalizedCheck: "한국은행이 기준금리를 동결했다",
       checkType: "policy",
-      isFactCheckQuestion: true,
       searchPlan: {
         queries: [
           {
@@ -563,7 +560,6 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "한국은행 기준금리 동결",
         normalizedCheck: "한국은행이 기준금리를 동결했다",
         checkType: "policy",
-        isFactCheckQuestion: true,
         searchPlan: {
           queries: [
             {
@@ -675,7 +671,6 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "트럼프의 관세 발표",
         normalizedCheck: "트럼프가 관세를 발표했다",
         checkType: "policy",
-        isFactCheckQuestion: true,
         searchPlan: {
           queries: [
             {
@@ -1093,7 +1088,7 @@ describe("AnswersQueryPreviewService", () => {
     expect(providers.extractContent).not.toHaveBeenCalled();
   });
 
-  it("isFactCheckQuestion false면 out_of_scope가 아니라 OpenAI 직접 답변으로 저장한다", async () => {
+  it("direct_answer mode면 out_of_scope가 아니라 OpenAI 직접 답변으로 저장한다", async () => {
     const persistence = createPersistenceMock();
     persistence.persistQueryPreviewResult.mockResolvedValue({
       createdSources: [
@@ -1132,7 +1127,7 @@ describe("AnswersQueryPreviewService", () => {
         coreCheck: "정치 뉴스 읽는 방법",
         normalizedCheck: "정치 뉴스를 어떻게 읽어야 하는지 묻는 질문",
         checkType: "general_fact",
-        isFactCheckQuestion: false,
+        answerMode: "direct_answer",
         searchPlan: { queries: [] },
         generatedQueries: [{ id: "q1", text: "정치 뉴스 읽는 방법", rank: 1 }],
         searchRoute: "unsupported",
@@ -1155,11 +1150,122 @@ describe("AnswersQueryPreviewService", () => {
     });
 
     expect(result.status).toBe("partial");
-    expect(result.isFactCheckQuestion).toBe(false);
     expect(result.result?.analysisSummary).toContain("정치 뉴스");
     expect(providers.answerDirectly).toHaveBeenCalledWith("정치 뉴스 읽는 방법");
     expect(providers.searchSources).not.toHaveBeenCalled();
     expect(persistence.persistOutOfScopeAnswer).not.toHaveBeenCalled();
+  });
+
+  it("context answer mode면 직접 답변과 Naver 검색을 저장하고 근거 신호 분류는 건너뛴다", async () => {
+    const persistence = createPersistenceMock();
+    persistence.persistQueryPreviewResult.mockResolvedValue({
+      createdSources: [
+        {
+          id: "source-1",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: new Date("2026-04-01T01:00:00.000Z"),
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "부동산 정책 논란",
+          rawSnippet: "부동산 정책 쟁점을 다룬 기사입니다.",
+          originQueryIds: ["sp1"],
+          relevanceTier: "reference",
+          relevanceReason: "맥락 답변과 함께 확인할 관련 뉴스입니다.",
+          retrievalBucket: "familiar",
+          domainRegistryId: null,
+          fetchStatus: "pending",
+          contentText: null,
+        },
+      ],
+      evidenceSnippets: [],
+      discardedSourceCount: 0,
+      handoffSourceIds: ["source-1"],
+      insufficiencyReason: null,
+      evidenceSignals: [],
+      answerSummary: {
+        analysisSummary: "부동산 정책 논란은 세금과 공급 대책을 둘러싼 쟁점이 큽니다.",
+        uncertaintySummary: "관련 뉴스 맥락 답변입니다.",
+        uncertaintyItems: [],
+      },
+    });
+    const providers = {
+      refineQuery: jest.fn().mockResolvedValue({
+        coreCheck: "부동산 정책 논란 배경",
+        normalizedCheck: "부동산 정책이 논란이 되는 배경",
+        checkType: "policy",
+        answerMode: "context_answer_with_news",
+        searchPlan: {
+          queries: [
+            {
+              id: "sp1",
+              purpose: "check_specific",
+              query: "부동산 정책 논란",
+              priority: 1,
+            },
+            {
+              id: "sp2",
+              purpose: "current_state",
+              query: "부동산 정책 현재 쟁점",
+              priority: 2,
+            },
+            {
+              id: "sp3",
+              purpose: "primary_source",
+              query: "부동산 정책 공식 발표",
+              priority: 3,
+            },
+            {
+              id: "sp4",
+              purpose: "contradiction_or_update",
+              query: "부동산 정책 반박 정정",
+              priority: 4,
+            },
+          ],
+        },
+        generatedQueries: [{ id: "sp1", text: "부동산 정책 논란", rank: 1 }],
+        searchRoute: "supported",
+        searchRouteReason: "한국 정치·경제 맥락 설명형 질문입니다.",
+      }),
+      answerDirectly: jest.fn().mockResolvedValue({
+        answerText: "부동산 정책 논란은 세금과 공급 대책을 둘러싼 쟁점이 큽니다.",
+        citations: [],
+      }),
+      searchSources: jest.fn().mockResolvedValue([
+        {
+          id: "candidate-1",
+          searchRoute: "supported",
+          sourceProvider: "naver-search",
+          sourceType: "news",
+          publisherName: "연합뉴스",
+          publishedAt: "2026-04-01T01:00:00.000Z",
+          canonicalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          originalUrl: "https://www.yna.co.kr/view/AKR20260401000100001",
+          rawTitle: "부동산 정책 논란",
+          rawSnippet: "부동산 정책 쟁점을 다룬 기사입니다.",
+          normalizedHash: "hash-1",
+          originQueryIds: ["sp1"],
+          retrievalBucket: "familiar",
+          domainRegistryId: null,
+        },
+      ]),
+      classifyRelevanceAndEvidenceSignals: jest.fn(),
+    } as unknown as AnswersProvidersService;
+    const service = new AnswersQueryPreviewService(
+      persistence as never,
+      providers,
+    );
+
+    const result = await service.createQueryProcessingPreview("user-1", {
+      check: "부동산 정책이 왜 논란이야?",
+    });
+
+    expect(result.answerMode).toBe("context_answer_with_news");
+    expect(result.result?.verdict).toBeNull();
+    expect(result.sources).toHaveLength(1);
+    expect(providers.answerDirectly).toHaveBeenCalledWith("부동산 정책 논란 배경");
+    expect(providers.searchSources).toHaveBeenCalled();
+    expect(providers.classifyRelevanceAndEvidenceSignals).not.toHaveBeenCalled();
   });
 
   it("verification source가 부족해도 domainless fallback search를 수행하지 않는다", async () => {

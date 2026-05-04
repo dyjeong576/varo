@@ -6,6 +6,7 @@ import {
   EvidenceSignalStance,
   EvidenceSignalTemporalRole,
   EvidenceSignalUpdateType,
+  AnswerMode,
   AnswerGeneratedSummary,
   ExtractedSource,
   QueryPurpose,
@@ -56,7 +57,7 @@ interface QueryRefinementPayload {
   coreCheck: string;
   normalizedCheck: string;
   checkType: string;
-  isFactCheckQuestion: boolean;
+  answerMode: AnswerMode;
   searchPlan: SearchPlan | null;
   generatedQueries: QueryArtifact[];
   searchRoute?: string;
@@ -88,6 +89,11 @@ const ANSWER_CHECK_TYPES = [
   "corporate_action",
   "incident",
   "general_fact",
+];
+const ANSWER_MODES: AnswerMode[] = [
+  "fact_check",
+  "direct_answer",
+  "context_answer_with_news",
 ];
 const EVIDENCE_SIGNAL_STANCES: EvidenceSignalStance[] = [
   "supports",
@@ -222,12 +228,16 @@ export function buildQueryRefinementPayload(
   const searchRoute =
     refinement.searchRoute ?? "unsupported";
   const searchProvider = buildSearchProvider(searchRoute);
+  const answerMode = fallbackAnswerMode(
+    refinement.answerMode,
+    refinement.searchRoute,
+  );
 
   return {
     coreCheck: refinement.coreCheck,
     normalizedCheck: refinement.normalizedCheck,
     checkType: refinement.checkType,
-    isFactCheckQuestion: refinement.isFactCheckQuestion,
+    answerMode,
     searchPlan: {
       queries: refinement.searchPlan.queries.map((query) => ({
         id: query.id,
@@ -320,6 +330,63 @@ function buildSearchProvider(searchRoute: string): string | null {
   return null;
 }
 
+function fallbackAnswerMode(
+  answerMode: unknown,
+  searchRoute: unknown,
+): AnswerMode {
+  return ANSWER_MODES.includes(answerMode as AnswerMode)
+    ? (answerMode as AnswerMode)
+    : searchRoute === "supported" || searchRoute === "news"
+      ? "fact_check"
+      : "direct_answer";
+}
+
+function buildNonFactCheckResult(params: {
+  answerMode: Exclude<AnswerMode, "fact_check">;
+  sources: Source[];
+  answerSummary?: AnswerGeneratedSummary | null;
+  insufficiencyReason: string | null;
+}) {
+  return {
+    mode: params.answerMode,
+    verdict: null,
+    confidenceScore: null,
+    consensusLevel: null,
+    analysisSummary:
+      params.answerSummary?.analysisSummary ??
+      "답변 요약을 생성하지 못했습니다.",
+    uncertaintySummary:
+      params.answerSummary?.uncertaintySummary ??
+      "출처 기반 사실성 검토 verdict가 아닌 답변입니다.",
+    uncertaintyItems: params.answerSummary?.uncertaintyItems.length
+      ? params.answerSummary.uncertaintyItems
+      : params.insufficiencyReason
+        ? [params.insufficiencyReason]
+        : [],
+    agreementCount: 0,
+    conflictCount: 0,
+    contextCount: params.sources.length,
+    sourceBreakdown: params.sources.reduce(
+      (acc, source) => {
+        if (source.sourceType.includes("official")) {
+          acc.official += 1;
+        } else if (source.sourceType.includes("social")) {
+          acc.social += 1;
+        } else if (source.sourceType.includes("analysis")) {
+          acc.analysis += 1;
+        } else if (source.sourceType.includes("news")) {
+          acc.press += 1;
+        } else {
+          acc.other += 1;
+        }
+
+        return acc;
+      },
+      { official: 0, press: 0, social: 0, analysis: 0, other: 0 },
+    ),
+  };
+}
+
 export function mapPreviewResponse(params: {
   answerJob: Pick<AnswerJob, "id" | "clientRequestId">;
   check: Pick<AnswerCheckRecord, "id" | "rawText">;
@@ -336,17 +403,34 @@ export function mapPreviewResponse(params: {
   evidenceSignals?: EvidenceSignal[];
   answerSummary?: AnswerGeneratedSummary | null;
 }): AnswerQueryProcessingPreviewResponseDto {
-  const assembledResult = assembleAnswerResult({
-    coreCheck: params.refinement.coreCheck,
-    rawCheck: params.check.rawText,
-    sources: params.sources,
-    evidenceSnippets: params.evidenceSnippets,
-    insufficiencyReason: params.insufficiencyReason,
-    checkType: params.refinement.checkType,
-    searchPlan: params.refinement.searchPlan,
-    evidenceSignals: params.evidenceSignals,
-    answerSummary: params.answerSummary,
-  });
+  const answerMode = fallbackAnswerMode(
+    params.refinement.answerMode,
+    params.refinement.searchRoute,
+  );
+  const assembledResult =
+    answerMode === "fact_check"
+      ? assembleAnswerResult({
+          coreCheck: params.refinement.coreCheck,
+          rawCheck: params.check.rawText,
+          sources: params.sources,
+          evidenceSnippets: params.evidenceSnippets,
+          insufficiencyReason: params.insufficiencyReason,
+          checkType: params.refinement.checkType,
+          searchPlan: params.refinement.searchPlan,
+          evidenceSignals: params.evidenceSignals,
+          answerSummary: params.answerSummary,
+        })
+      : {
+          sourceStances: Object.fromEntries(
+            params.sources.map((source) => [source.id, "context"] as const),
+          ),
+          result: buildNonFactCheckResult({
+            answerMode,
+            sources: params.sources,
+            answerSummary: params.answerSummary,
+            insufficiencyReason: params.insufficiencyReason,
+          }),
+        };
 
   return {
     answerId: params.answerJob.id,
@@ -358,7 +442,7 @@ export function mapPreviewResponse(params: {
     currentStage: "handoff_ready",
     normalizedCheck: params.normalizedCheck,
     coreCheck: params.refinement.coreCheck,
-    isFactCheckQuestion: params.refinement.isFactCheckQuestion,
+    answerMode,
     generatedQueries: params.generatedQueries,
     sources: params.sources.map((source) => ({
       id: source.id,
@@ -404,6 +488,11 @@ export function mapOutOfScopePreviewResponse(params: {
   generatedQueries: QueryArtifact[];
   insufficiencyReason: string | null;
 }): AnswerQueryProcessingPreviewResponseDto {
+  const answerMode = fallbackAnswerMode(
+    params.refinement.answerMode,
+    params.refinement.searchRoute,
+  );
+
   return {
     answerId: params.answerJob.id,
     clientRequestId: params.answerJob.clientRequestId,
@@ -414,7 +503,7 @@ export function mapOutOfScopePreviewResponse(params: {
     currentStage: "scope_checked",
     normalizedCheck: params.normalizedCheck,
     coreCheck: params.refinement.coreCheck,
-    isFactCheckQuestion: params.refinement.isFactCheckQuestion,
+    answerMode,
     generatedQueries: params.generatedQueries,
     sources: [],
     evidenceSnippets: [],
@@ -440,6 +529,11 @@ export function mapSearchPreviewResponse(params: {
   generatedQueries: QueryArtifact[];
   sources: Source[];
 }): AnswerQueryProcessingPreviewResponseDto {
+  const answerMode = fallbackAnswerMode(
+    params.refinement.answerMode,
+    params.refinement.searchRoute,
+  );
+
   return {
     answerId: params.answerJob.id,
     clientRequestId: params.answerJob.clientRequestId,
@@ -450,7 +544,7 @@ export function mapSearchPreviewResponse(params: {
     currentStage: "relevance_and_signal_classification",
     normalizedCheck: params.normalizedCheck,
     coreCheck: params.refinement.coreCheck,
-    isFactCheckQuestion: params.refinement.isFactCheckQuestion,
+    answerMode,
     generatedQueries: params.generatedQueries,
     sources: params.sources.map((source) => ({
       id: source.id,
@@ -648,7 +742,7 @@ function parseQueryRefinementPayload(
       coreCheck: normalizedCheck,
       normalizedCheck,
       checkType: "general_fact",
-      isFactCheckQuestion: false,
+      answerMode: "direct_answer",
       searchPlan: null,
       generatedQueries: [],
       searchRoute: "unsupported",
@@ -656,18 +750,19 @@ function parseQueryRefinementPayload(
     };
   }
 
-  const rawSearchRoute = parseString(payload.searchRoute, "unsupported");
+  const rawSearchRoute = parseString(payload.searchRoute, "supported");
   const searchRoute = rawSearchRoute === "news" ? "supported" : rawSearchRoute;
   const generatedQueries = parseGeneratedQueries(payload.generatedQueries);
+  const answerMode = fallbackAnswerMode(
+    payload.answerMode,
+    searchRoute,
+  );
 
   return {
     coreCheck: parseString(payload.coreCheck, normalizedCheck),
     normalizedCheck: parseString(payload.normalizedCheck, normalizedCheck),
     checkType: parseString(payload.checkType, "general_fact"),
-    isFactCheckQuestion:
-      typeof payload.isFactCheckQuestion === "boolean"
-        ? payload.isFactCheckQuestion
-        : searchRoute === "supported",
+    answerMode,
     searchPlan: parseSearchPlan(payload.searchPlan),
     generatedQueries,
     searchRoute,
@@ -735,17 +830,34 @@ export function mapStoredPreviewResponse(
     refinement.coreCheck,
     answerJob.evidenceSnippets,
   );
-  const assembledResult = assembleAnswerResult({
-    coreCheck: refinement.coreCheck,
-    rawCheck: answerJob.check.rawText,
-    sources: answerJob.sources,
-    evidenceSnippets: answerJob.evidenceSnippets,
-    insufficiencyReason: handoff.insufficiencyReason,
-    checkType: refinement.checkType as QueryRefinementResult["checkType"],
-    searchPlan: refinement.searchPlan,
-    evidenceSignals: handoff.evidenceSignals,
-    answerSummary: handoff.answerSummary,
-  });
+  const answerMode = fallbackAnswerMode(
+    refinement.answerMode,
+    refinement.searchRoute,
+  );
+  const assembledResult =
+    answerMode === "fact_check"
+      ? assembleAnswerResult({
+          coreCheck: refinement.coreCheck,
+          rawCheck: answerJob.check.rawText,
+          sources: answerJob.sources,
+          evidenceSnippets: answerJob.evidenceSnippets,
+          insufficiencyReason: handoff.insufficiencyReason,
+          checkType: refinement.checkType as QueryRefinementResult["checkType"],
+          searchPlan: refinement.searchPlan,
+          evidenceSignals: handoff.evidenceSignals,
+          answerSummary: handoff.answerSummary,
+        })
+      : {
+          sourceStances: Object.fromEntries(
+            answerJob.sources.map((source) => [source.id, "context"] as const),
+          ),
+          result: buildNonFactCheckResult({
+            answerMode,
+            sources: answerJob.sources,
+            answerSummary: handoff.answerSummary,
+            insufficiencyReason: handoff.insufficiencyReason,
+          }),
+        };
   const result =
     answerJob.status === "out_of_scope" || answerJob.status === "searching"
       ? null
@@ -761,7 +873,7 @@ export function mapStoredPreviewResponse(
     currentStage: answerJob.currentStage,
     normalizedCheck: answerJob.check.normalizedText,
     coreCheck: refinement.coreCheck,
-    isFactCheckQuestion: refinement.isFactCheckQuestion,
+    answerMode,
     generatedQueries: refinement.generatedQueries,
     sources: answerJob.sources.map((source) => ({
       id: source.id,
