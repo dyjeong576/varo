@@ -104,6 +104,10 @@ const FALLBACK_ANALYSIS_SUMMARY =
   "LLM summary가 아직 저장되지 않아 수집된 출처의 구조 정보만 표시합니다.";
 const FALLBACK_UNCERTAINTY_SUMMARY =
   "요약이 없는 기존 결과이므로 중요한 판단은 원문 출처를 직접 확인해 주세요.";
+const NO_SEARCH_RESULTS_ANALYSIS_SUMMARY =
+  "입력하신 내용과 관련된 뉴스를 찾지 못했습니다.";
+const NO_SEARCH_RESULTS_UNCERTAINTY_SUMMARY =
+  "검색 결과가 없어 수집된 출처 기준의 해석을 만들 수 없습니다.";
 
 function categorizeSourceType(sourceType: string): AnswerSourceCategory {
   const normalized = sourceType.toLowerCase();
@@ -490,6 +494,7 @@ export function assembleAnswerResult(
     : input.insufficiencyReason
       ? [input.insufficiencyReason]
       : [];
+  const hasNoSearchResults = input.sources.length === 0;
 
   return {
     sourceStances,
@@ -512,10 +517,12 @@ export function assembleAnswerResult(
         supportSources.length,
         hasCurrentUpdateConflict,
       ),
-      analysisSummary: input.answerSummary?.analysisSummary ?? FALLBACK_ANALYSIS_SUMMARY,
+      analysisSummary:
+        input.answerSummary?.analysisSummary ??
+        (hasNoSearchResults ? NO_SEARCH_RESULTS_ANALYSIS_SUMMARY : FALLBACK_ANALYSIS_SUMMARY),
       uncertaintySummary:
         input.answerSummary?.uncertaintySummary ??
-        FALLBACK_UNCERTAINTY_SUMMARY,
+        (hasNoSearchResults ? NO_SEARCH_RESULTS_UNCERTAINTY_SUMMARY : FALLBACK_UNCERTAINTY_SUMMARY),
       uncertaintyItems,
       agreementCount: supportSources.length,
       conflictCount: conflictSources.length,

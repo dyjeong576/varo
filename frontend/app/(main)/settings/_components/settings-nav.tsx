@@ -50,7 +50,7 @@ export function SettingsNav() {
       clearAnswerTasks();
       clearNotifications();
       clearNotificationPreferences();
-      router.replace("/login");
+      router.replace("/home");
       router.refresh();
     } catch (error) {
       setLogoutError(

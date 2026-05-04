@@ -9,11 +9,13 @@ import { AnswerPreviewSummary } from "@/lib/answers/types";
 import { getMergedAnswerSummaries } from "@/lib/answers/history";
 import { subscribeAnswerTasks } from "@/lib/answers/task-store";
 import { AnswerHistoryList } from "@/components/answers/AnswerHistoryList";
+import { LoginRequiredSheet } from "@/components/auth/login-required-sheet";
 
 export function HistoryDrawer({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [answers, setAnswers] = useState<AnswerPreviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginRequiredFeature, setLoginRequiredFeature] = useState<string | null>(null);
 
   const openDrawer = () => {
     setIsLoading(true);
@@ -90,10 +92,27 @@ export function HistoryDrawer({ isAuthenticated }: { isAuthenticated: boolean })
             <History className="w-5 h-5 text-gray-400" />
             <span className="font-semibold text-[15px]">히스토리</span>
           </Link>
-          <Link href={isAuthenticated ? "/settings" : "/login"} className="flex items-center gap-4 px-6 py-[18px] hover:bg-gray-50 text-gray-700 transition-colors" onClick={() => setIsOpen(false)}>
-            <Settings className="w-5 h-5 text-gray-400" />
-            <span className="font-semibold text-[15px]">설정</span>
-          </Link>
+          {isAuthenticated ? (
+            <Link href="/settings" className="flex items-center gap-4 px-6 py-[18px] hover:bg-gray-50 text-gray-700 transition-colors" onClick={() => setIsOpen(false)}>
+              <Settings className="w-5 h-5 text-gray-400" />
+              <span className="font-semibold text-[15px]">설정</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="flex w-full items-center gap-4 px-6 py-[18px] text-left text-gray-700 transition-colors hover:bg-gray-50"
+              onClick={() => {
+                setIsOpen(false);
+                setLoginRequiredFeature("설정");
+              }}
+            >
+              <Settings className="w-5 h-5 text-gray-400" />
+              <span className="font-semibold text-[15px]">설정</span>
+              <span className="ml-auto rounded-full bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-500">
+                로그인 필요
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="h-2 bg-gray-50 border-y border-gray-100 shrink-0" />
@@ -120,6 +139,7 @@ export function HistoryDrawer({ isAuthenticated }: { isAuthenticated: boolean })
           </p>
         </div>
       </div>
+      <LoginRequiredSheet featureName={loginRequiredFeature} onClose={() => setLoginRequiredFeature(null)} />
     </>
   );
 }

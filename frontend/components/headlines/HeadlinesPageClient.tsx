@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock, ExternalLink, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/http";
 import type {
@@ -43,8 +42,19 @@ function getPublisherCategory(
   return publisher.category ?? (publisher.publisherKey.endsWith("-economy") ? "economy" : "politics");
 }
 
+function getHeadlinesErrorMessage(error: unknown): string {
+  if (error instanceof TypeError) {
+    return "API 서버에 연결할 수 없습니다.";
+  }
+
+  if (error instanceof ApiClientError) {
+    return error.status >= 500 ? "저장된 헤드라인을 불러오지 못했습니다." : error.message;
+  }
+
+  return "저장된 헤드라인을 불러오지 못했습니다.";
+}
+
 export function HeadlinesPageClient() {
-  const router = useRouter();
   const dateInputRef = useRef<HTMLInputElement>(null);
   const maxHeadlineDate = getKstDateKey();
   const [activeCategory, setActiveCategory] = useState<HeadlineCategory>("politics");
@@ -54,6 +64,7 @@ export function HeadlinesPageClient() {
   const [analysis, setAnalysis] = useState<HeadlinesAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [analysisErrorMessage, setAnalysisErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -61,25 +72,33 @@ export function HeadlinesPageClient() {
     async function load() {
       try {
         setIsLoading(true);
-        const [todayResponse, analysisResponse] = await Promise.all([
-          api.headlines.getToday({ date: selectedDate, category: activeCategory }),
-          api.headlines.getAnalysis({ date: selectedDate, category: activeCategory }),
-        ]);
+        setAnalysisErrorMessage(null);
+        const todayResponse = await api.headlines.getToday({ date: selectedDate, category: activeCategory });
 
         if (!isMounted) return;
 
         setToday(todayResponse);
-        setAnalysis(analysisResponse);
         setErrorMessage(null);
+
+        try {
+          const analysisResponse = await api.headlines.getAnalysis({ date: selectedDate, category: activeCategory });
+
+          if (!isMounted) return;
+
+          setAnalysis(analysisResponse);
+        } catch {
+          if (!isMounted) return;
+
+          setAnalysis(null);
+          setAnalysisErrorMessage("헤드라인 분석을 불러오지 못했습니다.");
+        }
       } catch (error) {
         if (!isMounted) return;
 
-        if (error instanceof ApiClientError && error.status === 401) {
-          router.replace("/login");
-          return;
-        }
-
-        setErrorMessage("헤드라인을 불러오지 못했습니다.");
+        setToday(null);
+        setAnalysis(null);
+        setAnalysisErrorMessage(null);
+        setErrorMessage(getHeadlinesErrorMessage(error));
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -90,7 +109,7 @@ export function HeadlinesPageClient() {
     return () => {
       isMounted = false;
     };
-  }, [activeCategory, router, selectedDate]);
+  }, [activeCategory, selectedDate]);
 
   const publisherCount = useMemo(
     () =>
@@ -208,7 +227,14 @@ export function HeadlinesPageClient() {
         </button>
       </div>
 
-      {analysis?.status === "ready" && analysis.clusters.length > 0 ? (
+      {analysisErrorMessage ? (
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
+            <p className="text-sm text-on-surface-variant">{analysisErrorMessage}</p>
+          </div>
+          <HeadlinePublisherTable publishers={visiblePublishers} category={activeCategory} />
+        </div>
+      ) : analysis?.status === "ready" && analysis.clusters.length > 0 ? (
         <HeadlineEventFeed analysis={analysis} category={activeCategory} />
       ) : analysis?.status === "pending" ? (
         <div className="space-y-4">

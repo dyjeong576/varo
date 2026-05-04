@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { Bell, Home, TrendingUp, MessageSquare, Newspaper } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HistoryDrawer } from "@/components/ui/history-drawer";
+import { LoginRequiredSheet } from "@/components/auth/login-required-sheet";
 import { APP_NAME } from "@/lib/config/app";
 import type { SessionResponse } from "@/lib/api/types";
 import {
@@ -24,8 +25,8 @@ export function MainShell({
   const pathname = usePathname();
   const isNotificationsPage = pathname === "/notifications";
   const isAuthenticated = session.isAuthenticated;
-  const notificationHref = isAuthenticated ? "/notifications" : "/login";
-  const communityHref = isAuthenticated ? "/community" : "/login";
+  const isHomePage = pathname === "/" || pathname === "/home";
+  const [loginRequiredFeature, setLoginRequiredFeature] = useState<string | null>(null);
   const unreadNotificationCount = useSyncExternalStore(
     subscribeNotifications,
     getUnreadNotificationCount,
@@ -59,18 +60,29 @@ export function MainShell({
             </Link>
           </div>
           <div className="flex items-center">
-            <Link
-              href={notificationHref}
-              className="p-3 -mr-3 text-gray-700 hover:bg-gray-100 rounded-full transition-all active:scale-95 duration-150 cursor-pointer flex items-center justify-center relative z-[110]"
-              aria-label="알림"
-            >
-              <Bell className="w-6 h-6" />
-              {isAuthenticated && unreadNotificationCount > 0 ? (
-                <div className="absolute top-2.5 right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 border-2 border-white text-[10px] font-bold text-white flex items-center justify-center">
-                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                </div>
-              ) : null}
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/notifications"
+                className="p-3 -mr-3 text-gray-700 hover:bg-gray-100 rounded-full transition-all active:scale-95 duration-150 cursor-pointer flex items-center justify-center relative z-[110]"
+                aria-label="알림"
+              >
+                <Bell className="w-6 h-6" />
+                {unreadNotificationCount > 0 ? (
+                  <div className="absolute top-2.5 right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 border-2 border-white text-[10px] font-bold text-white flex items-center justify-center">
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                  </div>
+                ) : null}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setLoginRequiredFeature("알림")}
+                className="p-3 -mr-3 text-gray-700 hover:bg-gray-100 rounded-full transition-all active:scale-95 duration-150 cursor-pointer flex items-center justify-center relative z-[110]"
+                aria-label="알림"
+              >
+                <Bell className="w-6 h-6" />
+              </button>
+            )}
           </div>
         </header>
       )}
@@ -80,7 +92,7 @@ export function MainShell({
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-100 z-50 flex items-center justify-around px-2 pb-safe shadow-sm">
-        <Link href="/" className={`flex flex-col items-center justify-center w-full h-full ${pathname === "/" ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
+        <Link href="/" className={`flex flex-col items-center justify-center w-full h-full ${isHomePage ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
           <Home className="w-6 h-6 mb-1" />
           <span className="text-[10px] font-semibold">홈</span>
         </Link>
@@ -92,11 +104,19 @@ export function MainShell({
           <Newspaper className="w-6 h-6 mb-1" />
           <span className="text-[10px] font-semibold">헤드라인</span>
         </Link>
-        <Link href={communityHref} className={`flex flex-col items-center justify-center w-full h-full ${pathname?.startsWith("/community") ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
-          <MessageSquare className="w-6 h-6 mb-1" />
-          <span className="text-[10px] font-semibold">커뮤니티</span>
-        </Link>
+        {isAuthenticated ? (
+          <Link href="/community" className={`flex flex-col items-center justify-center w-full h-full ${pathname?.startsWith("/community") ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
+            <MessageSquare className="w-6 h-6 mb-1" />
+            <span className="text-[10px] font-semibold">커뮤니티</span>
+          </Link>
+        ) : (
+          <button type="button" onClick={() => setLoginRequiredFeature("커뮤니티")} className="flex flex-col items-center justify-center w-full h-full text-gray-400 hover:text-gray-900 transition-colors">
+            <MessageSquare className="w-6 h-6 mb-1" />
+            <span className="text-[10px] font-semibold">커뮤니티</span>
+          </button>
+        )}
       </nav>
+      <LoginRequiredSheet featureName={loginRequiredFeature} onClose={() => setLoginRequiredFeature(null)} />
     </div>
   );
 }

@@ -30,6 +30,7 @@ function createSnippet(overrides: Partial<EvidenceSnippet>): EvidenceSnippet {
   return {
     id: "snippet-1",
     answerJobId: "answer-1",
+    createdAt: new Date("2026-04-01T01:00:00.000Z"),
     sourceId: "source-1",
     snippetText: "기본 snippet",
     stance: "neutral",
@@ -371,6 +372,27 @@ describe("assembleAnswerResult", () => {
     );
     expect(result.result.uncertaintyItems[0]).toBe(
       "extract 가능한 source가 없어 evidence 부족 상태로 handoff 됩니다.",
+    );
+  });
+
+  it("검색 결과가 없으면 뉴스 검색 미조회 상태를 표시한다", () => {
+    const result = assembleAnswerResult({
+      coreCheck: "검토 대상 주장",
+      rawCheck: "검토 대상 주장",
+      sources: [],
+      evidenceSnippets: [],
+      insufficiencyReason: "입력하신 내용과 관련된 뉴스를 찾지 못했습니다.",
+    });
+
+    expect(result.result.verdict).toBe("Unclear");
+    expect(result.result.analysisSummary).toBe(
+      "입력하신 내용과 관련된 뉴스를 찾지 못했습니다.",
+    );
+    expect(result.result.uncertaintySummary).toBe(
+      "검색 결과가 없어 수집된 출처 기준의 해석을 만들 수 없습니다.",
+    );
+    expect(result.result.uncertaintyItems[0]).toBe(
+      "입력하신 내용과 관련된 뉴스를 찾지 못했습니다.",
     );
   });
 });

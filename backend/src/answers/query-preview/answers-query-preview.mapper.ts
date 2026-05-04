@@ -185,6 +185,10 @@ export function buildInsufficiencyReason(
   candidates: SearchCandidate[],
   primaryExtractionLimit: number,
 ): string | null {
+  if (candidates.length === 0) {
+    return "입력하신 내용과 관련된 뉴스를 찾지 못했습니다.";
+  }
+
   const primaryCount = candidates.filter((c) => c.relevanceTier === "primary").length;
 
   if (primaryCount === 0) {

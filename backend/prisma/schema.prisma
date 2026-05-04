@@ -36,6 +36,7 @@ model UserProfile {
   ageRange  String?  @map("age_range")
   country   String?
   city      String?
+  createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -141,6 +142,7 @@ model Source {
   relevanceTier    String?              @map("relevance_tier")
   relevanceReason  String?              @map("relevance_reason")
   retrievalBucket  String?              @map("retrieval_bucket")
+  createdAt        DateTime             @default(now()) @map("created_at")
   answerJob        AnswerJob            @relation(fields: [answerJobId], references: [id], onDelete: Cascade)
   evidenceSnippets EvidenceSnippet[]
 
@@ -157,6 +159,7 @@ model EvidenceSnippet {
   stance      String
   startOffset Int?     @map("start_offset")
   endOffset   Int?     @map("end_offset")
+  createdAt   DateTime @default(now()) @map("created_at")
   answerJob   AnswerJob @relation(fields: [answerJobId], references: [id], onDelete: Cascade)
   source      Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
@@ -247,6 +250,7 @@ model NotificationRead {
   notificationId String       @map("notification_id")
   userId         String       @map("user_id")
   readAt         DateTime     @default(now()) @map("read_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -260,6 +264,7 @@ model UserNotificationPreference {
   answerCompleted  Boolean  @default(true) @map("answer_completed")
   communityComment Boolean  @default(true) @map("community_comment")
   communityLike    Boolean  @default(true) @map("community_like")
+  createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -298,6 +303,7 @@ model HeadlineArticle {
   normalizedUrl  String                     @map("normalized_url")
   normalizedHash String                     @map("normalized_hash")
   rawItem        Json                       @map("raw_item")
+  createdAt      DateTime                   @default(now()) @map("created_at")
   clusterItems   HeadlineEventClusterItem[]
 
   @@index([dateKey, publisherKey])
@@ -330,6 +336,7 @@ model HeadlineEventCluster {
   commonFacts   Json?                      @map("common_facts")
   uncertainty   String?
   sortOrder     Int                        @default(0) @map("sort_order")
+  createdAt     DateTime                   @default(now()) @map("created_at")
   analysis      HeadlineAnalysis           @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   items         HeadlineEventClusterItem[]
 
@@ -348,6 +355,7 @@ model HeadlineEventClusterItem {
   expressionSummary String               @map("expression_summary")
   emphasis          String?
   framing           String?
+  createdAt         DateTime             @default(now()) @map("created_at")
   cluster           HeadlineEventCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
   article           HeadlineArticle?     @relation(fields: [articleId], references: [id], onDelete: SetNull)
 
