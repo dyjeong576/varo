@@ -1,19 +1,13 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Controller, Get } from "@nestjs/common";
 import {
-  ApiCookieAuth,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import { SessionAuthGuard } from "../common/guards/session-auth.guard";
-import { ApiErrorResponseDto } from "../shared/dto/api-error-response.dto";
 import { PopularTopicResponseDto } from "./dto/popular-topic-response.dto";
 import { PopularService } from "./popular.service";
 
 @ApiTags("인기 주제")
-@ApiCookieAuth("sessionAuth")
-@UseGuards(SessionAuthGuard)
 @Controller("popular/topics")
 export class PopularController {
   constructor(private readonly popularService: PopularService) {}
@@ -28,10 +22,6 @@ export class PopularController {
     description: "인기 검색 주제 목록 조회 성공",
     type: PopularTopicResponseDto,
     isArray: true,
-  })
-  @ApiUnauthorizedResponse({
-    description: "세션이 없거나 만료됨",
-    type: ApiErrorResponseDto,
   })
   async listTopics(): Promise<PopularTopicResponseDto[]> {
     return this.popularService.listTopics();

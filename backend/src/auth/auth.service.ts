@@ -82,15 +82,11 @@ export class AuthService {
     }
 
     const session = await this.sessionService.createSession(user.id, googleUser.sub);
-    const profile = user.profile ?? null;
-    const redirectTo = this.sessionService.getProfileComplete(profile)
-      ? payload.redirectTo
-      : "/onboarding/profile";
 
     return {
       sessionId: session.id,
       expiresAt: session.expiresAt,
-      redirectTo,
+      redirectTo: payload.redirectTo,
     };
   }
 

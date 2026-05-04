@@ -7,15 +7,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HistoryDrawer } from "@/components/ui/history-drawer";
 import { APP_NAME } from "@/lib/config/app";
+import type { SessionResponse } from "@/lib/api/types";
 import {
   getUnreadNotificationCount,
   refreshNotifications,
   subscribeNotifications,
 } from "@/lib/notifications/store";
 
-export function MainShell({ children }: { children: React.ReactNode }) {
+export function MainShell({
+  children,
+  session,
+}: {
+  children: React.ReactNode;
+  session: SessionResponse;
+}) {
   const pathname = usePathname();
   const isNotificationsPage = pathname === "/notifications";
+  const isAuthenticated = session.isAuthenticated;
+  const notificationHref = isAuthenticated ? "/notifications" : "/login";
+  const communityHref = isAuthenticated ? "/community" : "/login";
   const unreadNotificationCount = useSyncExternalStore(
     subscribeNotifications,
     getUnreadNotificationCount,
@@ -23,15 +33,19 @@ export function MainShell({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     void refreshNotifications().catch(() => undefined);
-  }, []);
+  }, [isAuthenticated]);
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
       {!isNotificationsPage && (
         <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 z-[100] px-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-1">
-            <HistoryDrawer />
+            <HistoryDrawer isAuthenticated={isAuthenticated} />
             <Link href="/" className="flex items-center -ml-1 active:scale-95 transition-transform duration-150">
               <Image
                 src="/logo/brand_logo.png"
@@ -39,18 +53,19 @@ export function MainShell({ children }: { children: React.ReactNode }) {
                 width={87}
                 height={32}
                 className="h-8 w-auto object-contain"
+                style={{ width: "auto" }}
                 priority
               />
             </Link>
           </div>
           <div className="flex items-center">
             <Link
-              href="/notifications"
+              href={notificationHref}
               className="p-3 -mr-3 text-gray-700 hover:bg-gray-100 rounded-full transition-all active:scale-95 duration-150 cursor-pointer flex items-center justify-center relative z-[110]"
               aria-label="알림"
             >
               <Bell className="w-6 h-6" />
-              {unreadNotificationCount > 0 ? (
+              {isAuthenticated && unreadNotificationCount > 0 ? (
                 <div className="absolute top-2.5 right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 border-2 border-white text-[10px] font-bold text-white flex items-center justify-center">
                   {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
                 </div>
@@ -77,7 +92,7 @@ export function MainShell({ children }: { children: React.ReactNode }) {
           <Newspaper className="w-6 h-6 mb-1" />
           <span className="text-[10px] font-semibold">헤드라인</span>
         </Link>
-        <Link href="/community" className={`flex flex-col items-center justify-center w-full h-full ${pathname?.startsWith("/community") ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
+        <Link href={communityHref} className={`flex flex-col items-center justify-center w-full h-full ${pathname?.startsWith("/community") ? "text-primary" : "text-gray-400 hover:text-gray-900 transition-colors"}`}>
           <MessageSquare className="w-6 h-6 mb-1" />
           <span className="text-[10px] font-semibold">커뮤니티</span>
         </Link>

@@ -1,19 +1,16 @@
-import { Controller, Get, Headers, HttpStatus, Post, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Headers, HttpStatus, Post, Query } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
-  ApiCookieAuth,
   ApiForbiddenResponse,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
-import { SessionAuthGuard } from "../common/guards/session-auth.guard";
 import { ApiErrorResponseDto } from "../shared/dto/api-error-response.dto";
 import {
   HeadlinesAnalysisResponseDto,
@@ -42,8 +39,6 @@ export class HeadlinesController {
   ) {}
 
   @Get("today")
-  @UseGuards(SessionAuthGuard)
-  @ApiCookieAuth("sessionAuth")
   @ApiOperation({
     summary: "오늘의 헤드라인 조회",
     description: "KST 날짜 기준으로 저장된 매체별 RSS 헤드라인을 반환합니다. category=economy를 전달하면 경제 RSS 헤드라인만 조회합니다.",
@@ -52,7 +47,6 @@ export class HeadlinesController {
   @ApiQuery(HEADLINE_CATEGORY_QUERY)
   @ApiOkResponse({ type: HeadlinesTodayResponseDto })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
-  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
   async getToday(
     @Query("date") date?: string,
     @Query("category") category?: string,
@@ -61,8 +55,6 @@ export class HeadlinesController {
   }
 
   @Get("live")
-  @UseGuards(SessionAuthGuard)
-  @ApiCookieAuth("sessionAuth")
   @ApiOperation({
     summary: "실시간 헤드라인 조회",
     description: "DB에 저장하지 않고 RSS를 즉시 조회해 매체별 헤드라인을 반환합니다. category=economy를 전달하면 경제 RSS만 즉시 조회합니다.",
@@ -70,14 +62,11 @@ export class HeadlinesController {
   @ApiQuery(HEADLINE_CATEGORY_QUERY)
   @ApiOkResponse({ type: HeadlinesTodayResponseDto })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
-  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
   async getLive(@Query("category") category?: string): Promise<HeadlinesTodayResponseDto> {
     return this.headlinesService.getLive(category);
   }
 
   @Get("today/analysis")
-  @UseGuards(SessionAuthGuard)
-  @ApiCookieAuth("sessionAuth")
   @ApiOperation({
     summary: "오늘의 헤드라인 분석 조회",
     description: "수집된 RSS 제목과 요약만 기반으로 사건별 표현 비교 분석을 반환합니다. category=economy를 전달하면 경제 RSS 헤드라인 기반 표현만 반환합니다.",
@@ -86,7 +75,6 @@ export class HeadlinesController {
   @ApiQuery(HEADLINE_CATEGORY_QUERY)
   @ApiOkResponse({ type: HeadlinesAnalysisResponseDto })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
-  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
   async getAnalysis(
     @Query("date") date?: string,
     @Query("category") category?: string,

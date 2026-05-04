@@ -218,21 +218,39 @@ export class AnswersQueryPreviewPersistenceService {
     userId: string,
     answerId: string,
   ): Promise<AnswerPreviewRecord> {
-    const answerJob = await this.prisma.answerJob.findFirst({
-      where: {
-        id: answerId,
-        userId,
-      },
-      include: {
-        check: true,
-        sources: {
-          orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+    const answerJob =
+      (await this.prisma.answerJob.findFirst({
+        where: {
+          id: answerId,
+          userId,
         },
-        evidenceSnippets: {
-          orderBy: { id: "asc" },
+        include: {
+          check: true,
+          sources: {
+            orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+          },
+          evidenceSnippets: {
+            orderBy: { id: "asc" },
+          },
         },
-      },
-    });
+      })) ??
+      (await this.prisma.answerJob.findFirst({
+        where: {
+          id: answerId,
+          handoffPayload: {
+            not: Prisma.AnyNull,
+          },
+        },
+        include: {
+          check: true,
+          sources: {
+            orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+          },
+          evidenceSnippets: {
+            orderBy: { id: "asc" },
+          },
+        },
+      }));
 
     if (!answerJob) {
       throw new AppException(

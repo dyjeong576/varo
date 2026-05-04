@@ -1,14 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
-import { ApiClientError } from '@/lib/api/http';
 import { PopularTopic } from '@/lib/types/popular';
 import { PopularTopicList } from './PopularTopicList';
 
 export const PopularTopicFeed = () => {
-  const router = useRouter();
   const [topics, setTopics] = useState<PopularTopic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -26,13 +23,8 @@ export const PopularTopicFeed = () => {
 
         setTopics(nextTopics);
         setErrorMessage(null);
-      } catch (error) {
+      } catch {
         if (!isMounted) {
-          return;
-        }
-
-        if (error instanceof ApiClientError && error.status === 401) {
-          router.replace('/login');
           return;
         }
 
@@ -49,7 +41,7 @@ export const PopularTopicFeed = () => {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, []);
 
   if (isLoading) {
     return (

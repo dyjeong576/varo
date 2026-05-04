@@ -3,6 +3,8 @@ import { AnswersService } from "../src/answers/answers.service";
 import { ConfigService } from "@nestjs/config";
 
 describe("AnswersController (e2e)", () => {
+  const actor = { userId: "user-1", kind: "authenticated" as const };
+
   it("query processing preview 요청을 서비스에 위임한다", async () => {
     const answersService = {
       createQueryProcessingPreview: jest.fn().mockResolvedValue({
@@ -38,11 +40,7 @@ describe("AnswersController (e2e)", () => {
     const controller = new AnswersController(answersService, configService);
 
     const result = await controller.createQueryProcessingPreview(
-      {
-        user: {
-          id: "user-1",
-        },
-      },
+      actor,
       {
         check: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
         clientRequestId: "pending:answer-1",
@@ -51,7 +49,7 @@ describe("AnswersController (e2e)", () => {
 
     expect(result.answerId).toBe("answer-1");
     expect(result.clientRequestId).toBe("pending:answer-1");
-    expect(answersService.createQueryProcessingPreview).toHaveBeenCalledWith("user-1", {
+    expect(answersService.createQueryProcessingPreview).toHaveBeenCalledWith(actor, {
       check: "나 어제 뉴스에서 봤는데 테슬라가 한국에서 완전 철수한대",
       clientRequestId: "pending:answer-1",
     });
@@ -198,15 +196,11 @@ describe("AnswersController (e2e)", () => {
     const configService = {} as ConfigService;
     const controller = new AnswersController(answersService, configService);
 
-    const result = await controller.listQueryProcessingPreviews({
-      user: {
-        id: "user-1",
-      },
-    });
+    const result = await controller.listQueryProcessingPreviews(actor);
 
     expect(result).toHaveLength(1);
     expect(result[0]?.clientRequestId).toBe("pending:answer-1");
-    expect(answersService.listQueryProcessingPreviews).toHaveBeenCalledWith("user-1");
+    expect(answersService.listQueryProcessingPreviews).toHaveBeenCalledWith(actor);
   });
 
   it("answer preview 상세 조회를 서비스에 위임한다", async () => {
@@ -240,18 +234,14 @@ describe("AnswersController (e2e)", () => {
     const controller = new AnswersController(answersService, configService);
 
     const result = await controller.getQueryProcessingPreview(
-      {
-        user: {
-          id: "user-1",
-        },
-      },
+      actor,
       "answer-1",
     );
 
     expect(result.answerId).toBe("answer-1");
     expect(result.clientRequestId).toBe("pending:answer-1");
     expect(answersService.getQueryProcessingPreview).toHaveBeenCalledWith(
-      "user-1",
+      actor,
       "answer-1",
     );
   });
@@ -264,11 +254,7 @@ describe("AnswersController (e2e)", () => {
     const controller = new AnswersController(answersService, configService);
 
     const result = await controller.recordAnswerReopen(
-      {
-        user: {
-          id: "user-1",
-        },
-      },
+      actor,
       "answer-1",
       {
         source: "popular",
@@ -277,7 +263,7 @@ describe("AnswersController (e2e)", () => {
 
     expect(result).toEqual({ ok: true });
     expect(answersService.recordAnswerReopen).toHaveBeenCalledWith(
-      "user-1",
+      actor,
       "answer-1",
       {
         source: "popular",

@@ -10,7 +10,7 @@ import { getMergedAnswerSummaries } from "@/lib/answers/history";
 import { subscribeAnswerTasks } from "@/lib/answers/task-store";
 import { AnswerHistoryList } from "@/components/answers/AnswerHistoryList";
 
-export function HistoryDrawer() {
+export function HistoryDrawer({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [answers, setAnswers] = useState<AnswerPreviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +28,7 @@ export function HistoryDrawer() {
 
       void getMergedAnswerSummaries(api.answers.getRecent).then((result) => {
         setAnswers(result);
-      });
+      }).catch(() => undefined);
     });
   }, [isOpen]);
 
@@ -36,7 +36,7 @@ export function HistoryDrawer() {
     if (isOpen) {
       getMergedAnswerSummaries(api.answers.getRecent).then((res) => {
         setAnswers(res);
-      }).finally(() => {
+      }).catch(() => undefined).finally(() => {
         setIsLoading(false);
       });
     }
@@ -90,7 +90,7 @@ export function HistoryDrawer() {
             <History className="w-5 h-5 text-gray-400" />
             <span className="font-semibold text-[15px]">히스토리</span>
           </Link>
-          <Link href="/settings" className="flex items-center gap-4 px-6 py-[18px] hover:bg-gray-50 text-gray-700 transition-colors" onClick={() => setIsOpen(false)}>
+          <Link href={isAuthenticated ? "/settings" : "/login"} className="flex items-center gap-4 px-6 py-[18px] hover:bg-gray-50 text-gray-700 transition-colors" onClick={() => setIsOpen(false)}>
             <Settings className="w-5 h-5 text-gray-400" />
             <span className="font-semibold text-[15px]">설정</span>
           </Link>

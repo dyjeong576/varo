@@ -190,6 +190,15 @@ export class NotificationsService {
     answerId: string;
     check: string;
   }): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { authProvider: true },
+    });
+
+    if (user?.authProvider === "guest") {
+      return;
+    }
+
     const enabled = await this.isPreferenceEnabled(params.userId, "answerCompleted");
 
     if (!enabled) {

@@ -40,6 +40,10 @@ export class SessionAuthGuard implements CanActivate {
 
     request.sessionId = resolved.session.id;
     request.sessionExpiresAt = resolved.session.expiresAt;
+    request.currentActor = {
+      userId: resolved.user.id,
+      kind: "authenticated",
+    };
     request.currentUser = {
       id: resolved.user.id,
       email: resolved.user.email,

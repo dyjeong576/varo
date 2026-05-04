@@ -15,6 +15,7 @@ model User {
   createdAt               DateTime                   @default(now()) @map("created_at")
   profile                 UserProfile?
   sessions                Session[]
+  guestSession            GuestSession?
   answerJobs              AnswerJob[]
   historyEntries          UserHistory[]
   communityPosts          CommunityPost[]
@@ -51,6 +52,21 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+model GuestSession {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  tokenHash        String   @unique @map("token_hash")
+  expiresAt        DateTime @map("expires_at")
+  dailyAnswerCount Int      @default(0) @map("daily_answer_count")
+  dailyQuotaDate   String   @map("daily_quota_date")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("guest_sessions")
 }
 
 model Check {

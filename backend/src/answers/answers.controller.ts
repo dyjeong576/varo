@@ -21,9 +21,10 @@ import {
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
-import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { CurrentActor } from "../common/decorators/current-actor.decorator";
 import { AppException } from "../common/exceptions/app-exception";
-import { SessionAuthGuard } from "../common/guards/session-auth.guard";
+import { SessionOrGuestActorGuard } from "../common/guards/session-or-guest-actor.guard";
+import type { RequestActor } from "../common/types/authenticated-request";
 import { ApiErrorResponseDto } from "../shared/dto/api-error-response.dto";
 import { CreateAnswerQueryProcessingPreviewDto } from "./dto/create-answer-query-processing-preview.dto";
 import { CreateAnswerReopenDto } from "./dto/create-answer-reopen.dto";
@@ -46,7 +47,7 @@ export class AnswersController {
 
   @Post("query-processing-preview")
   @ApiCookieAuth("sessionAuth")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionOrGuestActorGuard)
   @ApiOperation({
     summary: "answer query processing 미리보기 실행",
     description:
@@ -69,15 +70,15 @@ export class AnswersController {
     type: ApiErrorResponseDto,
   })
   async createQueryProcessingPreview(
-    @CurrentUser() current: { user: { id: string } },
+    @CurrentActor() actor: RequestActor,
     @Body() payload: CreateAnswerQueryProcessingPreviewDto,
   ): Promise<AnswerQueryProcessingPreviewResponseDto> {
-    return this.answersService.createQueryProcessingPreview(current.user.id, payload);
+    return this.answersService.createQueryProcessingPreview(actor, payload);
   }
 
   @Post("query-processing-preview/async")
   @ApiCookieAuth("sessionAuth")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionOrGuestActorGuard)
   @ApiOperation({
     summary: "answer query processing 비동기 미리보기 실행",
     description:
@@ -100,21 +101,21 @@ export class AnswersController {
     type: ApiErrorResponseDto,
   })
   async createQueryProcessingPreviewAsync(
-    @CurrentUser() current: { user: { id: string } },
+    @CurrentActor() actor: RequestActor,
     @Body() payload: CreateAnswerQueryProcessingPreviewDto,
   ): Promise<AnswerQueryProcessingPreviewResponseDto> {
     return this.answersService.createQueryProcessingPreviewAsync(
-      current.user.id,
+      actor,
       payload,
     );
   }
 
   @Get()
   @ApiCookieAuth("sessionAuth")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionOrGuestActorGuard)
   @ApiOperation({
     summary: "최근 answer preview 목록 조회",
-    description: "로그인한 사용자의 최근 answer query processing preview 목록을 반환합니다.",
+    description: "현재 계정 또는 게스트 브라우저의 최근 answer query processing preview 목록을 반환합니다.",
   })
   @ApiOkResponse({
     description: "answer preview 목록 조회 성공",
@@ -126,18 +127,18 @@ export class AnswersController {
     type: ApiErrorResponseDto,
   })
   async listQueryProcessingPreviews(
-    @CurrentUser() current: { user: { id: string } },
+    @CurrentActor() actor: RequestActor,
   ): Promise<AnswerPreviewSummaryResponseDto[]> {
-    return this.answersService.listQueryProcessingPreviews(current.user.id);
+    return this.answersService.listQueryProcessingPreviews(actor);
   }
 
   @Get(":answerId")
   @ApiCookieAuth("sessionAuth")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionOrGuestActorGuard)
   @ApiOperation({
     summary: "answer query processing preview 상세 조회",
     description:
-      "로그인한 사용자가 접근 가능한 answer 상세와 수집된 evidence/source, 그리고 현재 저장된 근거 기준 임시 결과 화면 데이터를 반환합니다.",
+      "현재 계정 또는 게스트 브라우저가 접근 가능한 answer 상세와 수집된 evidence/source, 그리고 현재 저장된 근거 기준 임시 결과 화면 데이터를 반환합니다.",
   })
   @ApiOkResponse({
     description: "answer preview 상세 조회 성공",
@@ -152,19 +153,19 @@ export class AnswersController {
     type: ApiErrorResponseDto,
   })
   async getQueryProcessingPreview(
-    @CurrentUser() current: { user: { id: string } },
+    @CurrentActor() actor: RequestActor,
     @Param("answerId") answerId: string,
   ): Promise<AnswerQueryProcessingPreviewResponseDto> {
-    return this.answersService.getQueryProcessingPreview(current.user.id, answerId);
+    return this.answersService.getQueryProcessingPreview(actor, answerId);
   }
 
   @Delete(":answerId")
   @ApiCookieAuth("sessionAuth")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionOrGuestActorGuard)
   @ApiOperation({
     summary: "answer preview 삭제",
     description:
-      "로그인한 사용자의 answer preview와 연결된 source, evidence, history, answer 대상 알림을 함께 삭제합니다.",
+      "현재 계정 또는 게스트 브라우저 소유 answer preview와 연결된 source, evidence, history, answer 대상 알림을 함께 삭제합니다.",
   })
   @ApiOkResponse({
     description: "answer preview 삭제 성공",
@@ -179,15 +180,15 @@ export class AnswersController {
     type: ApiErrorResponseDto,
   })
   async deleteQueryProcessingPreview(
-    @CurrentUser() current: { user: { id: string } },
+    @CurrentActor() actor: RequestActor,
     @Param("answerId") answerId: string,
   ): Promise<AnswerReopenResponseDto> {
-    return this.answersService.deleteQueryProcessingPreview(current.user.id, answerId);
+    return this.answersService.deleteQueryProcessingPreview(actor, answerId);
   }
 
   @Post(":answerId/reopen")
   @ApiCookieAuth("sessionAuth")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionOrGuestActorGuard)
   @ApiOperation({
     summary: "answer preview 재진입 이벤트 기록",
     description:
@@ -206,11 +207,11 @@ export class AnswersController {
     type: ApiErrorResponseDto,
   })
   async recordAnswerReopen(
-    @CurrentUser() current: { user: { id: string } },
+    @CurrentActor() actor: RequestActor,
     @Param("answerId") answerId: string,
     @Body() payload: CreateAnswerReopenDto,
   ): Promise<AnswerReopenResponseDto> {
-    return this.answersService.recordAnswerReopen(current.user.id, answerId, payload);
+    return this.answersService.recordAnswerReopen(actor, answerId, payload);
   }
 
   @Post("query-processing-preview/test")

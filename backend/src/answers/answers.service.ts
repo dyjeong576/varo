@@ -1,6 +1,8 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { APP_ERROR_CODES } from "../common/constants/app-error-codes";
 import { AppException } from "../common/exceptions/app-exception";
+import type { RequestActor } from "../common/types/authenticated-request";
+import { GuestSessionService } from "../auth/guest-session.service";
 import { CreateAnswerQueryProcessingPreviewDto } from "./dto/create-answer-query-processing-preview.dto";
 import {
   NaverNewsSearchTestRequestDto,
@@ -18,21 +20,26 @@ export class AnswersService {
   constructor(
     private readonly queryPreviewService: AnswersQueryPreviewService,
     private readonly providersService: AnswersProvidersService,
+    private readonly guestSessionService: GuestSessionService,
   ) {}
 
   async createQueryProcessingPreview(
-    userId: string,
+    actor: RequestActor,
     payload: CreateAnswerQueryProcessingPreviewDto,
   ): Promise<AnswerQueryProcessingPreviewResponseDto> {
-    return this.queryPreviewService.createQueryProcessingPreview(userId, payload);
+    await this.consumeGuestAnswerQuota(actor);
+
+    return this.queryPreviewService.createQueryProcessingPreview(actor.userId, payload);
   }
 
   async createQueryProcessingPreviewAsync(
-    userId: string,
+    actor: RequestActor,
     payload: CreateAnswerQueryProcessingPreviewDto,
   ): Promise<AnswerQueryProcessingPreviewResponseDto> {
+    await this.consumeGuestAnswerQuota(actor);
+
     return this.queryPreviewService.createQueryProcessingPreviewAsync(
-      userId,
+      actor.userId,
       payload,
     );
   }
@@ -92,34 +99,42 @@ export class AnswersService {
   }
 
   async listQueryProcessingPreviews(
-    userId: string,
+    actor: RequestActor,
   ): Promise<AnswerPreviewSummaryResponseDto[]> {
-    return this.queryPreviewService.listQueryProcessingPreviews(userId);
+    return this.queryPreviewService.listQueryProcessingPreviews(actor.userId);
   }
 
   async getQueryProcessingPreview(
-    userId: string,
+    actor: RequestActor,
     answerId: string,
   ): Promise<AnswerQueryProcessingPreviewResponseDto> {
-    return this.queryPreviewService.getQueryProcessingPreview(userId, answerId);
+    return this.queryPreviewService.getQueryProcessingPreview(actor.userId, answerId);
   }
 
   async deleteQueryProcessingPreview(
-    userId: string,
+    actor: RequestActor,
     answerId: string,
   ): Promise<AnswerReopenResponseDto> {
-    await this.queryPreviewService.deleteQueryProcessingPreview(userId, answerId);
+    await this.queryPreviewService.deleteQueryProcessingPreview(actor.userId, answerId);
 
     return { ok: true };
   }
 
   async recordAnswerReopen(
-    userId: string,
+    actor: RequestActor,
     answerId: string,
     _payload: CreateAnswerReopenDto,
   ): Promise<AnswerReopenResponseDto> {
-    await this.queryPreviewService.recordAnswerReopen(userId, answerId);
+    await this.queryPreviewService.recordAnswerReopen(actor.userId, answerId);
 
     return { ok: true };
+  }
+
+  private async consumeGuestAnswerQuota(actor: RequestActor): Promise<void> {
+    if (actor.kind !== "guest") {
+      return;
+    }
+
+    await this.guestSessionService.consumeAnswerQuota(actor.userId);
   }
 }

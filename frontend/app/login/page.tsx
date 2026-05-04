@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const authErrorMessage = getAuthErrorMessage(authError);
 
   if (session.isAuthenticated) {
-    redirect(session.profileComplete ? "/" : "/onboarding/profile");
+    redirect("/");
   }
 
   return (
@@ -54,6 +54,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           width={190}
           height={70}
           className="mb-4 h-20 w-auto object-contain"
+          style={{ width: "auto" }}
           priority
         />
 

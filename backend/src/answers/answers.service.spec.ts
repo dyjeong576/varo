@@ -3,10 +3,15 @@ import { AnswersProvidersService } from "./answers.providers.service";
 import { AnswersService } from "./answers.service";
 
 describe("AnswersService", () => {
+  const actor = { userId: "user-1", kind: "authenticated" as const };
   const createProvidersServiceMock = () =>
     ({
       searchNaverNewsForTest: jest.fn(),
     }) as unknown as AnswersProvidersService;
+  const createGuestSessionServiceMock = () =>
+    ({
+      consumeAnswerQuota: jest.fn(),
+    }) as { consumeAnswerQuota: jest.Mock };
 
   it("query processing preview 요청을 query preview service에 위임한다", async () => {
     const queryPreviewService = {
@@ -20,9 +25,10 @@ describe("AnswersService", () => {
     const service = new AnswersService(
       queryPreviewService,
       createProvidersServiceMock(),
+      createGuestSessionServiceMock() as never,
     );
 
-    const result = await service.createQueryProcessingPreview("user-1", {
+    const result = await service.createQueryProcessingPreview(actor, {
       check: "테슬라가 한국에서 철수한대",
       clientRequestId: "pending:answer-1",
     });
@@ -33,6 +39,36 @@ describe("AnswersService", () => {
       {
         check: "테슬라가 한국에서 철수한대",
         clientRequestId: "pending:answer-1",
+      },
+    );
+  });
+
+  it("게스트 answer 생성은 일일 quota를 먼저 소비한다", async () => {
+    const queryPreviewService = {
+      createQueryProcessingPreview: jest.fn().mockResolvedValue({ answerId: "answer-1" }),
+      createTestQueryProcessingPreview: jest.fn(),
+      listQueryProcessingPreviews: jest.fn(),
+      getQueryProcessingPreview: jest.fn(),
+      deleteQueryProcessingPreview: jest.fn(),
+      recordAnswerReopen: jest.fn(),
+    } as unknown as AnswersQueryPreviewService;
+    const guestSessionService = createGuestSessionServiceMock();
+    const service = new AnswersService(
+      queryPreviewService,
+      createProvidersServiceMock(),
+      guestSessionService as never,
+    );
+    const guestActor = { userId: "guest-user-1", kind: "guest" as const };
+
+    await service.createQueryProcessingPreview(guestActor, {
+      check: "한국 경제 뉴스 확인",
+    });
+
+    expect(guestSessionService.consumeAnswerQuota).toHaveBeenCalledWith("guest-user-1");
+    expect(queryPreviewService.createQueryProcessingPreview).toHaveBeenCalledWith(
+      "guest-user-1",
+      {
+        check: "한국 경제 뉴스 확인",
       },
     );
   });
@@ -51,6 +87,7 @@ describe("AnswersService", () => {
     const service = new AnswersService(
       queryPreviewService,
       createProvidersServiceMock(),
+      createGuestSessionServiceMock() as never,
     );
 
     const result = await service.createTestQueryProcessingPreview({
@@ -77,9 +114,10 @@ describe("AnswersService", () => {
     const service = new AnswersService(
       queryPreviewService,
       createProvidersServiceMock(),
+      createGuestSessionServiceMock() as never,
     );
 
-    const result = await service.listQueryProcessingPreviews("user-1");
+    const result = await service.listQueryProcessingPreviews(actor);
 
     expect(result).toEqual([{ answerId: "answer-1" }]);
     expect(queryPreviewService.listQueryProcessingPreviews).toHaveBeenCalledWith(
@@ -101,9 +139,10 @@ describe("AnswersService", () => {
     const service = new AnswersService(
       queryPreviewService,
       createProvidersServiceMock(),
+      createGuestSessionServiceMock() as never,
     );
 
-    const result = await service.getQueryProcessingPreview("user-1", "answer-1");
+    const result = await service.getQueryProcessingPreview(actor, "answer-1");
 
     expect(result).toEqual({ answerId: "answer-1" });
     expect(queryPreviewService.getQueryProcessingPreview).toHaveBeenCalledWith(
@@ -124,9 +163,10 @@ describe("AnswersService", () => {
     const service = new AnswersService(
       queryPreviewService,
       createProvidersServiceMock(),
+      createGuestSessionServiceMock() as never,
     );
 
-    const result = await service.deleteQueryProcessingPreview("user-1", "answer-1");
+    const result = await service.deleteQueryProcessingPreview(actor, "answer-1");
 
     expect(result).toEqual({ ok: true });
     expect(queryPreviewService.deleteQueryProcessingPreview).toHaveBeenCalledWith(
@@ -147,9 +187,10 @@ describe("AnswersService", () => {
     const service = new AnswersService(
       queryPreviewService,
       createProvidersServiceMock(),
+      createGuestSessionServiceMock() as never,
     );
 
-    const result = await service.recordAnswerReopen("user-1", "answer-1", {
+    const result = await service.recordAnswerReopen(actor, "answer-1", {
       source: "popular",
     });
 
@@ -180,7 +221,11 @@ describe("AnswersService", () => {
         },
       ]),
     } as unknown as AnswersProvidersService;
-    const service = new AnswersService(queryPreviewService, providersService);
+    const service = new AnswersService(
+      queryPreviewService,
+      providersService,
+      createGuestSessionServiceMock() as never,
+    );
 
     const result = await service.searchNaverNewsForTest({
       query: " 테슬라 한국 철수 ",
